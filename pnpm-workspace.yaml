@@ -1,0 +1,12 @@
+packages:
+  - packages/*
+allowBuilds:
+  esbuild: true
+overrides:
+  # postcss reaches us only through vitest > vite, so it never ships in a
+  # published tarball — but leaving a known-vulnerable transitive in the tree
+  # makes `pnpm audit` fail for every contributor and every security scanner
+  # pointed at the public repo. GHSA-fxqj-rqcc-2cmp (moderate) is fixed in
+  # 8.5.23; the path-traversal advisory (high) in 8.5.18. Drop this override
+  # once vitest ships a vite that resolves >= 8.5.23 on its own.
+  postcss: '>=8.5.23'

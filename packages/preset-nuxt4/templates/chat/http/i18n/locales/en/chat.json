@@ -1,0 +1,10 @@
+{
+    "chat": {
+        "placeholder": "Ask anything…",
+        "send": "Send",
+        "errorTitle": "Chat unavailable",
+        "errorGeneric": "Something went wrong. Try again.",
+        "errorMissingKey": "NUXT_LITELLM_KEY is not set in .env. Add the key and restart the dev server.",
+        "errorMissingUrl": "NUXT_LITELLM_URL is not set in .env. Point it at your proxy and restart the dev server."
+    }
+}

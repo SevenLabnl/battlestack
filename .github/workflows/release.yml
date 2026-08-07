@@ -1,0 +1,96 @@
+name: Release
+
+# Publishes all four packages to npm when a `v*` tag is pushed.
+#
+# `pnpm publish`, never `npm publish`: the packages depend on each other with
+# `workspace:*`, and only pnpm rewrites that to a real version at pack time. npm
+# would upload four tarballs nobody can install.
+#
+# `-r` publishes every workspace package in dependency order and skips any whose
+# version is already on the registry, so a re-run after a partial failure
+# finishes the job instead of erroring on the ones that made it.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run every gate and pack the tarballs, but publish nothing'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      # `registry-url` is what writes the .npmrc that makes NODE_AUTH_TOKEN
+      # work. Without it the token is ignored and the publish fails on auth.
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The gates run before the publish, not after: an unpublish window is 72
+      # hours and a bad version number is permanent, so it is far cheaper to
+      # fail here than to ship and retract.
+      - name: Type-check
+        run: pnpm tsc
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # Catches the mistake this workflow is most likely to make: tagging v0.2.0
+      # while package.json still says 0.1.0. npm would happily publish the
+      # package version, silently disagreeing with the tag forever.
+      - name: Verify the tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./packages/cli/package.json').version")
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::tag v$TAG does not match packages/cli version $PKG"
+            exit 1
+          fi
+          echo "tag v$TAG matches package version $PKG"
+
+      # Proves the tarballs install and the binary runs, from the packed
+      # artifacts rather than the workspace. This is the check that would catch
+      # a `workspace:*` that failed to rewrite.
+      - name: Smoke-test the packed tarballs
+        run: node scripts/pack-smoke.mjs
+
+      - name: Publish
+        if: github.event.inputs.dry_run != 'true'
+        run: pnpm -r publish --access public --no-git-checks --report-summary
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Dry run (no publish)
+        if: github.event.inputs.dry_run == 'true'
+        run: pnpm -r publish --access public --no-git-checks --dry-run
+
+      - name: Upload the publish summary
+        if: always() && hashFiles('pnpm-publish-summary.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-summary
+          path: pnpm-publish-summary.json

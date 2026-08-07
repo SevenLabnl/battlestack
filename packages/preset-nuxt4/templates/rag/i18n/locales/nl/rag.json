@@ -1,0 +1,22 @@
+{
+    "rag": {
+        "title": "Kennisbank",
+        "subtitle": "Voeg documenten toe en doorzoek ze met semantische zoekopdrachten (RAG).",
+        "error": "Er ging iets mis",
+        "ingest": {
+            "heading": "Document toevoegen",
+            "title": "Titel",
+            "source": "Bron",
+            "sourceHint": "Een identifier die bij resultaten wordt getoond (URL, bestandsnaam, doc-id).",
+            "text": "Tekst",
+            "submit": "Toevoegen",
+            "success": "{n} fragment(en) toegevoegd"
+        },
+        "query": {
+            "heading": "Zoeken",
+            "placeholder": "Stel een vraag…",
+            "submit": "Zoeken",
+            "empty": "Geen overeenkomende resultaten."
+        }
+    }
+}

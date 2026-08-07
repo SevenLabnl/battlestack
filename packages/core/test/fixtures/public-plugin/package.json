@@ -1,0 +1,5 @@
+{
+    "name": "@battlestack/preset-nuxt-fixture",
+    "type": "module",
+    "main": "index.mjs"
+}

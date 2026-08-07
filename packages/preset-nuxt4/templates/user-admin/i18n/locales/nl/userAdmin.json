@@ -1,0 +1,51 @@
+{
+    "userAdmin": {
+        "title": "Gebruikers",
+        "new": "Nieuwe gebruiker",
+        "searchPlaceholder": "Zoek op e-mail",
+        "columns": {
+            "email": "E-mail",
+            "name": "Naam",
+            "role": "Rol",
+            "createdAt": "Aangemaakt"
+        },
+        "pagination": {
+            "range": "{from}–{to} van {total}",
+            "previous": "Vorige",
+            "next": "Volgende"
+        },
+        "create": {
+            "title": "Nieuwe gebruiker",
+            "email": "E-mail",
+            "name": "Naam",
+            "password": "Wachtwoord",
+            "role": "Rol",
+            "cancel": "Annuleren",
+            "submit": "Aanmaken",
+            "failed": "Aanmaken mislukt",
+            "successTitle": "Gebruiker aangemaakt",
+            "failedTitle": "Aanmaken mislukt"
+        },
+        "roles": {
+            "user": "Gebruiker",
+            "admin": "Beheerder"
+        },
+        "edit": {
+            "title": "Gebruiker bewerken",
+            "back": "Terug",
+            "passwordPlaceholder": "Nieuw wachtwoord (laat leeg om te behouden)",
+            "delete": "Verwijderen",
+            "save": "Opslaan",
+            "savedTitle": "Gebruiker opgeslagen",
+            "saveFailedTitle": "Opslaan mislukt",
+            "saveFailed": "Opslaan mislukt",
+            "deleteTitle": "Gebruiker verwijderen",
+            "deleteConfirm": "Dit verwijdert {email} permanent. Kan niet ongedaan worden gemaakt.",
+            "deletedTitle": "Gebruiker verwijderd",
+            "deleteFailedTitle": "Verwijderen mislukt",
+            "deleteFailed": "Verwijderen mislukt",
+            "deleteConfirmAction": "Verwijderen",
+            "cancel": "Annuleren"
+        }
+    }
+}

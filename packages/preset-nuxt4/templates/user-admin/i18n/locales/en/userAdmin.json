@@ -1,0 +1,51 @@
+{
+    "userAdmin": {
+        "title": "Users",
+        "new": "New user",
+        "searchPlaceholder": "Search by email",
+        "columns": {
+            "email": "Email",
+            "name": "Name",
+            "role": "Role",
+            "createdAt": "Created"
+        },
+        "pagination": {
+            "range": "{from}–{to} of {total}",
+            "previous": "Previous",
+            "next": "Next"
+        },
+        "create": {
+            "title": "New user",
+            "email": "Email",
+            "name": "Name",
+            "password": "Password",
+            "role": "Role",
+            "cancel": "Cancel",
+            "submit": "Create",
+            "failed": "Failed to create user",
+            "successTitle": "User created",
+            "failedTitle": "Create failed"
+        },
+        "roles": {
+            "user": "User",
+            "admin": "Admin"
+        },
+        "edit": {
+            "title": "Edit user",
+            "back": "Back",
+            "passwordPlaceholder": "New password (leave blank to keep)",
+            "delete": "Delete",
+            "save": "Save",
+            "savedTitle": "User saved",
+            "saveFailedTitle": "Save failed",
+            "saveFailed": "Save failed",
+            "deleteTitle": "Delete user",
+            "deleteConfirm": "This permanently deletes {email}. Cannot be undone.",
+            "deletedTitle": "User deleted",
+            "deleteFailedTitle": "Delete failed",
+            "deleteFailed": "Delete failed",
+            "deleteConfirmAction": "Delete",
+            "cancel": "Cancel"
+        }
+    }
+}

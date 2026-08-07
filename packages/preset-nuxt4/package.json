@@ -1,0 +1,57 @@
+{
+    "name": "@battlestack/preset-nuxt4",
+    "version": "0.1.0",
+    "description": "Public Battlestack preset: Nuxt 4 framework + open-source features. (Versioned for Nuxt-major coexistence — a future preset-nuxt5 registers alongside.)",
+    "license": "MIT",
+    "author": "SevenLab",
+    "homepage": "https://github.com/SevenLabnl/battlestack#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/SevenLabnl/battlestack.git",
+        "directory": "packages/preset-nuxt4"
+    },
+    "bugs": {
+        "url": "https://github.com/SevenLabnl/battlestack/issues"
+    },
+    "keywords": [
+        "battlestack",
+        "battlestack-preset",
+        "nuxt",
+        "nuxt4",
+        "scaffolding",
+        "template"
+    ],
+    "engines": {
+        "node": ">=24"
+    },
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "templates"
+    ],
+    "sideEffects": false,
+    "publishConfig": {
+        "access": "public"
+    },
+    "dependencies": {
+        "@battlestack/tui": "workspace:*",
+        "magicast": "^0.5.3",
+        "picocolors": "^1.1.1",
+        "prompts": "^2.4.2"
+    },
+    "peerDependencies": {
+        "@battlestack/core": "workspace:*"
+    },
+    "devDependencies": {
+        "@battlestack/core": "workspace:*",
+        "@types/prompts": "^2.4.9"
+    }
+}

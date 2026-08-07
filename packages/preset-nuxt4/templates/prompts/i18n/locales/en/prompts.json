@@ -1,0 +1,19 @@
+{
+    "prompts": {
+        "title": "Prompts",
+        "subtitle": "Edit AI agent system prompts without redeploying. Reset to default at any time.",
+        "loading": "Loading…",
+        "version": "v{n}",
+        "edit": "Edit",
+        "reset": "Reset",
+        "cancel": "Cancel",
+        "save": "Save",
+        "resetConfirm": "Reset {key} to its default? This cannot be undone.",
+        "savedTitle": "{name} saved",
+        "resetTitle": "{name} reset to default",
+        "saveFailed": "Save failed",
+        "saveFailedTitle": "Save failed",
+        "resetFailed": "Reset failed",
+        "resetFailedTitle": "Reset failed"
+    }
+}

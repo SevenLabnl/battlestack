@@ -1,0 +1,14 @@
+{
+  "hooks": [
+    {
+      "type": "session-start",
+      "skill": "using-superpowers",
+      "description": "Load the skills overview at the start of every session"
+    },
+    {
+      "type": "PreToolUse",
+      "skill": "task-arbiter",
+      "description": "Triage every new task before taking action"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+---
+description: Realtime patterns, HTTP chunked-stream (legacy / non-Cloudflare)
+globs: server/**/*.ts, app/composables/**/*.ts
+alwaysApply: false
+---
+
+# Realtime Patterns (http transport)
+
+> ⚠️ **Status: not supported in production today.** Cloudflare's edge proxy buffers `text/event-stream` and chunked-transfer responses below ~100 KB, so incremental tokens arrive in batches several seconds late. This transport is shipped but never auto-selected; pick the `ws-nitro` WebSocket transport for any new project unless your deploy target is *not* Cloudflare-fronted.
+
+This project's chat transport is **`http`**: Vercel AI SDK chunked-stream over HTTP, served from `server/api/chat.post.ts` via `handleChatStream` + `createUIMessageStreamResponse`. The browser consumes it through `useChat` from `@ai-sdk/vue`.
+
+## When this transport is the right choice
+
+- Direct nginx / Vercel / Fly.io / on-prem deploys (no Cloudflare in front of the streaming route).
+- Reference / migration baseline (it's the simplest single-endpoint shape).
+- Edge runtimes that explicitly support unbuffered streaming (Cloudflare Workers Logs route, etc).
+
+If your project goes behind Cloudflare's CDN later: switch transport to `ws-nitro` before shipping.
+
+## Server: streaming chat endpoint
+
+Already shipped in `server/api/chat.post.ts`:
+
+```ts
+import { handleChatStream } from '@mastra/ai-sdk'
+import { createUIMessageStreamResponse } from 'ai'
+import { mastra } from '#server/mastra'
+
+export default defineEventHandler(async (event) => {
+    await requireUserSession(event)
+    const body = await readBody(event)
+    const stream = await handleChatStream({ mastra, agentId: 'default', params: body })
+    return createUIMessageStreamResponse({ stream })
+})
+```
+
+Set `Cache-Control: no-cache, no-transform` on the response if you're behind any CDN.
+
+## Server: generic SSE for non-chat realtime
+
+Same buffering caveat. Use only when not Cloudflare-fronted.
+
+```ts
+// server/api/events.get.ts
+import postgres from 'postgres'
+
+export default defineEventHandler(async (event) => {
+    setResponseHeader(event, 'content-type', 'text/event-stream')
+    setResponseHeader(event, 'cache-control', 'no-cache, no-transform')
+    setResponseHeader(event, 'connection', 'keep-alive')
+
+    const sql = postgres(String(useRuntimeConfig().databaseUrl))
+    await sql.listen('data_changed', (payload) => {
+        event.node.res.write(`data: ${payload}\n\n`)
+    })
+
+    event._handled = true
+    event.node.req.on('close', () => sql.end())
+})
+```
+
+## Client: SSE composable
+
+```ts
+// app/composables/useSSE.ts
+export function useSSE<T>(url: string, channel?: string) {
+    const data = ref<T | null>(null)
+    let eventSource: EventSource | null = null
+
+    onMounted(() => {
+        eventSource = new EventSource(url)
+        eventSource.onmessage = (event) => {
+            const parsed = JSON.parse(event.data)
+            if (!channel || parsed.table === channel) data.value = parsed
+        }
+    })
+
+    onUnmounted(() => eventSource?.close())
+
+    return { data }
+}
+```
+
+## Migration to the WebSocket transport
+
+When the project moves behind Cloudflare (or you just want stable streaming), switch transports:
+
+1. Set `state.chatTransport = 'ws-nitro'` in `.battlestack/manifest.json`.
+2. Run `battlestack pull`; the chat templates get rewritten from the new subtree.
+3. Resolve any `.battlestack.patch` artefacts on `useChatAgent.ts` / `Chat.vue` if you'd customised them.
+4. No infra change needed; `ws-nitro` multiplexes onto the same port 3000 / single Ingress.

@@ -1,0 +1,158 @@
+{
+    "dashboard": {
+        "nav": {
+            "dashboard": "Dashboard",
+            "profile": "Profiel",
+            "security": "Beveiliging",
+            "users": "Gebruikers",
+            "usersHint": "Teamleden uitnodigen, bewerken of verwijderen",
+            "prompts": "Prompts",
+            "promptsHint": "Systeemprompts van AI-agents bewerken",
+            "files": "Bestanden",
+            "aiSettings": "AI-instellingen",
+            "aiSettingsHint": "Wissel chat- en embeddingmodellen per agent",
+            "admin": "Admin",
+            "signOut": "Uitloggen"
+        },
+        "home": {
+            "title": "Dashboard",
+            "welcome": "Welkom, {name}",
+            "subtitle": "Ga verder waar je gebleven was, of duik in een van de veelvoorkomende taken hieronder.",
+            "getStarted": {
+                "title": "Aan de slag",
+                "description": "Voer battlestack uit vanuit de projectroot om alle taakcommando's te zien."
+            },
+            "quickLinks": {
+                "profile": "Profiel",
+                "profileHint": "Werk je naam, taal en thema bij.",
+                "security": "Beveiliging",
+                "securityHint": "2FA instellen en passkeys beheren.",
+                "users": "Gebruikers",
+                "usersHint": "Teamleden uitnodigen, bewerken of verwijderen.",
+                "ai": "AI-instellingen",
+                "aiHint": "Wissel chat- en embeddingmodellen per agent."
+            }
+        },
+        "profile": {
+            "title": "Profiel",
+            "subtitle": "Werk je naam, thema en taal bij.",
+            "name": "Naam",
+            "email": "E-mailadres",
+            "locale": "Taal",
+            "theme": "Thema",
+            "themeOptions": {
+                "light": "Licht",
+                "dark": "Donker",
+                "system": "Systeem"
+            },
+            "save": "Wijzigingen opslaan",
+            "saved": "Profiel bijgewerkt",
+            "error": "Bijwerken mislukt",
+            "errorTitle": "Fout",
+            "avatar": {
+                "upload": "Foto wijzigen",
+                "remove": "Foto verwijderen",
+                "uploaded": "Foto bijgewerkt",
+                "removed": "Foto verwijderd",
+                "uploadError": "Foto uploaden mislukt",
+                "removeError": "Foto verwijderen mislukt"
+            }
+        },
+        "security": {
+            "title": "Beveiliging",
+            "subtitle": "Beheer hoe je inlogt en bekijk recente accountactiviteit.",
+            "passkeys": {
+                "heading": "Passkeys",
+                "description": "Log in met je apparaatbiometrie in plaats van een wachtwoord.",
+                "add": "Passkey toevoegen",
+                "remove": "Verwijderen",
+                "labelFallback": "Passkey",
+                "lastUsed": "Laatst gebruikt {date}",
+                "neverUsed": "Nooit gebruikt",
+                "empty": "Geen passkeys geregistreerd.",
+                "added": "Passkey toegevoegd",
+                "removed": "Passkey verwijderd",
+                "addError": "Passkey toevoegen mislukt",
+                "removeError": "Passkey verwijderen mislukt",
+                "namePrompt": "Geef deze passkey een naam (bv. Laptop, Telefoon):"
+            },
+            "sessions": {
+                "heading": "Actieve sessies",
+                "description": "Apparaten en browsers die momenteel zijn ingelogd op je account. Trek sessies in die je niet herkent.",
+                "current": "dit apparaat",
+                "empty": "Geen actieve sessies.",
+                "lastSeen": "Laatst actief {date}",
+                "unknown": "Onbekend apparaat",
+                "revoke": "Intrekken",
+                "revoked": "Sessie ingetrokken",
+                "revokeError": "Kon sessie niet intrekken"
+            },
+            "twoFactor": {
+                "heading": "Tweestapsverificatie",
+                "description": "Voeg een tijdgebonden code uit een authenticator-app toe bovenop je wachtwoord.",
+                "enable": "2FA inschakelen",
+                "setupHint": "Scan met je authenticator-app en voer daarna de 6-cijferige code in:",
+                "qrAlt": "2FA QR-code",
+                "copyUri": "Of kopieer de URI",
+                "codePlaceholder": "123456",
+                "verify": "Verifiëren",
+                "enabled": "2FA ingeschakeld",
+                "disableCodePlaceholder": "Huidige 6-cijferige code",
+                "disable": "2FA uitschakelen",
+                "disabled": "2FA uitgeschakeld",
+                "setupError": "2FA-installatie mislukt",
+                "verifyError": "Code kon niet worden geverifieerd",
+                "disableError": "2FA uitschakelen mislukt"
+            },
+            "backupCodes": {
+                "heading": "Back-upcodes",
+                "description": "Eenmalige herstelcodes voor als je authenticator niet beschikbaar is. Elke code werkt één keer.",
+                "unused": "{count} ongebruikt",
+                "runningLow": "— bijna op; genereer binnenkort opnieuw.",
+                "none": "Nog geen back-upcodes gegenereerd.",
+                "generate": "Codes genereren",
+                "regenerate": "Codes opnieuw genereren",
+                "saveTitle": "Sla deze codes nu op",
+                "saveDescription": "Ze worden niet opnieuw getoond. Bewaar ze in een wachtwoordmanager.",
+                "saved": "Ik heb ze opgeslagen",
+                "generated": "Back-upcodes gegenereerd — sla ze nu op",
+                "generateError": "Back-upcodes genereren mislukt"
+            },
+            "auditLog": {
+                "heading": "Recente activiteit",
+                "description": "Laatste 50 audit-events van je account (logins, wachtwoordwijzigingen, passkey- en 2FA-mutaties).",
+                "empty": "Nog geen audit-events vastgelegd.",
+                "actions": {
+                    "user_login_success": "Ingelogd",
+                    "user_login_fail": "Mislukte inlogpoging",
+                    "user_logout": "Uitgelogd",
+                    "user_signup": "Account aangemaakt",
+                    "user_deleted": "Account verwijderd",
+                    "user_role_changed": "Rol gewijzigd",
+                    "user_email_changed": "E-mailadres gewijzigd",
+                    "user_password_changed": "Wachtwoord gewijzigd",
+                    "user_email_verified": "E-mailadres geverifieerd",
+                    "user_email_verification_resent": "Verificatiemail opnieuw verstuurd",
+                    "user_password_reset_requested": "Wachtwoord-reset aangevraagd",
+                    "user_password_reset_completed": "Wachtwoord-reset voltooid",
+                    "user_totp_enabled": "Tweestapsverificatie ingeschakeld",
+                    "user_totp_disabled": "Tweestapsverificatie uitgeschakeld",
+                    "user_backup_codes_generated": "Back-upcodes gegenereerd",
+                    "user_backup_codes_redeemed": "Back-upcode gebruikt",
+                    "user_backup_codes_redeem_failed": "Back-upcode mislukt",
+                    "user_passkey_registered": "Passkey toegevoegd",
+                    "user_passkey_removed": "Passkey verwijderd",
+                    "user_passkey_login": "Ingelogd met passkey",
+                    "user_session_revoked": "Sessie ingetrokken",
+                    "auth_oauth_signin": "Ingelogd via OAuth",
+                    "prompt_updated": "Prompt bijgewerkt",
+                    "prompt_reset": "Prompt teruggezet naar standaard",
+                    "ai_model_config_updated": "AI-modelconfiguratie bijgewerkt",
+                    "file_uploaded": "Bestand geüpload",
+                    "file_deleted": "Bestand verwijderd"
+                }
+            },
+            "empty": "Schakel {extras} in voor passkeys of {twoFactor} voor TOTP via {addCommand}."
+        }
+    }
+}

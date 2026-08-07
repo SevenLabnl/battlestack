@@ -1,0 +1,81 @@
+---
+description: Tailwind CSS v4 conventions and design tokens
+globs: "*.vue, *.css, app.config.ts, main.css"
+---
+
+# Tailwind CSS v4
+
+This project uses **Tailwind CSS v4**, NOT v3. Key differences:
+
+## Configuration
+
+- **No `tailwind.config.ts`**: v4 uses CSS-first configuration via `@theme` blocks in `main.css`
+- **No `@apply` in components**: use utility classes directly in templates
+- **CSS imports:** `@import "tailwindcss"` + `@import "@nuxt/ui"` in `app/assets/css/main.css`
+
+## Design Tokens (`@theme` in main.css)
+
+```css
+@theme {
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --radius-sm: 0.25rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+```
+
+These tokens are used globally by `rounded-md`, `shadow-md`, `font-sans` etc. and by Nuxt UI components.
+
+## Colors
+
+Colors are configured in `app/app.config.ts` via Nuxt UI:
+
+```ts
+ui: {
+    colors: {
+        primary: 'blue',      // buttons, links, focus rings
+        secondary: 'purple',  // alternative actions
+        neutral: 'zinc',      // text, borders, backgrounds
+    },
+}
+```
+
+**Never hardcode color values**; use semantic color classes: `text-primary`, `bg-neutral-100`, `border-secondary`.
+
+## Responsive Design (Mobile-First)
+
+Always design mobile-first. Base styles = mobile, then add breakpoints:
+
+```
+sm:  640px   — large phones, small tablets
+md:  768px   — tablets
+lg:  1024px  — laptops
+xl:  1280px  — desktops
+2xl: 1536px  — large desktops
+```
+
+### Common patterns:
+- `flex-col sm:flex-row`: stack on mobile, row on desktop
+- `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`: responsive grid
+- `hidden md:block`: hide on mobile, show on desktop
+- `w-full max-w-lg mx-auto`: centered container with max width
+- `overflow-x-auto`: horizontal scroll for tables on mobile
+- `p-4 sm:p-6 lg:p-8`: progressive padding
+
+## Tailwind v4 Breaking Changes from v3
+
+- `@tailwind base/components/utilities` → `@import "tailwindcss"`
+- Config is CSS-based (`@theme {}`) not JS-based (`tailwind.config.ts`)
+- `cursor-pointer` is no longer default on buttons; we restore it in `main.css`
+- Color opacity modifiers work differently: `bg-blue-500/50` (still works)
+- Container queries supported natively: `@container`, `@sm`, `@md`
+
+## Do NOT
+
+- Don't create a `tailwind.config.ts` file; use `@theme` in CSS
+- Don't use `@apply`; write utility classes in templates
+- Don't hardcode colors; use the semantic color system
+- Don't use px values for spacing; use Tailwind's spacing scale (4, 6, 8, etc.)

@@ -1,0 +1,10 @@
+{
+    "chat": {
+        "placeholder": "Vraag iets…",
+        "send": "Versturen",
+        "errorTitle": "Chat niet beschikbaar",
+        "errorGeneric": "Er ging iets mis. Probeer het opnieuw.",
+        "errorMissingKey": "NUXT_LITELLM_KEY ontbreekt in .env. Stel de sleutel in en herstart de dev-server.",
+        "errorMissingUrl": "NUXT_LITELLM_URL ontbreekt in .env. Stel de proxy-URL in en herstart de dev-server."
+    }
+}

@@ -1,0 +1,66 @@
+{
+    "name": "@battlestack/core",
+    "version": "0.1.0",
+    "description": "Battlestack plugin SDK: types, registries, plugin loader.",
+    "license": "MIT",
+    "author": "SevenLab",
+    "homepage": "https://github.com/SevenLabnl/battlestack#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/SevenLabnl/battlestack.git",
+        "directory": "packages/core"
+    },
+    "bugs": {
+        "url": "https://github.com/SevenLabnl/battlestack/issues"
+    },
+    "keywords": [
+        "battlestack",
+        "battlestack-plugin",
+        "plugin",
+        "sdk",
+        "scaffolding"
+    ],
+    "engines": {
+        "node": ">=24"
+    },
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./utils/*.js": {
+            "types": "./dist/utils/*.d.ts",
+            "default": "./dist/utils/*.js"
+        },
+        "./types/*.js": {
+            "types": "./dist/types/*.d.ts",
+            "default": "./dist/types/*.js"
+        },
+        "./constants/*.js": {
+            "types": "./dist/constants/*.d.ts",
+            "default": "./dist/constants/*.js"
+        },
+        "./ui-port.js": {
+            "types": "./dist/ui-port.d.ts",
+            "default": "./dist/ui-port.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "sideEffects": false,
+    "publishConfig": {
+        "access": "public"
+    },
+    "dependencies": {
+        "diff": "^9.0.0",
+        "magicast": "^0.5.3",
+        "ora": "^8.2.0"
+    },
+    "devDependencies": {
+        "@types/diff": "^8.0.0"
+    }
+}

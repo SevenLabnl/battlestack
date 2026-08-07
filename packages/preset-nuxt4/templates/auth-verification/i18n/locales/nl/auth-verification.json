@@ -1,0 +1,17 @@
+{
+    "authVerification": {
+        "verify": {
+            "title": "E-mail verifiëren",
+            "pending": "Bezig met verifiëren…",
+            "success": {
+                "title": "E-mail geverifieerd",
+                "description": "Je kunt dit tabblad sluiten.",
+                "cta": "Verder naar inloggen"
+            },
+            "failure": {
+                "title": "Verificatie mislukt",
+                "description": "Deze link is mogelijk verlopen. Vraag een nieuwe verificatiemail aan en probeer het opnieuw."
+            }
+        }
+    }
+}

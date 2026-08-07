@@ -1,0 +1,35 @@
+{
+    // Whole-workspace type-check config used by `pnpm tsc` (--noEmit). Covers
+    // every package's src AND test files in one pass. This is deliberately
+    // NOT part of the composite project-reference graph used for the actual
+    // `dist` build (see tsconfig.build.json + packages/*/tsconfig.json) —
+    // it type-checks tests too, which the publishable build must not include.
+    "extends": "./tsconfig.base.json",
+    "compilerOptions": {
+        "noEmit": true,
+        // Each package's package.json "exports" now points at its `dist/`
+        // build output (required for publishing). This whole-workspace
+        // type-check must still pass on a clean checkout with no `dist/`
+        // built yet, so map the workspace package names straight to source
+        // here — same reasoning as the vitest resolve.alias in
+        // vitest.config.ts. Deliberately NOT in tsconfig.base.json: the
+        // per-package composite build configs (packages/*/tsconfig.json)
+        // must keep resolving cross-package imports through each other's
+        // built `dist/*.d.ts` via ordinary node_modules resolution — that's
+        // what makes `tsc -b`'s project-reference build order meaningful.
+        "baseUrl": ".",
+        "paths": {
+            "@battlestack/core": ["packages/core/src/index.ts"],
+            "@battlestack/core/*": ["packages/core/src/*"],
+            "@battlestack/tui": ["packages/tui/src/index.ts"],
+            "@battlestack/preset-nuxt4": ["packages/preset-nuxt4/src/index.ts"]
+        }
+    },
+    "include": ["packages/**/src/**/*.ts", "packages/**/test/**/*.ts", "scripts/**/*.ts"],
+    // Template trees are scaffold PAYLOAD, not part of this repo's compilation:
+    // they reference the generated project's Nuxt aliases (`~~/`, `#imports`, …)
+    // and its installed deps, none of which resolve here. `**/test/**` in
+    // `include` would otherwise pull in template `test/` dirs (e.g. a feature's
+    // emitted e2e specs). Excluded wholesale.
+    "exclude": ["packages/**/templates/**", "**/node_modules/**"]
+}

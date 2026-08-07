@@ -1,0 +1,37 @@
+---
+description: PostgreSQL
+globs: server/database/**/*.ts, *.sql
+alwaysApply: false
+---
+
+# PostgreSQL Conventions
+
+## General
+
+- Use PostgreSQL 18 via Docker
+- Connection via `NUXT_DATABASE_URL` environment variable, bound to `runtimeConfig.databaseUrl`. Server code reads `useRuntimeConfig().databaseUrl`; standalone tools (`tools/seed.mjs`, `tools/migrate.mjs`) read `process.env.NUXT_DATABASE_URL` directly because they run outside the Nitro runtime.
+- LISTEN/NOTIFY available for realtime if needed
+
+## Naming
+
+- Table names: plural, snake_case (`users`, `order_items`)
+- Column names: snake_case (`created_at`, `user_id`)
+- Primary keys: `id`
+- Foreign keys: `<referenced_table_singular>_id` (`user_id`, `order_id`)
+- Indexes: `idx_<table>_<columns>` (`idx_users_email`)
+- Timestamps: `created_at`, `updated_at`
+
+## Data Types
+
+- Use `uuid` for primary keys (with `gen_random_uuid()`)
+- Use `text` over `varchar` (PostgreSQL treats them the same)
+- Use `timestamp` for dates (not `date` unless date-only is needed)
+- Use `boolean` for true/false values
+- Use `jsonb` for structured data (not `json`)
+- Use `serial` only for auto-incrementing counters
+
+## Security
+
+- Never expose database credentials in client-side code
+- Use parameterized queries (Drizzle handles this automatically)
+- Never expose tables directly; always use server API routes

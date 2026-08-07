@@ -1,0 +1,70 @@
+---
+description: Security best practices for the application
+globs: "server/**/*.ts, app/**/*.ts, app/**/*.vue"
+---
+
+# Security
+
+## Authentication
+
+- Passwords hashed with `@node-rs/argon2` (argon2id); never store plaintext
+- Sessions use secure httpOnly cookies; never expose tokens to client JS
+- Admin credentials in `.env`; never commit `.env` to git
+- Session max age: 30 days, configurable in `server/utils/auth.ts`
+
+## API Route Protection
+
+```ts
+// Require any authenticated user (nuxt-auth-utils, auto-imported)
+const { user } = await requireUserSession(event)
+
+// Require specific role
+const admin = await requireRole(event, Role.Admin)
+```
+
+- **Every** data-mutating endpoint must validate with Zod
+- **Every** protected endpoint must call `requireUserSession` or `requireRole`
+- Return 401 for unauthenticated, 403 for unauthorized
+- Never trust client-side data; always validate server-side
+
+## Input Validation
+
+```ts
+const schema = z.object({
+    email: z.email(),
+    name: z.string().min(1).max(255),
+})
+const body = await readValidatedBody(event, schema.parse)
+```
+
+- Use Zod on ALL API endpoints; frontend validation is UX only
+- Validate types, lengths, formats, and ranges
+- Prefer `readValidatedBody(event, schema.parse)` / `getValidatedQuery(event, schema.parse)`: h3 turns a thrown ZodError into a **400**. A bare `schema.parse(await readBody(event))` escapes as an unhandled **500**.
+
+## Database Security
+
+- Use Drizzle ORM parameterized queries; never concatenate SQL strings
+- ESLint `drizzle/enforce-delete-with-where` prevents accidental mass deletes
+- ESLint `drizzle/enforce-update-with-where` prevents accidental mass updates
+- Foreign keys with `onDelete: 'cascade'` for referential integrity
+
+## Environment Variables
+
+- Secrets in `.env`; never hardcode API keys, passwords, or tokens
+- `.env` is in `.gitignore`; `.env.example` is committed (with placeholder values)
+- Use `useRuntimeConfig()` in server routes for Nuxt env access
+- LiteLLM key, admin password, session secret: all from `.env`
+
+## Headers and Cookies
+
+- Session cookies: `httpOnly: true`, `secure: true` (production), `sameSite: 'lax'`
+- No CORS needed for same-origin API calls (Nuxt server routes)
+- For external APIs: configure CORS in Nitro if needed
+
+## Do NOT
+
+- Don't expose database credentials to the frontend
+- Don't log passwords or sensitive data (seed script is silent)
+- Don't disable ESLint security rules
+- Don't use unsafe code execution patterns
+- Don't store sessions in localStorage; use httpOnly cookies

@@ -1,0 +1,261 @@
+---
+description: Vue 3.5+ and Nuxt UI v4 component conventions
+globs: "*.vue"
+alwaysApply: false
+---
+
+You are an expert in TypeScript, Vue 3.5, Nuxt 4, Nuxt UI v4, Pinia, VueUse, and Tailwind CSS v4.
+
+Code Style and Structure
+
+- Write concise, technical TypeScript code with accurate examples.
+- Use composition API and declarative programming patterns; never use options API.
+- Prefer iteration and modularization over code duplication.
+- Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError).
+- Structure files: exported component, composables, pinia stores, helpers, interfaces, types.
+- Prefer using global pinia store.
+
+Naming Conventions
+
+- Use lowercase with dashes for directories (e.g., components/auth-wizard).
+- Use PascalCase for component names (e.g., AuthWizard.vue).
+- Use camelCase for composables (e.g., useAuthState.ts).
+- Use camelCase for stores (e.g., authStore.ts).
+
+Import Aliases (Nuxt 4)
+
+Nuxt 4 changed `~` and `@` from rootDir (Nuxt 3) to `app/`. **`~/server/...` is broken; use `#server/...` or a relative path.**
+
+| Alias | Resolves to | Typical use |
+|---|---|---|
+| `~` / `@` | `app/` | Components, composables, pages, utils, assets |
+| `~~` / `@@` | `<rootDir>` | Rarely needed; prefer a more specific alias |
+| `#shared` | `shared/` | Code shared between client and server (types, pure helpers) |
+| `#server` | `server/` | Importing server-side types from shared/app code |
+| `assets` | `app/assets/` | Asset imports (CSS, images referenced from templates) |
+| `public` | `public/` | Public assets served as-is |
+| `#build` | `.nuxt/` | Generated build artefacts (read-only) |
+
+- Frontend → frontend: `~/components/Foo.vue`, `~/composables/useBar.ts`.
+- Frontend → server types only: `import type { … } from '#server/…'`.
+- Server → server: `#server/utils/auth`, not relative paths. Exception: standalone scripts (e.g. `server/database/seed.ts`, run via `tsx` or `node` directly) must keep relative imports because the runtime can't resolve Nuxt aliases before `.nuxt/` is generated.
+- Never import server runtime code from frontend files.
+
+TypeScript Usage
+
+- Use TypeScript for all code.
+- Use Vue 3 with TypeScript, leveraging defineComponent and PropType.
+- Prefer await, catch and throw over try catch
+
+Syntax and Formatting
+
+- Use arrow functions for methods and computed properties.
+- Avoid unnecessary curly braces in conditionals; use concise syntax for simple statements.
+- Use template syntax for declarative rendering.
+
+UI and Styling
+
+- Use Nuxt UI and Tailwind for components and styling.
+- Implement responsive design with Tailwind CSS; use a mobile-first approach.
+- Use design tokens from `@theme` in `main.css`; never hardcode colors, radius, or shadows. Use Tailwind classes (`rounded-md`, `shadow-sm`, `text-primary-500`) that reference the tokens.
+- Change brand colors in `app/app.config.ts` under `ui.colors`, not in CSS.
+- Use the `<UIcon />` component for icons: it resolves any Iconify set on demand via the `<prefix>:<name>` naming convention, e.g.:
+
+```vue
+<UIcon name="lucide:house" />
+<UIcon name="material-symbols:10k-sharp" />
+```
+
+`lucide` is the icon set already used throughout this project's own components; prefer it unless a page already commits to another set. If `package.json#dependencies` has `@fortawesome/*` packages (the optional FontAwesome Pro feature), `fas:`/`far:`/etc. prefixes are also available; check for those packages before reaching for a FontAwesome prefix, since they aren't installed by default.
+
+NuxtUI specific
+
+- When using the `UTable` component make sure you:
+    - make sure to import the correct types for a table `import type { TableRow, TableData, TableColumn, TableOptions, TableProps } from '@nuxt/ui'`
+    - always use the slots pattern `<template #XXX-cell="{ cell, column, getValue, renderValue, row, table }">` for example
+    ```vue
+<script setup lang="ts">
+    import type { TableColumn, DropdownMenuItem } from '@nuxt/ui'
+    import { useClipboard } from '@vueuse/core'
+
+    interface User {
+        id: number
+        name: string
+        position: string
+        email: string
+        role: string
+    }
+
+    const toast = useToast()
+    const { copy } = useClipboard()
+
+    const data = ref<User[]>([
+        {
+            id: 1,
+            name: 'Lindsay Walton',
+            position: 'Front-end Developer',
+            email: 'lindsay.walton@example.com',
+            role: 'Member',
+        },
+        {
+            id: 2,
+            name: 'Courtney Henry',
+            position: 'Designer',
+            email: 'courtney.henry@example.com',
+            role: 'Admin',
+        },
+        {
+            id: 3,
+            name: 'Tom Cook',
+            position: 'Director of Product',
+            email: 'tom.cook@example.com',
+            role: 'Member',
+        },
+        {
+            id: 4,
+            name: 'Whitney Francis',
+            position: 'Copywriter',
+            email: 'whitney.francis@example.com',
+            role: 'Admin',
+        },
+        {
+            id: 5,
+            name: 'Leonard Krasner',
+            position: 'Senior Designer',
+            email: 'leonard.krasner@example.com',
+            role: 'Owner',
+        },
+        {
+            id: 6,
+            name: 'Floyd Miles',
+            position: 'Principal Designer',
+            email: 'floyd.miles@example.com',
+            role: 'Member',
+        },
+    ])
+
+    const columns: TableColumn<User>[] = [
+        {
+            accessorKey: 'id',
+            header: 'ID',
+        },
+        {
+            accessorKey: 'name',
+            header: 'Name',
+        },
+        {
+            accessorKey: 'email',
+            header: 'Email',
+        },
+        {
+            accessorKey: 'role',
+            header: 'Role',
+        },
+        {
+            id: 'action',
+        },
+    ]
+
+    function getDropdownActions(user: User): DropdownMenuItem[][] {
+        return [
+            [
+                {
+                    label: 'Copy user Id',
+                    icon: 'i-lucide-copy',
+                    onSelect: () => {
+                        copy(user.id.toString())
+
+                        toast.add({
+                            title: 'User ID copied to clipboard!',
+                            color: 'success',
+                            icon: 'i-lucide-circle-check',
+                        })
+                    },
+                },
+            ],
+            [
+                {
+                    label: 'Edit',
+                    icon: 'i-lucide-edit',
+                },
+                {
+                    label: 'Delete',
+                    icon: 'i-lucide-trash',
+                    color: 'error',
+                },
+            ],
+        ]
+    }
+</script>
+
+<template>
+    <UTable :data="data" :columns="columns" class="flex-1">
+        <template #name-cell="{ row }">
+            <div class="flex items-center gap-3">
+                <UAvatar :src="`https://i.pravatar.cc/120?img=${row.original.id}`" size="lg" :alt="`${row.original.name} avatar`" />
+                <div>
+                    <p class="font-medium text-highlighted">
+                        {{ row.original.name }}
+                    </p>
+                    <p>
+                        {{ row.original.position }}
+                    </p>
+                </div>
+            </div>
+        </template>
+        <template #action-cell="{ row }">
+            <UDropdownMenu :items="getDropdownActions(row.original)">
+                <UButton icon="i-lucide-ellipsis-vertical" color="neutral" variant="ghost" aria-label="Actions" />
+            </UDropdownMenu>
+        </template>
+    </UTable>
+</template>
+    ```
+- When using the `UModal` component make sure you:
+    - use the `title` prop for the modal header and `#body` slot for content (NOT `#header`/`#footer` slots)
+    - optionally use the `description` prop for subtitle text
+    ```vue
+    <UModal v-model:open="open" title="My Modal" description="Optional description">
+        <template #body>
+            <!-- modal content here -->
+        </template>
+    </UModal>
+    ```
+- When using the `UDropdownMenu` component:
+    - define items as `DropdownMenuItem[][]` (array of groups)
+    - use `onSelect` callback on each item for actions
+    ```vue
+    <UDropdownMenu :items="dropdownItems">
+        <UButton icon="i-lucide-ellipsis-vertical" color="neutral" variant="ghost" />
+    </UDropdownMenu>
+    ```
+- When using the `USelectMenu` component:
+    - use `value-key` prop to return the value string instead of the whole object
+    ```vue
+    <USelectMenu v-model="selected" :items="options" value-key="value" />
+    ```
+
+Calendar / Date Picker
+
+- NEVER use the Nuxt UI calendar component.
+- Always use `@vuepic/vue-datepicker` for all date/calendar needs.
+- Use the `<ExampleCalendar>` component or import `VueDatePicker` directly.
+- Docs: https://vue3datepicker.com/
+
+Key Conventions
+
+- Use VueUse for common composables and utility functions.
+- Use Pinia for UI state management (modals, sidebar, preferences).
+- Use `$fetch` / `useFetch` for server data operations.
+
+Vue 3 and Composition API Best Practices
+
+- Vue components have the following order <template> <script>.
+- Prefer not to use <style> but instead use tailwind classes.
+- Use <script setup> syntax for concise component definitions.
+- Always prefer ref over reactive.
+- Leverage ref, and computed for reactive state management.
+- Prever using global pinia store over provide/inject.
+- Implement custom composables for reusable logic.
+
+Follow the official Vue.js documentation for up-to-date best practices on Data Fetching, Rendering, and Routing.

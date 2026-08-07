@@ -1,0 +1,17 @@
+{
+    "authVerification": {
+        "verify": {
+            "title": "Verify email",
+            "pending": "Verifying…",
+            "success": {
+                "title": "Email verified",
+                "description": "You can close this tab.",
+                "cta": "Continue to sign in"
+            },
+            "failure": {
+                "title": "Verification failed",
+                "description": "This link may have expired. Request a new verification email and try again."
+            }
+        }
+    }
+}

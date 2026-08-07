@@ -1,0 +1,15 @@
+{
+    // Root aggregator for `tsc -b` (the publishable `dist` build). No files of
+    // its own — just the reference graph, so `tsc -b tsconfig.build.json`
+    // builds every package in dependency order (core -> tui -> preset-nuxt4
+    // -> cli) in one invocation. Kept separate from the root `tsconfig.json`
+    // (whole-workspace `--noEmit` type-check, includes tests) so `pnpm tsc`
+    // and `pnpm build` stay independent concerns.
+    "files": [],
+    "references": [
+        { "path": "packages/core" },
+        { "path": "packages/tui" },
+        { "path": "packages/preset-nuxt4" },
+        { "path": "packages/cli" }
+    ]
+}

@@ -1,0 +1,41 @@
+{
+    "authRecovery": {
+        "forgot": {
+            "title": "Wachtwoord vergeten",
+            "email": "E-mailadres",
+            "submit": "Herstellink versturen",
+            "backToSignIn": "Terug naar inloggen",
+            "validation": {
+                "email": "Voer een geldig e-mailadres in"
+            },
+            "success": {
+                "title": "Controleer je inbox",
+                "description": "Als dit e-mailadres geregistreerd is, sturen we een herstellink."
+            },
+            "errors": {
+                "generic": "Verzoek mislukt"
+            }
+        },
+        "reset": {
+            "title": "Wachtwoord herstellen",
+            "newPassword": "Nieuw wachtwoord",
+            "confirmPassword": "Bevestig wachtwoord",
+            "hint": "Minimaal 12 tekens. Gebruik een wachtwoordzin of een mix van tekens.",
+            "submit": "Herstellen",
+            "showPassword": "Wachtwoord tonen",
+            "hidePassword": "Wachtwoord verbergen",
+            "validation": {
+                "minLength": "Minimaal 12 tekens",
+                "mismatch": "Wachtwoorden komen niet overeen"
+            },
+            "success": {
+                "title": "Wachtwoord hersteld",
+                "description": "Je kunt nu inloggen met je nieuwe wachtwoord.",
+                "cta": "Inloggen"
+            },
+            "errors": {
+                "generic": "Herstellen mislukt"
+            }
+        }
+    }
+}

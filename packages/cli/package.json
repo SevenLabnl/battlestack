@@ -1,0 +1,56 @@
+{
+    "name": "battlestack",
+    "version": "0.1.0",
+    "description": "Battlestack CLI — open-source scaffolding tool. Loads extra capabilities from installed battlestack plugins.",
+    "license": "MIT",
+    "author": "SevenLab",
+    "homepage": "https://github.com/SevenLabnl/battlestack#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/SevenLabnl/battlestack.git",
+        "directory": "packages/cli"
+    },
+    "bugs": {
+        "url": "https://github.com/SevenLabnl/battlestack/issues"
+    },
+    "keywords": [
+        "nuxt",
+        "nuxt4",
+        "scaffold",
+        "scaffolding",
+        "boilerplate",
+        "generator",
+        "cli",
+        "starter",
+        "template",
+        "drizzle",
+        "tailwind"
+    ],
+    "engines": {
+        "node": ">=24"
+    },
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "bin": {
+        "battlestack": "./dist/index.js",
+        "bstack": "./dist/index.js"
+    },
+    "files": [
+        "dist"
+    ],
+    "sideEffects": false,
+    "dependencies": {
+        "@battlestack/core": "workspace:*",
+        "@battlestack/preset-nuxt4": "workspace:*",
+        "@battlestack/tui": "workspace:*",
+        "minimist": "^1.2.8",
+        "ora": "^8.2.0",
+        "picocolors": "^1.1.1",
+        "prompts": "^2.4.2"
+    },
+    "devDependencies": {
+        "@types/minimist": "^1.2.5",
+        "@types/prompts": "^2.4.9"
+    }
+}

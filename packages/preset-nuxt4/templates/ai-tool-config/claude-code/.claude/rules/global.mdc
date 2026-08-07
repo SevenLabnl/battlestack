@@ -1,0 +1,59 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+## Project Conventions
+
+- Always consult the [CLAUDE.md](mdc:CLAUDE.md) file at the root of the project for stack overview and conventions
+- Default package manager is **pnpm**. `bun`, `npm`, `yarn` also work; match the project's `packageManager` field. Use `pnpm add`, `pnpm dlx`, `pnpm run`.
+- Always run `pnpm run lint` and `pnpm test` before considering work complete.
+
+## Pending upstream merges: `.battlestack/pull/`
+
+When `battlestack pull` finds a file you've edited locally, it does **not** overwrite it. It stages the incoming upstream version + a diff under `.battlestack/pull/`, mirroring the file's path:
+
+- `.battlestack/pull/<path>.new`: the full new upstream content
+- `.battlestack/pull/<path>.patch`: a unified diff from your current file to the new version
+- `.battlestack/pull/<path>.bak`: your prior content, only when `battlestack pull --force` overwrote the file
+
+These live **outside** the source tree on purpose, so Nuxt/Nitro/TS never compile them. **A non-empty `.battlestack/pull/` means the project has pending upstream changes that still need to be applied to your files**; treat it as a TODO. When asked to review, apply, or reconcile pending battlestack updates (or after `battlestack pull` reports skipped/drifted files), look in `.battlestack/pull/` first: read the `.patch` to see what upstream changed, merge the relevant parts into the real file by hand, then clear the staged artifacts by running **`battlestack cleanup`** (interactive: it lists every `.battlestack/pull/` file and any stray legacy artifact for removal). Never import from, edit, or ship files under `.battlestack/pull/`; they are throwaway merge scratch.
+
+## Runtime Config: env vars go through `runtimeConfig`, not `process.env`
+
+- Every env-configurable value needs a key declared in `nuxt.config.ts#runtimeConfig` (empty-string/default placeholder). Nuxt binds `NUXT_*` env vars onto **existing keys only**; an unregistered key means the env var is silently dead.
+- Naming is positional: `runtimeConfig.smtpHost` ← `NUXT_SMTP_HOST`; nested `runtimeConfig.rag.maxChunkSize` ← `NUXT_RAG_MAX_CHUNK_SIZE`. Client-exposed values go under `public` ← `NUXT_PUBLIC_*`.
+- Read via `useRuntimeConfig()` in Nitro handlers/plugins/utils, never `process.env.NUXT_*` there. In `app/` client code this is a hard bug, not just style: `process.env`/`import.meta.env` are statically replaced at build, so the browser never sees your real env; a client read is either baked in forever or silently `undefined`. Server-side, `process.env` happens to reflect real container env at actual startup, but reading it directly still skips the registered-key contract above (nothing catches a wrong or mis-cased var name), so it's banned there too, with exactly two exceptions:
+  - `server/mastra/**`: Mastra Studio boots these files outside Nitro, where `useRuntimeConfig()` doesn't exist.
+  - Standalone scripts Nuxt never builds (`tools/migrate.mjs`, `tools/seed.mjs`, `drizzle.config.ts`, the seed runner under `server/database/seeds/`): there's no Nitro runtime there to call `useRuntimeConfig()` in.
+
+  Anywhere else in `server/` (a route, a plugin, a util), declare the runtimeConfig key instead of reaching for `process.env`.
+- **`process.env.NODE_ENV` specifically: never, anywhere in Nuxt-built code; this one is a different mechanism from the rule above, not a variant of it.** Bundlers (Vite/Rollup, and Nitro downstream of them) special-case and statically inline `process.env.NODE_ENV` at build time, because that's what enables dead-code elimination of dev-only branches. A check keyed on it is frozen forever to whatever the **build machine's** env happened to be; a deploy-time env var or container secret can never change it, because by then it's a literal string baked into the bundle. This produced a real bug here: a passwordless-login endpoint's dev-only guard was keyed to the build environment instead of the running one. Use `import.meta.dev` for any dev-vs-production branch instead; it fails closed by construction (the production build compiles the dead branch out entirely, so there's no live code path left to trip, not just a `false` value to check).
+- Never put real values (secrets, URLs) in `nuxt.config.ts`; defaults there are committed and baked at build; actual values come from `.env` (dev) or container env (prod).
+- When adding a new env var: declare the runtimeConfig key, add it to `.env`, AND verify the `NUXT_` name maps exactly to the key path.
+
+## Stack Versions
+
+- **Nuxt** 4.x (`nuxt@^4`)
+- **Vue** 3.5+ (Composition API, `<script setup>`)
+- **Nuxt UI** v4 (`@nuxt/ui@^4`): 125+ components, Reka UI, Tailwind Variants
+- **Tailwind CSS** v4: CSS-first config via `@theme` blocks (no tailwind.config.ts)
+- **pnpm** 9+ (default): package manager. bun / npm / yarn also supported. Node ≥ 24 LTS is the runtime.
+- **Vitest** 4.x + `@nuxt/test-utils` 4.x: test runner (`pnpm test`)
+- **Drizzle ORM** with `postgres` driver on PostgreSQL 17
+- **Zod** for validation (backend mandatory, frontend for UX)
+- **Nitro** server (Node preset)
+
+## Boilerplate Features
+
+This project is scaffolded with the following features already built:
+- **Authentication**: login, logout, session cookies (`@node-rs/argon2` argon2id), password reset flow
+- **User management**: admin-only CRUD at `/app/settings/users`
+- **Role system**: `Role.Admin` and `Role.User` enum, `requireRole()` helper
+- **Prompt management**: editable prompts at `/app/settings/prompts`, seeded via `seed.ts`
+- **AI model configuration**: LiteLLM-backed model selection at `/app/settings/ai`
+- **PWA**: installable progressive web app via `@vite-pwa/nuxt`
+- **WebSockets**: Nitro `defineWebSocketHandler` at `/_ws` (multiplexed on port 3000)
+- **Linting**: @nuxt/eslint + eslint-plugin-drizzle + eslint-plugin-security
+
+Use these as reference when building new features. Follow the same patterns (schema -> API -> page -> i18n -> tests).

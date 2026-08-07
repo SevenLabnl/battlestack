@@ -1,0 +1,20 @@
+{
+    "mastraAdmin": {
+        "title": "AI settings",
+        "subtitle": "Pick which model each agent role uses. Changes take effect immediately — no redeploy required.",
+        "configsHeader": "Model configurations",
+        "loadingModels": "Loading models…",
+        "noModels": "No models available. Set NUXT_LITELLM_KEY in .env and restart.",
+        "selectModel": "Select a model",
+        "searchModels": "Search models",
+        "updated": "Updated",
+        "agentsHeader": "Agents",
+        "agentsSubtitle": "Attach each agent to a model configuration and (optionally) a prompt. Takes effect immediately — no redeploy required.",
+        "noAgents": "No agents registered yet.",
+        "selectModelConfig": "Select a model configuration",
+        "selectPrompt": "Select a prompt",
+        "noPrompt": "No prompt",
+        "errorTitle": "Error",
+        "errorGeneric": "Something went wrong"
+    }
+}

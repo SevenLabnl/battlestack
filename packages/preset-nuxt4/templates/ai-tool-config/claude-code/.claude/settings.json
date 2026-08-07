@@ -1,0 +1,18 @@
+{
+    "//": "Claude Code project settings. MCP servers live in `.mcp.json` at the project root; `shared:ai-tool-config` emits that file based on enabled features.",
+    "permissions": {
+        "allow": [
+            "Bash(pnpm run db:generate)",
+            "Bash(pnpm run db:migrate)",
+            "Bash(pnpm run db:push)",
+            "Bash(pnpm run db:seed)",
+            "Bash(pnpm run lint)",
+            "Bash(pnpm test:*)",
+            "Bash(battlestack db:generate)",
+            "Bash(battlestack db:migrate)",
+            "Bash(battlestack db:push)",
+            "Bash(battlestack db:seed)",
+            "Bash(battlestack db:up)"
+        ]
+    }
+}

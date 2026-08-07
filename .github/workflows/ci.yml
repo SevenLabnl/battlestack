@@ -1,0 +1,235 @@
+name: CI
+
+# This repo's OWN CI. It is unrelated to packages/preset-nuxt4/templates/.github/
+# — that tree is scaffold *payload* copied into generated end-user projects,
+# not this pipeline.
+#
+# Deliberately `ubuntu-latest`, not a self-hosted runner: this is the public
+# repo, and a stranger's fork must be able to run this workflow unmodified.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Type-check and test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 24 is the engines floor; 26 has no bundled corepack, which proves the
+        # toolchain never depends on it.
+        node: ['24', '26']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # pnpm/action-setup, NOT `corepack enable`: corepack is no longer bundled
+      # with Node (removed in 25+), so enabling it cannot be assumed. Reads the
+      # pnpm version from the root package.json `packageManager` field.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm tsc
+
+      - name: Test
+        run: pnpm test
+
+
+  # `packages/preset-nuxt4/templates/**` is scaffold payload, excluded from this
+  # repo's tsconfig and test run, so nothing here checks it. This job scaffolds a
+  # real project and runs the gates that project ships with, which is the only
+  # place that code is checkable.
+  verify-scaffold:
+    name: Scaffold a project and run its own gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Without a reachable database the DB-gated template tests skip themselves
+    # and the file reports one passing assertion that the database is down, so
+    # the suite is green having tested nothing. With this service the fullstack
+    # scaffold runs 35 tests instead of 4.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NUXT_DATABASE_URL: postgres://postgres:postgres@localhost:5432/app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the CLI
+        run: pnpm build
+
+      # `nuxt4-fullstack` enables the most features, so it emits the most
+      # template code. Docker is not started: lint, typecheck and the non-DB
+      # tests do not need it, and the DB-gated tests skip themselves.
+      - name: Scaffold
+        run: |
+          mkdir -p "$RUNNER_TEMP/scaffold"
+          node packages/cli/dist/index.js ci-app nuxt4-fullstack -y --debug --cwd "$RUNNER_TEMP/scaffold"
+
+      - name: Lint
+        working-directory: ${{ runner.temp }}/scaffold/ci-app
+        run: |
+          pnpm exec nuxi prepare
+          pnpm run lint
+
+      - name: Typecheck
+        working-directory: ${{ runner.temp }}/scaffold/ci-app
+        run: pnpm run typecheck
+
+      - name: Apply the schema
+        working-directory: ${{ runner.temp }}/scaffold/ci-app
+        run: pnpm run db:push
+
+      # `--reporter=verbose` because the marker is a passing test's title, which
+      # the default reporter does not print. An unreachable database otherwise
+      # produces a green run with the database tests silently skipped.
+      - name: Test
+        working-directory: ${{ runner.temp }}/scaffold/ci-app
+        run: |
+          set -o pipefail
+          pnpm vitest run --reporter=verbose 2>&1 | tee test-output.txt
+          if grep -qi 'no configured, reachable database' test-output.txt; then
+            echo "::error::database-gated tests skipped; the postgres service was not reachable"
+            exit 1
+          fi
+
+  # Native Windows is a supported target, not just WSL. Kept as its own job
+  # rather than a matrix leg on `verify` so a Windows failure is legible at a
+  # glance instead of hidden in a matrix cell.
+  verify-windows:
+    name: Type-check, test, build, CLI smoke (Windows, Node ${{ matrix.node }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['24', '26']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # pnpm/action-setup, NOT `corepack enable`: corepack is no longer bundled
+      # with Node (removed in 25+), so enabling it cannot be assumed. Reads the
+      # pnpm version from the root package.json `packageManager` field.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm tsc
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # Invoked through `node dist/index.js` rather than the `battlestack` bin
+      # name, which would need a global install this job deliberately skips.
+      - name: CLI smoke — --version
+        run: node packages/cli/dist/index.js --version
+
+      - name: CLI smoke — --help
+        run: node packages/cli/dist/index.js --help
+
+      # The actual point of a Windows job, and the part `--version`/`--help`
+      # cannot reach. A real scaffold:
+      #
+      #   - writes ~400 files through the copy paths, which is where separator
+      #     and line-ending bugs live;
+      #   - reaches `pnpm dlx nuxi` through win-exec's cmd.exe route, because
+      #     pnpm is a `.cmd` shim on Windows and CreateProcess cannot execute a
+      #     batch file directly. That route is the entire reason 5b4368e exists
+      #     and nothing had ever executed it on Windows;
+      #   - runs under a `C:\Users\RUNNER~1\...` temp path, i.e. an 8.3 short
+      #     name, which is a realistic thing to get wrong.
+      #
+      # `nuxt4-fullstack` rather than minimal: it enables the most features and
+      # so writes the most files. `--skip-install` skips only the CLI's own dep
+      # install; nuxi's embedded install still runs, deliberately (see the
+      # release-age note in features/scaffold.ts), so this step needs network.
+      - name: CLI smoke — real scaffold (nuxt4-fullstack)
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\scaffold" | Out-Null
+          node packages/cli/dist/index.js smoke-app nuxt4-fullstack -y --skip-install --cwd "$env:RUNNER_TEMP\scaffold"
+          if ($LASTEXITCODE -ne 0) { throw "scaffold exited with $LASTEXITCODE" }
+
+      # A scaffold that exits 0 having written nothing useful would pass the
+      # step above, so assert on the artefact.
+      - name: Verify the scaffold
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'scaffold\smoke-app'
+          if (-not (Test-Path $root)) { throw "no project directory at $root" }
+
+          foreach ($f in @(
+            'package.json', 'nuxt.config.ts', 'docker-compose.yml', 'Dockerfile',
+            '.env', '.battlestack\manifest.json'
+          )) {
+            if (-not (Test-Path (Join-Path $root $f))) { throw "scaffold is missing $f" }
+          }
+
+          # The manifest must be real JSON with features recorded — it is the
+          # file every later command (add/remove/pull/doctor) reads.
+          $manifest = Get-Content -Raw (Join-Path $root '.battlestack\manifest.json') | ConvertFrom-Json
+          if (-not $manifest.features -or $manifest.features.Count -eq 0) {
+            throw "manifest records no features"
+          }
+          Write-Host "manifest records $($manifest.features.Count) features"
+
+          # Line endings. `.gitattributes` pins `* text=auto eol=lf` precisely so
+          # that a Windows checkout cannot turn packages/*/templates/** — which
+          # is scaffold PAYLOAD copied verbatim — into CRLF and emit mixed line
+          # endings into a generated app. The CLI's copy paths never translate,
+          # so any CR here came from the checkout. That reasoning had never been
+          # tested on Windows; this is the check that makes it a fact.
+          # Dockerfile is template payload (packages/preset-nuxt4/templates/docker/Dockerfile).
+          foreach ($f in @('Dockerfile', 'docker-compose.yml')) {
+            $bytes = [IO.File]::ReadAllBytes((Join-Path $root $f))
+            if ($bytes -contains 13) { throw "$f contains CR — scaffold emitted CRLF on Windows" }
+          }
+          Write-Host "template payload is LF on Windows"

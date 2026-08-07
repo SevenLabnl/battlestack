@@ -1,0 +1,128 @@
+---
+description: Realtime patterns, Nitro experimental WebSocket
+globs: server/**/*.ts, app/composables/**/*.ts
+alwaysApply: false
+---
+
+# Realtime Patterns (ws-nitro transport)
+
+This project's chat transport is **`ws-nitro`**: Nitro's `defineWebSocketHandler` at `/_ws`, gated by `nitro.experimental.websocket = true` (set automatically by the chat feature). Other realtime needs should use the same pattern.
+
+**SSE / server-pushed events**: documented below as a reference pattern but ⚠️ **currently broken under Cloudflare** (edge proxy buffers `text/event-stream` and chunked-transfer responses, defeating incremental streaming). Safe to use only when the deployment target is *not* Cloudflare-fronted, or when the SSE-buffering behaviour gets resolved upstream. For LLM streaming + chat → use the WebSocket transport.
+
+## Adding a WebSocket route
+
+```ts
+// server/routes/_ws-<name>.ts
+export default defineWebSocketHandler({
+    async open(peer) {
+        // peer.send(...) any time
+    },
+    async message(peer, message) {
+        const payload = JSON.parse(typeof message === 'string' ? message : message.text())
+        // process and respond
+        peer.send(JSON.stringify({ type: 'ack' }))
+    },
+    async close(peer) {
+        // cleanup
+    },
+})
+```
+
+Auth: Nitro middleware runs before the upgrade; `requireUserSession(peer.context.event)` works the same as in HTTP routes (Nitro 2 + Nuxt 4 experimental).
+
+## PG LISTEN/NOTIFY (server-pushed updates)
+
+For data-change push, pair the WS route with PostgreSQL LISTEN/NOTIFY:
+
+```ts
+// server/plugins/realtime.ts — set up LISTEN once at server start
+import postgres from 'postgres'
+
+const peers = new Set<any>()
+
+export default defineNitroPlugin(() => {
+    const sql = postgres(String(useRuntimeConfig().databaseUrl))
+    sql.listen('data_changed', (payload) => {
+        for (const peer of peers) peer.send(payload)
+    })
+})
+```
+
+```ts
+// server/routes/_ws-events.ts
+export default defineWebSocketHandler({
+    open(peer) { peers.add(peer) },
+    close(peer) { peers.delete(peer) },
+})
+```
+
+```ts
+// notify after a mutation
+import postgres from 'postgres'
+const sql = postgres(String(useRuntimeConfig().databaseUrl))
+await sql.notify('data_changed', JSON.stringify({ table: 'todos', id }))
+```
+
+LISTEN requires a **dedicated connection**; don't reuse the Drizzle query pool.
+
+## Client side
+
+```ts
+const url = new URL('/_ws', window.location.href)
+url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+const ws = new WebSocket(url.toString())
+```
+
+Reconnect on close (exponential backoff capped at ~30s). Don't reconnect after intentional `close()`; set `ws.onclose = null` first.
+
+## SSE pattern (reference only, ⚠️ broken under Cloudflare)
+
+> ⚠️ **Status: not supported in production today.** Cloudflare's edge proxy buffers `text/event-stream` and chunked-transfer responses below ~100 KB, so incremental events arrive in batches several seconds late. We don't ship an SSE-based chat transport for that reason. Keep this section as a reference pattern only: if your project is *not* Cloudflare-fronted (direct nginx, Vercel, Fly.io) and you genuinely want one-way push, the code below is the shape it would take. If/when Cloudflare buffering gets fixed (or you set `Cache-Control: no-transform` on a non-buffered route), re-evaluate.
+
+### Server: streaming API route
+
+```ts
+// server/api/events.get.ts
+import postgres from 'postgres'
+
+export default defineEventHandler(async (event) => {
+    setResponseHeader(event, 'content-type', 'text/event-stream')
+    setResponseHeader(event, 'cache-control', 'no-cache, no-transform')
+    setResponseHeader(event, 'connection', 'keep-alive')
+
+    const sql = postgres(String(useRuntimeConfig().databaseUrl))
+
+    await sql.listen('data_changed', (payload) => {
+        event.node.res.write(`data: ${payload}\n\n`)
+    })
+
+    event._handled = true
+
+    event.node.req.on('close', () => sql.end())
+})
+```
+
+### Client: composable
+
+```ts
+// app/composables/useSSE.ts
+export function useSSE<T>(url: string, channel?: string) {
+    const data = ref<T | null>(null)
+    let eventSource: EventSource | null = null
+
+    onMounted(() => {
+        eventSource = new EventSource(url)
+        eventSource.onmessage = (event) => {
+            const parsed = JSON.parse(event.data)
+            if (!channel || parsed.table === channel) data.value = parsed
+        }
+    })
+
+    onUnmounted(() => eventSource?.close())
+
+    return { data }
+}
+```
+
+For LLM streaming + chat: use the WebSocket transport. SSE is reserved for future / non-Cloudflare deploys only.

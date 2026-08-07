@@ -1,0 +1,16 @@
+{
+    "common": {
+        "actions": {
+            "cancel": "Annuleren",
+            "save": "Opslaan",
+            "delete": "Verwijderen",
+            "confirm": "Bevestigen",
+            "edit": "Bewerken",
+            "reset": "Herstellen",
+            "loading": "Laden…",
+            "previous": "Vorige",
+            "next": "Volgende"
+        },
+        "welcome": "Welkom"
+    }
+}

@@ -1,0 +1,22 @@
+{
+    "rag": {
+        "title": "Knowledge base",
+        "subtitle": "Ingest documents and query them with semantic search (RAG).",
+        "error": "Something went wrong",
+        "ingest": {
+            "heading": "Ingest a document",
+            "title": "Title",
+            "source": "Source",
+            "sourceHint": "An identifier shown with results (URL, filename, doc id).",
+            "text": "Text",
+            "submit": "Ingest",
+            "success": "Ingested {n} chunk(s)"
+        },
+        "query": {
+            "heading": "Query",
+            "placeholder": "Ask a question…",
+            "submit": "Search",
+            "empty": "No matching results."
+        }
+    }
+}

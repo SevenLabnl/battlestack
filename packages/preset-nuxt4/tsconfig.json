@@ -1,0 +1,17 @@
+{
+    // Per-package BUILD config. References `core` + `tui` for project-reference
+    // build ordering. `templates/` is scaffold payload, not compiled input —
+    // excluded the same way the root type-check config excludes it.
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "composite": true,
+        "declaration": true,
+        "declarationMap": false,
+        "sourceMap": false,
+        "outDir": "dist",
+        "rootDir": "src",
+        "tsBuildInfoFile": "./.tsbuildinfo"
+    },
+    "include": ["src/**/*.ts"],
+    "references": [{ "path": "../core" }, { "path": "../tui" }]
+}

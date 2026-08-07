@@ -1,0 +1,20 @@
+{
+    "mastraAdmin": {
+        "title": "AI-instellingen",
+        "subtitle": "Kies welk model elke agent-rol gebruikt. Wijzigingen zijn direct actief — geen redeploy nodig.",
+        "configsHeader": "Modelconfiguraties",
+        "loadingModels": "Modellen laden…",
+        "noModels": "Geen modellen beschikbaar. Stel NUXT_LITELLM_KEY in .env in en herstart.",
+        "selectModel": "Kies een model",
+        "searchModels": "Zoek modellen",
+        "updated": "Bijgewerkt",
+        "agentsHeader": "Agents",
+        "agentsSubtitle": "Koppel elke agent aan een modelconfiguratie en (optioneel) een prompt. Direct actief — geen redeploy nodig.",
+        "noAgents": "Nog geen agents geregistreerd.",
+        "selectModelConfig": "Kies een modelconfiguratie",
+        "selectPrompt": "Kies een prompt",
+        "noPrompt": "Geen prompt",
+        "errorTitle": "Fout",
+        "errorGeneric": "Er ging iets mis"
+    }
+}

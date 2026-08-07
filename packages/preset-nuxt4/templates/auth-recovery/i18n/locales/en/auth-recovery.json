@@ -1,0 +1,41 @@
+{
+    "authRecovery": {
+        "forgot": {
+            "title": "Forgot password",
+            "email": "Email",
+            "submit": "Send reset link",
+            "backToSignIn": "Back to sign in",
+            "validation": {
+                "email": "Enter a valid email"
+            },
+            "success": {
+                "title": "Check your inbox",
+                "description": "If that email is registered, a reset link is on its way."
+            },
+            "errors": {
+                "generic": "Request failed"
+            }
+        },
+        "reset": {
+            "title": "Reset password",
+            "newPassword": "New password",
+            "confirmPassword": "Confirm password",
+            "hint": "Minimum 12 characters. Use a passphrase or mixed-character password.",
+            "submit": "Reset",
+            "showPassword": "Show password",
+            "hidePassword": "Hide password",
+            "validation": {
+                "minLength": "Minimum 12 characters",
+                "mismatch": "Passwords do not match"
+            },
+            "success": {
+                "title": "Password reset",
+                "description": "You can sign in with your new password now.",
+                "cta": "Sign in"
+            },
+            "errors": {
+                "generic": "Reset failed"
+            }
+        }
+    }
+}

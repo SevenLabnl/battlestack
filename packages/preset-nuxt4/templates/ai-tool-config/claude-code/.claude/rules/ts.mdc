@@ -1,0 +1,118 @@
+---
+description: TypeScript
+globs: *.ts
+alwaysApply: false
+---
+This comprehensive guide outlines best practices when using TypeScript with conventions and standards for development with modern web technologies like Vue 3, Nuxt UI, Pinia, VueUse, and Tailwind.
+
+Development Philosophy
+  - Write clean, maintainable, and scalable code
+  - Follow SOLID principles
+  - Prefer functional and declarative programming patterns over imperative
+  - Emphasize type safety and static analysis
+  - Practice component-driven development
+
+Naming Conventions
+General Rules
+  - Use PascalCase for:
+    - Components
+    - Type definitions
+    - Interfaces
+  - Use camelCase for:
+    - Variables
+    - Functions
+    - Methods
+    - Properties
+    - Props
+  - Use UPPERCASE for:
+    - Enums
+    - Environment variables
+    - Constants
+    - Global configurations
+  - Avoid try-catch in utility functions and composables; prefer `.catch()` and `throw`. Try-catch is acceptable in event handlers and top-level API route handlers where you need to catch and respond with specific error codes.
+  - Always put interfaces in an interface folder, eg. never put them in-line
+
+Specific Naming Patterns
+  - Prefix event handlers with 'handle': handleClick, handleSubmit
+  - Prefix boolean variables with verbs: isLoading, hasError, canSubmit
+  - Prefix custom hooks with 'use': useAuth, useForm
+  - Use complete words over abbreviations except for:
+    - err (error)
+    - req (request)
+    - res (response)
+    - props (properties)
+    - ref (reference)
+
+TypeScript Implementation
+  - Enable strict mode
+  - Define clear interfaces for component props, state, and Pinia state structure.
+  - Use type guards to handle potential undefined or null values safely.
+  - Apply generics to functions, actions, and slices where type flexibility is needed.
+  - Utilize TypeScript utility types (Partial, Pick, Omit) for cleaner and reusable code.
+  - Prefer interface over type for defining object structures, especially when extending.
+  - Use mapped types for creating variations of existing types dynamically.
+
+State Management
+
+Global State
+  - Use Pinia for UI state only (modals, sidebar, preferences)
+  - Use `$fetch` / `useFetch` for server data operations
+  - Use `defineStore('entity', {state, actions})` way of defining a Pinia store
+
+Error Handling and Validation
+Form Validation
+  - Use Zod for schema validation
+  - Implement proper error messages
+  - Use proper form libraries (e.g., NuxtUI Form)
+
+Error Boundaries
+  - Log caught errors to an external service (e.g., Bugsnag) for tracking and debugging.
+  - Design user-friendly fallback UIs to display when errors occur, keeping users informed without breaking the app.
+
+Internationalization (i18n)
+  - Use vue-i18n for translations
+  - Implement proper locale detection
+  - Use proper number and date formatting
+  - Use proper currency formatting
+  - Use computed Zod schemas with `t()` for translated validation errors:
+    ```ts
+    const { t } = useI18n()
+    const schema = computed(() => z.object({
+        name: z.string().min(1, t('validation.required')),
+        email: z.email(t('validation.email')),
+    }))
+    ```
+
+Below are some examples of data flow that you should follow. The examples are named "entity" but this can be anything, users, items etc:
+
+```ts
+// Data operations use $fetch / useFetch to call server API routes
+const { data: entities } = await useFetch('/api/entities')
+
+// Mutations
+await $fetch('/api/entities', { method: 'POST', body: { name: 'New Entity' } })
+await $fetch(`/api/entities/${id}`, { method: 'PUT', body: { name: 'Updated' } })
+await $fetch(`/api/entities/${id}`, { method: 'DELETE' })
+```
+
+Server-side Validation
+  - Use Zod for all API endpoint validation
+  - Validation MUST happen in the backend
+  - Frontend Zod schemas are for UX only
+
+  Example:
+  ```ts
+  import { z } from 'zod'
+
+  const schema = z.object({
+      email: z.email(),
+      name: z.string().min(1),
+  })
+
+  export default defineEventHandler(async (event) => {
+      // readValidatedBody wraps a thrown ZodError as a 400; a bare
+      // schema.parse(await readBody(event)) escapes as an unhandled 500.
+      const body = await readValidatedBody(event, schema.parse)
+      // handle validated data
+  })
+  ```

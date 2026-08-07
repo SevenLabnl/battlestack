@@ -1,0 +1,158 @@
+{
+    "dashboard": {
+        "nav": {
+            "dashboard": "Dashboard",
+            "profile": "Profile",
+            "security": "Security",
+            "users": "Users",
+            "usersHint": "Invite, edit, or remove team members",
+            "prompts": "Prompts",
+            "promptsHint": "Edit AI agent system prompts",
+            "files": "Files",
+            "aiSettings": "AI settings",
+            "aiSettingsHint": "Pick chat + embedding models per agent",
+            "admin": "Admin",
+            "signOut": "Sign out"
+        },
+        "home": {
+            "title": "Dashboard",
+            "welcome": "Welcome, {name}",
+            "subtitle": "Pick up where you left off, or jump into one of the common tasks below.",
+            "getStarted": {
+                "title": "Get started",
+                "description": "Run battlestack from the project root to see all task commands."
+            },
+            "quickLinks": {
+                "profile": "Profile",
+                "profileHint": "Update your name, language, and theme.",
+                "security": "Security",
+                "securityHint": "Set up 2FA + manage passkeys.",
+                "users": "Users",
+                "usersHint": "Invite, edit, or remove team members.",
+                "ai": "AI settings",
+                "aiHint": "Swap chat + embedding models per agent."
+            }
+        },
+        "profile": {
+            "title": "Profile",
+            "subtitle": "Update your name, theme, and language.",
+            "name": "Name",
+            "email": "Email",
+            "locale": "Language",
+            "theme": "Theme",
+            "themeOptions": {
+                "light": "Light",
+                "dark": "Dark",
+                "system": "System"
+            },
+            "save": "Save changes",
+            "saved": "Profile updated",
+            "error": "Update failed",
+            "errorTitle": "Error",
+            "avatar": {
+                "upload": "Change photo",
+                "remove": "Remove photo",
+                "uploaded": "Photo updated",
+                "removed": "Photo removed",
+                "uploadError": "Photo upload failed",
+                "removeError": "Could not remove photo"
+            }
+        },
+        "security": {
+            "title": "Security",
+            "subtitle": "Manage how you sign in and review recent account activity.",
+            "passkeys": {
+                "heading": "Passkeys",
+                "description": "Sign in with your device biometrics instead of a password.",
+                "add": "Add passkey",
+                "remove": "Remove",
+                "labelFallback": "Passkey",
+                "lastUsed": "Last used {date}",
+                "neverUsed": "Never used",
+                "empty": "No passkeys registered.",
+                "added": "Passkey added",
+                "removed": "Passkey removed",
+                "addError": "Could not add passkey",
+                "removeError": "Could not remove passkey",
+                "namePrompt": "Name this passkey (e.g. Laptop, Phone):"
+            },
+            "sessions": {
+                "heading": "Active sessions",
+                "description": "Devices and browsers currently signed in to your account. Revoke any you don't recognise.",
+                "current": "this device",
+                "empty": "No active sessions.",
+                "lastSeen": "Last active {date}",
+                "unknown": "Unknown device",
+                "revoke": "Revoke",
+                "revoked": "Session revoked",
+                "revokeError": "Could not revoke session"
+            },
+            "twoFactor": {
+                "heading": "Two-factor authentication",
+                "description": "Add a time-based code from an authenticator app on top of your password.",
+                "enable": "Enable 2FA",
+                "setupHint": "Scan with your authenticator app, then enter the 6-digit code:",
+                "qrAlt": "2FA QR code",
+                "copyUri": "Or copy the URI",
+                "codePlaceholder": "123456",
+                "verify": "Verify",
+                "enabled": "2FA enabled",
+                "disableCodePlaceholder": "Current 6-digit code",
+                "disable": "Disable 2FA",
+                "disabled": "2FA disabled",
+                "setupError": "Could not start 2FA setup",
+                "verifyError": "Code did not verify",
+                "disableError": "Could not disable 2FA"
+            },
+            "backupCodes": {
+                "heading": "Backup codes",
+                "description": "Single-use recovery codes for when your authenticator device is unavailable. Each code works once.",
+                "unused": "{count} unused",
+                "runningLow": "— running low; regenerate soon.",
+                "none": "No backup codes generated yet.",
+                "generate": "Generate codes",
+                "regenerate": "Regenerate codes",
+                "saveTitle": "Save these codes now",
+                "saveDescription": "They won't be shown again. Store them in a password manager.",
+                "saved": "I've saved them",
+                "generated": "Backup codes generated — save them now",
+                "generateError": "Could not generate backup codes"
+            },
+            "auditLog": {
+                "heading": "Recent activity",
+                "description": "Last 50 audit events for your account (logins, password changes, passkey + 2FA changes, etc.).",
+                "empty": "No audit events recorded yet.",
+                "actions": {
+                    "user_login_success": "Signed in",
+                    "user_login_fail": "Failed sign-in attempt",
+                    "user_logout": "Signed out",
+                    "user_signup": "Account created",
+                    "user_deleted": "Account deleted",
+                    "user_role_changed": "Role changed",
+                    "user_email_changed": "Email address changed",
+                    "user_password_changed": "Password changed",
+                    "user_email_verified": "Email address verified",
+                    "user_email_verification_resent": "Verification email resent",
+                    "user_password_reset_requested": "Password reset requested",
+                    "user_password_reset_completed": "Password reset completed",
+                    "user_totp_enabled": "Two-factor authentication enabled",
+                    "user_totp_disabled": "Two-factor authentication disabled",
+                    "user_backup_codes_generated": "Backup codes generated",
+                    "user_backup_codes_redeemed": "Backup code redeemed",
+                    "user_backup_codes_redeem_failed": "Backup code failed",
+                    "user_passkey_registered": "Passkey added",
+                    "user_passkey_removed": "Passkey removed",
+                    "user_passkey_login": "Signed in with passkey",
+                    "user_session_revoked": "Session revoked",
+                    "auth_oauth_signin": "Signed in with OAuth",
+                    "prompt_updated": "Prompt updated",
+                    "prompt_reset": "Prompt reset to default",
+                    "ai_model_config_updated": "AI model configuration updated",
+                    "file_uploaded": "File uploaded",
+                    "file_deleted": "File deleted"
+                }
+            },
+            "empty": "Enable {extras} for passkeys or {twoFactor} for TOTP via {addCommand}."
+        }
+    }
+}

@@ -1,0 +1,17 @@
+{
+    // Per-package BUILD config. References `core` for project-reference build
+    // ordering (`tsc -b` builds core's dist/*.d.ts before this package, so
+    // NodeNext resolution of `@battlestack/core` finds real output on disk).
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "composite": true,
+        "declaration": true,
+        "declarationMap": false,
+        "sourceMap": false,
+        "outDir": "dist",
+        "rootDir": "src",
+        "tsBuildInfoFile": "./.tsbuildinfo"
+    },
+    "include": ["src/**/*.ts"],
+    "references": [{ "path": "../core" }]
+}

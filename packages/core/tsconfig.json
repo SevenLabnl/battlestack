@@ -1,0 +1,18 @@
+{
+    // Per-package BUILD config (`src` -> `dist`), not the whole-workspace
+    // type-check config (that's the root `tsconfig.json`, which also covers
+    // `test/`). Composite + referenced from `../../tsconfig.build.json` so
+    // `tsc -b` builds packages in dependency order — core has no in-repo
+    // dependencies, so it builds first.
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "composite": true,
+        "declaration": true,
+        "declarationMap": false,
+        "sourceMap": false,
+        "outDir": "dist",
+        "rootDir": "src",
+        "tsBuildInfoFile": "./.tsbuildinfo"
+    },
+    "include": ["src/**/*.ts"]
+}

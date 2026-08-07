@@ -1,0 +1,20 @@
+{
+    "shell": {
+        "admin": "Admin",
+        "users": "Users",
+        "usersHint": "Invite, edit, or remove team members",
+        "ai": "AI settings",
+        "aiHint": "Pick chat + embedding models per agent",
+        "prompts": "Prompts",
+        "promptsHint": "Edit AI agent system prompts",
+        "rag": "Knowledge base",
+        "ragHint": "Ingest + search documents (RAG)",
+        "chat": "Chat",
+        "chatHint": "Talk to the AI assistant",
+        "profile": "Profile",
+        "security": "Security",
+        "signOut": "Sign out",
+        "accountMenu": "Account menu",
+        "dashboard": "Dashboard"
+    }
+}

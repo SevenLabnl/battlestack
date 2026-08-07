@@ -1,0 +1,16 @@
+{
+    "common": {
+        "actions": {
+            "cancel": "Cancel",
+            "save": "Save",
+            "delete": "Delete",
+            "confirm": "Confirm",
+            "edit": "Edit",
+            "reset": "Reset",
+            "loading": "Loading…",
+            "previous": "Previous",
+            "next": "Next"
+        },
+        "welcome": "Welcome"
+    }
+}

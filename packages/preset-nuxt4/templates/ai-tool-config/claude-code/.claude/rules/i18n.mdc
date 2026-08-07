@@ -1,0 +1,60 @@
+---
+description: i18n conventions for NL/EN translations
+globs: "i18n/**/*.ts, *.vue"
+---
+
+# Internationalization (i18n)
+
+This project uses `@nuxtjs/i18n` with Dutch (NL) as default and English (EN) as secondary language. No URL prefix strategy.
+
+## File Structure
+
+```
+i18n/locales/
+  nl.ts    # Dutch translations (default locale)
+  en.ts    # English translations
+```
+
+## Translation Keys
+
+- Use **camelCase** for keys: `signInDescription`, `userCreatedSuccessfully`
+- Group by feature: `auth.loginTitle`, `settings.users.deleteConfirm`
+- Keep NL and EN files in sync: every key must exist in both
+
+## Usage in Templates
+
+```vue
+<template>
+    <!-- In templates -->
+    <h1>{{ $t('auth.loginTitle') }}</h1>
+    <UButton :label="$t('common.save')" />
+</template>
+
+<script setup>
+const { t } = useI18n()
+
+// In script
+const message = t('auth.loginSuccess')
+</script>
+```
+
+## Zod Schemas with i18n
+
+Use `computed` schemas so error messages are reactive to locale changes:
+
+```ts
+const { t } = useI18n()
+
+const schema = computed(() => z.object({
+    email: z.email(t('validation.invalidEmail')),
+    name: z.string().min(1, t('validation.required')),
+}))
+```
+
+## Rules
+
+- **ALL user-facing text must use i18n**; never hardcode strings in templates
+- Date formatting: use `Intl.DateTimeFormat` with the current locale
+- Number formatting: use `Intl.NumberFormat` with the current locale
+- Zod validation messages must use `t()` inside `computed` schemas
+- Button labels, tooltips, placeholders, error messages: all i18n

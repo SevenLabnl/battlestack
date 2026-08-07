@@ -1,0 +1,132 @@
+---
+description: Mastra AI runtime conventions
+globs: server/mastra/**/*.ts, server/api/chat*.ts, server/api/rag/**/*.ts
+alwaysApply: false
+---
+
+# Mastra Conventions
+
+## Overview
+
+Mastra is the project's AI runtime. It talks to LiteLLM via the AI SDK's
+OpenAI-compatible provider; agents reference models with the raw LiteLLM
+proxy id (`openai/gpt-4o-mini`, `vertex_ai/gemini-3.1-flash`, etc). No
+custom gateway, no prefix juggling.
+
+The runtime singleton (`server/mastra/index.ts`) wires `PostgresStore` for
+thread/memory persistence and `Observability` so Mastra Studio shows
+conversation history and traces.
+
+## Packages
+
+- `@mastra/core`: Mastra instance and Agent definitions
+- `@mastra/ai-sdk`: `handleChatStream()` for Nuxt server routes
+- `@mastra/loggers`: `PinoLogger`
+- `@mastra/pg`: `PostgresStore` for threads, `PgVector` for RAG
+- `@mastra/observability`: `Observability` + `DefaultExporter`
+- `@ai-sdk/vue`: `Chat` class for Vue components
+- `@ai-sdk/openai-compatible`: LiteLLM transport
+- `ai`: Vercel AI SDK primitives
+
+## Structure
+
+- Runtime singleton: `server/mastra/index.ts`
+- Agents: `server/mastra/agents/`
+- Utils: `server/mastra/utils/` (`model-config.ts`, `ai-model.ts`)
+- Chat / RAG endpoints call `mastra.getAgent(...)` rather than instantiating their own clients
+
+Use **relative imports** inside `server/mastra/`; the standalone `mastra dev`
+bundler can't resolve Nuxt's `#server/*` alias.
+
+## Defining Agents
+
+Resolve model + instructions at call time from the agent's `agents` table row
+via `getAgentModelId(agentKey)` and `getAgentInstructions(agentKey)`
+(`server/mastra/utils/agent-runtime.ts`). The row links the agent to an
+`ai_model_configs.key` and (optionally) a `prompts.key`; admins repoint either
+from `/dashboard/settings/ai`. Both resolvers fall back to env / code defaults
+when a row, prompt, or table is absent. The returned model id is already
+`litellm/`-prefixed so Mastra routes through `LiteLLMGateway` (registered in
+`server/mastra/index.ts`) instead of its built-in provider lookups; those
+would demand per-provider API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, …)
+and deselect the model when the key is missing.
+
+```ts
+import { Agent } from '@mastra/core/agent'
+import { getAgentModelId, getAgentInstructions } from '../utils/agent-runtime'
+
+export const myAgent = new Agent({
+    id: 'my-agent',
+    name: 'My Agent',
+    instructions: () => getAgentInstructions('my-agent'),
+    model: () => getAgentModelId('my-agent'),
+})
+```
+
+Add the agent to the Mastra constructor in `server/mastra/index.ts` and give it
+an entry in `server/mastra/agents/registry.ts` (name, default model config +
+prompt). On boot, `server/plugins/10-sync-ai-on-boot.ts` registers a DB row for
+every agent on the Mastra instance: insert-if-missing, never deletes. For a
+fixed system prompt with no admin control, pass an `instructions` string
+instead and leave `promptKey` null in the registry.
+
+Use `getActiveModelId(key)` directly only for non-agent model lookups (it backs
+`getAgentModelId`).
+
+Embeddings still go through `getEmbeddingModel()` from
+`server/mastra/utils/model-config.ts`: Mastra gateways resolve chat models,
+not embedding models.
+
+Register agents in `server/mastra/index.ts`:
+
+```ts
+import { Mastra } from '@mastra/core'
+import { myAgent } from './agents/my-agent'
+
+export const mastra = new Mastra({
+    agents: { myAgent },
+    storage,
+    logger,
+    observability,
+})
+```
+
+## Server Route (HTTP streaming)
+
+```ts
+import { handleChatStream } from '@mastra/ai-sdk'
+import { createUIMessageStreamResponse } from 'ai'
+import { mastra } from '../../mastra'
+
+export default defineEventHandler(async (event) => {
+    const body = await readBody(event)
+    const stream = await handleChatStream({
+        mastra,
+        agentId: 'my-agent',
+        params: body,
+    })
+    return createUIMessageStreamResponse({ stream })
+})
+```
+
+## Frontend Chat Component
+
+```ts
+import { Chat } from '@ai-sdk/vue'
+import { DefaultChatTransport } from 'ai'
+
+const chat = new Chat({
+    transport: new DefaultChatTransport({ api: '/api/chat' }),
+})
+```
+
+Use `chat.messages`, `chat.sendMessage({ text })`, and `chat.status` in templates.
+
+## Best Practices
+
+- Keep agent instructions clear and focused
+- Use the cheapest model that gets the job done
+- Register every agent in `server/mastra/index.ts`
+- Call `mastra.getAgent(...)` in server routes; never call agents from the frontend
+- Model ids are raw LiteLLM proxy strings: `openai/gpt-4o-mini`, `vertex_ai/gemini-3.1-flash`. No `custom/` or `litellm/` prefix.
+- `battlestack mastra:studio` runs Mastra Studio (dev only): port allocated per project

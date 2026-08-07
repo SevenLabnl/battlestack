@@ -1,0 +1,19 @@
+{
+    "prompts": {
+        "title": "Prompts",
+        "subtitle": "Bewerk AI-agent systeemprompts zonder opnieuw te deployen. Herstel wanneer je wilt terug naar standaard.",
+        "loading": "Laden…",
+        "version": "v{n}",
+        "edit": "Bewerken",
+        "reset": "Herstellen",
+        "cancel": "Annuleren",
+        "save": "Opslaan",
+        "resetConfirm": "{key} herstellen naar standaard? Kan niet ongedaan worden gemaakt.",
+        "savedTitle": "{name} opgeslagen",
+        "resetTitle": "{name} hersteld naar standaard",
+        "saveFailed": "Opslaan mislukt",
+        "saveFailedTitle": "Opslaan mislukt",
+        "resetFailed": "Herstellen mislukt",
+        "resetFailedTitle": "Herstellen mislukt"
+    }
+}

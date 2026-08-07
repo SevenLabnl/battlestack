@@ -1,0 +1,5 @@
+{
+    "name": "battlestack-broken-plugin-fixture",
+    "type": "module",
+    "main": "index.mjs"
+}

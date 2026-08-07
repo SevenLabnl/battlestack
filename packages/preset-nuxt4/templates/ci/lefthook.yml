@@ -1,0 +1,13 @@
+# Silences lefthook's TTY UI and summary output: captured stdout/stderr otherwise leaks ANSI escapes and makes a passing hook look like git itself errored.
+# `output: false` prints only real errors (exit codes still propagate, so failures still block the commit); `no_tty: true` covers rendering even with a TTY attached.
+no_tty: true
+output: false
+
+pre-commit:
+    parallel: true
+    commands:
+        # ESLint owns both linting and formatting, so this is the only hook: a second formatter would fight it (e.g. over `<img />`'s self-closing slash).
+        # Run `pnpm format` to fix findings.
+        lint:
+            glob: '*.{ts,tsx,vue,js,mjs}'
+            run: __PM_EXEC__ eslint {staged_files}

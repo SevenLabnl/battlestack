@@ -1,0 +1,86 @@
+---
+description: Drizzle ORM
+globs: server/database/**/*.ts, drizzle.config.ts
+alwaysApply: false
+---
+
+# Drizzle ORM Conventions
+
+## Schema Definition
+
+- Define tables in `server/database/schema/` with one file per domain
+- Export all tables from `server/database/schema/index.ts`
+- Use `pgTable` for PostgreSQL tables
+- Use snake_case for column names (mapped via Drizzle)
+- Always include `createdAt` and `updatedAt` timestamps
+- Use `uuid` with `defaultRandom()` for primary keys unless sequential IDs are needed
+- Define foreign keys with explicit `onDelete` behavior
+
+## Example Schema
+
+```ts
+import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+
+export const items = pgTable('items', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+```
+
+## Queries
+
+- Use the `useDrizzle()` function to get the database client
+- Prefer Drizzle query builder over raw SQL
+- Use `eq`, `and`, `or`, `gt`, `lt` from `drizzle-orm` for conditions
+- Always use `.returning()` on INSERT/UPDATE when you need the result
+
+## Role Enum Pattern
+
+Define enums as TypeScript enums and use them in both schema and API routes:
+
+```ts
+// server/database/schema/users.ts
+export enum Role {
+    Admin = 'admin',
+    User = 'user',
+}
+
+export const users = pgTable('users', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    role: text('role').notNull().default(Role.User),
+    // ...
+})
+```
+
+Use `requireRole()` in API routes to protect endpoints:
+
+```ts
+import { requireRole } from '../../utils/auth'
+import { Role } from '../../database/schema'
+
+export default defineEventHandler(async (event) => {
+    const admin = await requireRole(event, Role.Admin)
+    // ...
+})
+```
+
+## Migrations: MANDATORY after every schema change
+
+After editing ANY file in `server/database/schema/`, you MUST run the drizzle commands yourself; do not stop at editing the TypeScript:
+
+```bash
+pnpm run db:generate   # drizzle-kit generate — emits NNNN_*.sql + updates meta/_journal.json
+pnpm run db:migrate    # drizzle-kit migrate — applies pending SQL to the local database
+```
+
+Then commit the generated `server/database/migrations/NNNN_*.sql` file AND the updated `meta/_journal.json` together with the schema change. A schema edit without its generated migration is incomplete work.
+
+- `battlestack db:generate` / `battlestack db:migrate` / `battlestack db:push` are equivalents that wrap the same package.json scripts; use `pnpm run db:*` if `battlestack` is not on PATH
+- `pnpm run db:push` (direct schema sync, no SQL files) is for quick local prototyping only; production deploys apply the committed SQL files, so push alone never ships
+- Never use `pnpm dlx drizzle-kit ...`; it downloads an unpinned drizzle-kit; always go through the `db:*` scripts
+- Never manually edit generated migration files
+- Never hand-write migration SQL; let `db:generate` derive it from the schema
+- If the database is not running: `pnpm run db:migrate` fails with a connection error; start it first (`battlestack db:up` or `docker compose up -d`)
+- Push-vs-migrate drift ("relation already exists" on migrate): happens when the schema was synced via `db:push` before migrations existed. The boot migrator and `migrate.mjs` auto-baseline this (record migrations as applied, run nothing); don't hand-edit `drizzle.__drizzle_migrations`

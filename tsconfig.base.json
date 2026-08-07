@@ -1,0 +1,25 @@
+{
+    // Shared compiler baseline for every tsconfig in the workspace (the root
+    // whole-workspace type-check config AND each package's per-package build
+    // config). Split out so both extend one source of truth instead of
+    // duplicating options that must stay identical (target/module/strict/…).
+    //
+    // NOT yet enabled: `noUncheckedIndexedAccess` (monolith has it on).
+    // Turning it on today red-lines `packages/core/src/{plugin,registry}.ts`
+    // (array-index reads after a length check TS can't narrow) — that's
+    // packages/*/src territory this root-tooling pass doesn't own. Flip it
+    // on once the core owner adds the couple of non-null assertions/guards;
+    // until then this tsconfig would otherwise ship a permanently-red
+    // `pnpm tsc`.
+    "compilerOptions": {
+        "target": "ES2022",
+        "lib": ["ES2023"],
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "strict": true,
+        "esModuleInterop": true,
+        "resolveJsonModule": true,
+        "skipLibCheck": true,
+        "types": ["node"]
+    }
+}

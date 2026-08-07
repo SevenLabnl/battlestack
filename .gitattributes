@@ -1,0 +1,25 @@
+# Normalise to LF in the index and on checkout, on every platform.
+#
+# This matters more than usual here: packages/*/templates/** is scaffold
+# PAYLOAD that gets copied verbatim into generated projects. A contributor on
+# Windows with core.autocrlf=true would otherwise check those files out as
+# CRLF and scaffold apps with mixed line endings. The CLI's copy paths use raw
+# copyFile / readFile+writeFile and never translate line endings, so whatever
+# is on disk is what the user gets.
+#
+# End users installing from npm are unaffected either way — a tarball is
+# extracted, not checked out, so their git config never touches it.
+* text=auto eol=lf
+
+# Binary assets — never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.tgz binary

@@ -1,0 +1,20 @@
+{
+    "shell": {
+        "admin": "Admin",
+        "users": "Gebruikers",
+        "usersHint": "Teamleden uitnodigen, bewerken of verwijderen",
+        "ai": "AI-instellingen",
+        "aiHint": "Wissel chat- en embeddingmodellen per agent",
+        "prompts": "Prompts",
+        "promptsHint": "Systeemprompts van AI-agents bewerken",
+        "rag": "Kennisbank",
+        "ragHint": "Documenten toevoegen + doorzoeken (RAG)",
+        "chat": "Chat",
+        "chatHint": "Praat met de AI-assistent",
+        "profile": "Profiel",
+        "security": "Beveiliging",
+        "signOut": "Uitloggen",
+        "accountMenu": "Accountmenu",
+        "dashboard": "Dashboard"
+    }
+}

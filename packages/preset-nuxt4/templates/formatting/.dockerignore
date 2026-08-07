@@ -1,0 +1,55 @@
+# Dependencies & build output
+node_modules/
+dist/
+dev-dist/
+.nuxt/
+.output/
+coverage/
+*.tsbuildinfo
+
+# Secrets: never bake into images. Compose mounts/passes them at runtime.
+.env
+.env.*
+
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# Dev-only orchestration
+docker-compose.yml
+docker-compose.*.yml
+k8s/
+drizzle/
+
+# Editors
+.idea/
+.vscode/
+.cursor/
+
+# AI-assistant context (re-attached at runtime if needed)
+.claude/
+.claude-plugin/
+CLAUDE.md
+
+# Tests
+test/
+tests/
+playwright-report/
+test-results/
+*.test.ts
+*.spec.ts
+
+# Battlestack project metadata + update artefacts
+.battlestack/
+*.battlestack.new
+*.battlestack.patch
+
+# Logs & OS junk
+*.log
+.DS_Store
+Thumbs.db
+
+# Docs
+*.md
+docs/
