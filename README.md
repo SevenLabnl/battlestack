@@ -139,6 +139,45 @@ battlestack upgrade      # pick up newer feature versions
 **`bstack` is a shorter alias for `battlestack`.** Same binary, either name, so
 `bstack dev` works too.
 
+## Installing and updating
+
+**Scaffolding needs no install.** `npx battlestack@latest` (or `pnpm dlx`,
+`bunx`) always fetches the newest release for that one run.
+
+**For daily use, install the CLI globally** so `battlestack` and `bstack` are
+on your PATH inside projects:
+
+```bash
+pnpm add -g battlestack   # or: npm i -g battlestack · bun i -g battlestack
+```
+
+**Updating the CLI.** A global install updates itself:
+
+```bash
+battlestack self-update
+```
+
+Under pnpm this respects the release-age gate, so a release published minutes
+ago is held back briefly; `--force` installs the true latest now. If you only
+ever run via `npx`, there is nothing persistent to update — `@latest` already
+does it.
+
+**Updating a project.** A scaffolded project is not frozen at scaffold time:
+
+```bash
+battlestack pull    # re-apply template + config changes, drift-aware
+battlestack bump    # bump npm dependencies to latest
+battlestack sync    # pull + bump + doctor in one go
+```
+
+`pull` refuses to clobber files you have edited; `--force` overwrites them and
+saves each one as `<file>.battlestack.bak` first, and `battlestack own <path>`
+tells `pull` to leave a file alone permanently.
+
+**Cloned an existing battlestack project?** `battlestack install` is the
+post-clone bootstrap: it writes `.env`, installs dependencies and applies the
+database schema in one step.
+
 ## Choosing a package manager
 
 `--pm <pnpm|npm|bun>` sets the package manager for the *generated* project,
