@@ -14,16 +14,21 @@ const TTL_MS = 30_000
 
 // Reads `process.env` directly (not `useRuntimeConfig`) since this is reachable from Mastra Studio's standalone process, which has no Nitro runtime context.
 // `key === 'embedding'` falls back to the embedding env default; every other key (chat + custom configs) falls back to the chat model env.
+// The `NUXT_LITELLM_*` names are a legacy fallback for projects scaffolded before the generic-gateway rename.
 function readFallback(key: string): string {
     if (key === 'embedding') {
-        return process.env.NUXT_LITELLM_EMBEDDING_MODEL || 'openai/text-embedding-3-small'
+        return process.env.NUXT_AI_GATEWAY_EMBEDDING_MODEL
+            || process.env.NUXT_LITELLM_EMBEDDING_MODEL
+            || 'openai/text-embedding-3-small'
     }
-    return process.env.NUXT_LITELLM_CHAT_MODEL || 'openai/gpt-4o-mini'
+    return process.env.NUXT_AI_GATEWAY_CHAT_MODEL
+        || process.env.NUXT_LITELLM_CHAT_MODEL
+        || 'openai/gpt-4o-mini'
 }
 
 /**
- * Returns the full `litellm/<provider>/<model>` id Mastra requires, since it throws on shorter forms; a bare DB value gets a provider inferred.
- * Embeddings bypass this and call `litellmEmbedding(rawId)` directly, because Mastra core has no embedding gateway.
+ * Returns the full `gateway/<provider>/<model>` id Mastra requires, since it throws on shorter forms; a bare DB value gets a provider inferred.
+ * Embeddings bypass this and call `gatewayEmbedding(rawId)` directly, because Mastra core has no embedding gateway.
  */
 export async function getActiveModelId(key: string): Promise<string> {
     const cached = cache.get(key)
@@ -43,7 +48,7 @@ export async function getActiveModelId(key: string): Promise<string> {
     }
 }
 
-// Embeddings reuse the `ai_model_configs.key = 'embedding'` row but resolve to a RAW id (no `litellm/` prefix) since Mastra core doesn't gateway embedding models.
+// Embeddings reuse the `ai_model_configs.key = 'embedding'` row but resolve to a RAW id (no `gateway/` prefix) since Mastra core doesn't gateway embedding models.
 // Cached under a distinct key so it never collides with the (prefixed) chat lookup.
 const EMBEDDING_CACHE_KEY = 'embedding:raw'
 
@@ -68,12 +73,16 @@ export async function getActiveEmbeddingModelId(fallback?: string): Promise<stri
     }
 }
 
-/** Build the Mastra router id `litellm/<provider>/<model>` from a DB-stored value: already-prefixed strings, bare names (provider inferred), or `<provider>/<model>` shorthand. */
+/**
+ * Build the Mastra router id `gateway/<provider>/<model>` from a DB-stored value: already-prefixed strings, bare names (provider inferred), or `<provider>/<model>` shorthand.
+ * A legacy `litellm/` prefix (rows written before the generic-gateway rename) is stripped and re-prefixed, so switching gateways never bricks stored ids.
+ */
 function toRouterId(stored: string): string {
-    if (stored.startsWith('litellm/')) return stored
-    if (stored.includes('/')) return `litellm/${stored}`
-    const provider = inferProviderFromName(stored) ?? 'openai'
-    return `litellm/${provider}/${stored}`
+    if (stored.startsWith('gateway/')) return stored
+    const bare = stored.startsWith('litellm/') ? stored.slice('litellm/'.length) : stored
+    if (bare.includes('/')) return `gateway/${bare}`
+    const provider = inferProviderFromName(bare) ?? 'openai'
+    return `gateway/${provider}/${bare}`
 }
 
 function inferProviderFromName(modelGroup: string): string | null {

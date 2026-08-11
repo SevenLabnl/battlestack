@@ -1,16 +1,16 @@
-export interface LiteLLMModels {
+export interface GatewayModels {
     chat: string[]
     embedding: string[]
 }
 
-export type LiteLLMFetchError
+export type GatewayFetchError
     = | { kind: 'timeout' }
         | { kind: 'network', message: string }
         | { kind: 'http', status: number, statusText: string }
         | { kind: 'parse', message: string }
         | { kind: 'empty' }
 
-export interface LiteLLMFetchResult {
-    models: LiteLLMModels | null
-    error: LiteLLMFetchError | null
+export interface GatewayFetchResult {
+    models: GatewayModels | null
+    error: GatewayFetchError | null
 }

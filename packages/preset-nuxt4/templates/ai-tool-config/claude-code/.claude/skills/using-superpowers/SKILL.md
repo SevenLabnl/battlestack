@@ -34,7 +34,7 @@ This project uses:
 - **Node 24 LTS** runtime, **pnpm** default PM (bun/npm/yarn also supported), **vitest** test runner
 - **Drizzle ORM** with PostgreSQL (Docker)
 - **Nuxt UI v4** + Tailwind CSS v4
-- **LiteLLM** for AI model access via the gateway URL configured in `NUXT_LITELLM_URL`
+- **AI gateway** (sluis.ai or any OpenAI-compatible endpoint) for AI model access via the URL configured in `NUXT_AI_GATEWAY_URL`
 - **vitest** for testing (2-minute timeout enforced)
 - **i18n** with Dutch (default) and English
 

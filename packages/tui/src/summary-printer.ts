@@ -107,14 +107,16 @@ function printAnswerSummary(state: FeatureState, has: (id: string) => boolean): 
     if (aiTool) rows.push(['AI tool', aiTool])
 
     if (has('nuxt4:mastra')) {
-        const url = pickString(state.litellmUrl)
-        if (url) rows.push(['LiteLLM URL', url])
-        const key = pickString(state.litellmKey)
+        const preset = pickString(state.aiGatewayPreset)
+        rows.push(['AI gateway', preset === 'custom' ? 'custom (OpenAI-compatible)' : 'sluis.ai'])
+        const url = pickString(state.aiGatewayUrl)
+        if (url) rows.push(['Gateway URL', url])
+        const key = pickString(state.aiGatewayKey)
         rows.push([
-            'LiteLLM key',
+            'Gateway key',
             key ? ui.maskSecret(key) : pc.dim('(blank, set later in .env)'),
         ])
-        const chatModel = pickString(state.litellmChatModel)
+        const chatModel = pickString(state.aiGatewayChatModel)
         if (chatModel) rows.push(['Chat model', chatModel])
     }
 

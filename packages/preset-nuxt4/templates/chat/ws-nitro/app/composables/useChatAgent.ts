@@ -12,8 +12,8 @@ export interface ChatError {
 }
 
 function classifyError(raw: string): ChatError {
-    if (/NUXT_LITELLM_KEY/i.test(raw)) return { kind: 'missing-key', message: raw }
-    if (/NUXT_LITELLM_URL/i.test(raw)) return { kind: 'missing-url', message: raw }
+    if (/NUXT_(?:AI_GATEWAY|LITELLM)_KEY/i.test(raw)) return { kind: 'missing-key', message: raw }
+    if (/NUXT_(?:AI_GATEWAY|LITELLM)_URL/i.test(raw)) return { kind: 'missing-url', message: raw }
     return { kind: 'generic', message: raw }
 }
 

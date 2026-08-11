@@ -12,4 +12,4 @@ You have access to structured AI coding workflows. Apply them proactively:
 - **Parallel Agents**: Split independent work across agents. Never let two agents modify the same file.
 - **Git Worktrees**: Use worktrees for isolated branches when parallelizing.
 
-Project stack: Nuxt 4 (SSR enabled), Node 24, pnpm (default), Drizzle ORM, PostgreSQL, Nuxt UI v4, Tailwind CSS v4, LiteLLM, vitest, i18n (NL default + EN).
+Project stack: Nuxt 4 (SSR enabled), Node 24, pnpm (default), Drizzle ORM, PostgreSQL, Nuxt UI v4, Tailwind CSS v4, an OpenAI-compatible AI gateway (sluis.ai preset), vitest, i18n (NL default + EN).

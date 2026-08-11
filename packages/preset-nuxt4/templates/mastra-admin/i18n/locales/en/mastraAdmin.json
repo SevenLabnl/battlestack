@@ -4,7 +4,7 @@
         "subtitle": "Pick which model each agent role uses. Changes take effect immediately — no redeploy required.",
         "configsHeader": "Model configurations",
         "loadingModels": "Loading models…",
-        "noModels": "No models available. Set NUXT_LITELLM_KEY in .env and restart.",
+        "noModels": "No models available. Set NUXT_AI_GATEWAY_KEY in .env and restart.",
         "selectModel": "Select a model",
         "searchModels": "Search models",
         "updated": "Updated",

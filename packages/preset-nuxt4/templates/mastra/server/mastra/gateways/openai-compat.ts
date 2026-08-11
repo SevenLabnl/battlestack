@@ -3,25 +3,29 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 
 /**
  * The only file calling the OpenAI-compatible SDK directly; everything else routes through Mastra agents or this gateway.
- * Mastra throws on router ids shorter than `<gateway>/<provider>/<model>`, so providers are discovered as buckets from LiteLLM's `/v1/models`.
+ * The upstream is ANY OpenAI-compatible AI gateway — sluis.ai, a self-hosted LiteLLM proxy, or another compatible endpoint — configured by `NUXT_AI_GATEWAY_URL`.
+ * Mastra throws on router ids shorter than `<gateway>/<provider>/<model>`, so providers are discovered as buckets from the gateway's `/v1/models`.
  */
-export class LiteLLMGateway extends MastraModelGateway {
-    readonly id = 'litellm'
-    readonly name = 'LiteLLM Proxy'
+export class OpenAICompatGateway extends MastraModelGateway {
+    readonly id = 'gateway'
+    readonly name = 'AI Gateway (OpenAI-compatible)'
 
     async fetchProviders(): Promise<Record<string, ProviderConfig>> {
         const modelsByProvider = new Map<string, Set<string>>()
-        const { root, apiKey } = litellmEndpoints()
+        const { root, apiKey } = gatewayEndpoints()
 
-        if (process.env.DEBUG_LITELLM_GATEWAY) {
+        if (process.env.DEBUG_AI_GATEWAY) {
             process.stderr.write(
-                `[litellm-gateway] fetchProviders() invoked, root=${root || '<unset>'} key=${apiKey ? '<set>' : '<unset>'}\n`,
+                `[ai-gateway] fetchProviders() invoked, root=${root || '<unset>'} key=${apiKey ? '<set>' : '<unset>'}\n`,
             )
         }
 
         try {
             const res = await fetch(`${root}/v1/models`, {
-                headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+                headers: {
+                    ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+                    ...gatewayHeaders(),
+                },
             })
             if (res.ok) {
                 const raw = (await res.json()) as
@@ -29,9 +33,9 @@ export class LiteLLMGateway extends MastraModelGateway {
                     | Array<{ id?: string }>
                 const entries = Array.isArray(raw) ? raw : (raw.data ?? [])
 
-                if (process.env.DEBUG_LITELLM_GATEWAY) {
+                if (process.env.DEBUG_AI_GATEWAY) {
                     process.stderr.write(
-                        `[litellm-gateway] /v1/models returned ${entries.length} entries\n`,
+                        `[ai-gateway] /v1/models returned ${entries.length} entries\n`,
                     )
                 }
 
@@ -55,33 +59,33 @@ export class LiteLLMGateway extends MastraModelGateway {
                     bucket.add(modelName)
                     modelsByProvider.set(provider, bucket)
                 }
-            } else if (process.env.DEBUG_LITELLM_GATEWAY) {
+            } else if (process.env.DEBUG_AI_GATEWAY) {
                 process.stderr.write(
-                    `[litellm-gateway] /v1/models → ${res.status} ${res.statusText}\n`,
+                    `[ai-gateway] /v1/models → ${res.status} ${res.statusText}\n`,
                 )
             }
         } catch (err) {
-            if (process.env.DEBUG_LITELLM_GATEWAY) {
+            if (process.env.DEBUG_AI_GATEWAY) {
                 const msg = err instanceof Error ? err.message : String(err)
-                process.stderr.write(`[litellm-gateway] /v1/models fetch failed: ${msg}\n`)
+                process.stderr.write(`[ai-gateway] /v1/models fetch failed: ${msg}\n`)
             }
         }
 
         const out: Record<string, ProviderConfig> = {}
         for (const [id, models] of modelsByProvider) {
             if (models.size === 0) continue
-            out[id] = this.providerConfig(`${id} via LiteLLM`, [...models].sort())
+            out[id] = this.providerConfig(`${id} via AI gateway`, [...models].sort())
         }
         return out
     }
 
     buildUrl(_modelId: string, _envVars: Record<string, string>): string {
-        return litellmEndpoints().apiRoot
+        return gatewayEndpoints().apiRoot
     }
 
     async getApiKey(): Promise<string> {
-        const { apiKey } = litellmEndpoints()
-        if (!apiKey) throw new Error('runtimeConfig.litellmKey is not set')
+        const { apiKey } = gatewayEndpoints()
+        if (!apiKey) throw new Error('runtimeConfig.aiGatewayKey is not set')
         return apiKey
     }
 
@@ -95,12 +99,12 @@ export class LiteLLMGateway extends MastraModelGateway {
         apiKey: string
         headers?: Record<string, string>
     }): Promise<GatewayLanguageModel> {
-        const upstreamId = toLiteLLMUpstreamId(args.providerId, args.modelId)
+        const upstreamId = toUpstreamId(args.providerId, args.modelId)
         return createOpenAICompatible({
-            name: 'litellm',
+            name: 'gateway',
             apiKey: args.apiKey,
-            baseURL: litellmEndpoints().apiRoot,
-            headers: args.headers,
+            baseURL: gatewayEndpoints().apiRoot,
+            headers: { ...gatewayHeaders(), ...args.headers },
         }).chatModel(upstreamId)
     }
 
@@ -108,42 +112,76 @@ export class LiteLLMGateway extends MastraModelGateway {
         return {
             name: label,
             models,
-            apiKeyEnvVar: 'NUXT_LITELLM_KEY',
+            apiKeyEnvVar: 'NUXT_AI_GATEWAY_KEY',
             gateway: this.id,
-            url: litellmEndpoints().apiRoot,
+            url: gatewayEndpoints().apiRoot,
         }
     }
 }
 
 /**
- * Build an embedding model routed through LiteLLM. Direct openai-compatible use is intentional: Mastra core doesn't gateway embedding models.
+ * Build an embedding model routed through the AI gateway. Direct openai-compatible use is intentional: Mastra core doesn't gateway embedding models.
  */
-export function litellmEmbedding(modelId: string) {
-    const { apiRoot, apiKey } = litellmEndpoints()
+export function gatewayEmbedding(modelId: string) {
+    const { apiRoot, apiKey } = gatewayEndpoints()
     return createOpenAICompatible({
-        name: 'litellm',
+        name: 'gateway',
         apiKey,
         baseURL: apiRoot,
+        headers: gatewayHeaders(),
     }).textEmbeddingModel(modelId)
 }
 
 /**
- * Normalizes the LiteLLM URL (strips/re-appends trailing `/v1`) and throws if unset, so an unconfigured project fails loudly instead of silently hitting a bad upstream.
+ * Normalizes the gateway URL (strips/re-appends trailing `/v1`) and throws if unset, so an unconfigured project fails loudly instead of silently hitting a bad upstream.
  * Reads `process.env` directly (not `useRuntimeConfig`) because this gateway also loads under standalone `mastra dev` Studio, which has no Nitro runtime context.
+ * `NUXT_LITELLM_URL`/`NUXT_LITELLM_KEY` are read as a legacy fallback so a project scaffolded before the generic-gateway rename keeps working after `battlestack pull`.
  */
-export function litellmEndpoints(): { root: string; apiRoot: string; apiKey: string } {
-    const raw = String(process.env.NUXT_LITELLM_URL ?? '').trim()
+export function gatewayEndpoints(): { root: string; apiRoot: string; apiKey: string } {
+    const raw = String(
+        process.env.NUXT_AI_GATEWAY_URL ?? process.env.NUXT_LITELLM_URL ?? '',
+    ).trim()
     if (!raw) {
         throw new Error(
-            'NUXT_LITELLM_URL is not set. Point it at your LiteLLM proxy in `.env`.',
+            'NUXT_AI_GATEWAY_URL is not set. Point it at your OpenAI-compatible AI gateway (e.g. https://api.sluis.ai) in `.env`.',
         )
     }
     const root = raw.replace(/\/+$/, '').replace(/\/v1$/i, '')
     return {
         root,
         apiRoot: `${root}/v1`,
-        apiKey: String(process.env.NUXT_LITELLM_KEY ?? ''),
+        apiKey: String(
+            process.env.NUXT_AI_GATEWAY_KEY ?? process.env.NUXT_LITELLM_KEY ?? '',
+        ),
     }
+}
+
+let warnedBadHeaders = false
+
+/**
+ * Optional extra request headers from `NUXT_AI_GATEWAY_HEADERS` (a JSON object), sent on every gateway call.
+ * This is how gateway-specific knobs are passed without dedicated code paths — e.g. sluis.ai's per-request residency override: `{"X-Sluis-Residency":"eu-only"}`.
+ */
+export function gatewayHeaders(): Record<string, string> {
+    const raw = String(process.env.NUXT_AI_GATEWAY_HEADERS ?? '').trim()
+    if (!raw) return {}
+    try {
+        const parsed = JSON.parse(raw) as unknown
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            const out: Record<string, string> = {}
+            for (const [k, v] of Object.entries(parsed)) out[k] = String(v)
+            return out
+        }
+    } catch {
+        // Fall through to the warning below.
+    }
+    if (!warnedBadHeaders) {
+        warnedBadHeaders = true
+        process.stderr.write(
+            '[ai-gateway] NUXT_AI_GATEWAY_HEADERS is not a JSON object; ignoring it\n',
+        )
+    }
+    return {}
 }
 
 /**
@@ -167,7 +205,7 @@ function isNonChatModelName(id: string): boolean {
     )
 }
 
-function toLiteLLMUpstreamId(providerId: string, modelId: string): string {
+function toUpstreamId(providerId: string, modelId: string): string {
     if (providerId === 'custom') return modelId
     if (modelId.startsWith(`${providerId}/`)) return modelId
     return `${providerId}/${modelId}`

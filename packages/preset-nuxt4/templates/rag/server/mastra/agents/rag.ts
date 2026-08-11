@@ -4,7 +4,7 @@ import { Agent } from '@mastra/core/agent'
 import { getActiveModelId } from '../utils/ai-model'
 
 // Same DB-backed chat-model selector as the default agent.
-// `getActiveModelId` returns the `litellm/`-prefixed form so Mastra routes through `LiteLLMGateway`.
+// `getActiveModelId` returns the `gateway/`-prefixed form so Mastra routes through `OpenAICompatGateway`.
 export const ragAgent = new Agent({
     id: 'rag',
     name: 'rag',

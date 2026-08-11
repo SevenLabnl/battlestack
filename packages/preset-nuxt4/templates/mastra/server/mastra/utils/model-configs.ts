@@ -14,13 +14,17 @@ export function getDefaultModelConfigs(): DefaultModelConfig[] {
             key: 'chat',
             name: 'Chat',
             description: 'Default chat model used by interactive agents.',
-            model: process.env.NUXT_LITELLM_CHAT_MODEL || 'openai/gpt-4o-mini',
+            model: process.env.NUXT_AI_GATEWAY_CHAT_MODEL
+                || process.env.NUXT_LITELLM_CHAT_MODEL // legacy pre-rename name
+                || 'openai/gpt-4o-mini',
         },
         {
             key: 'embedding',
             name: 'Embedding',
             description: 'Default embedding model used by RAG ingestion + query.',
-            model: process.env.NUXT_LITELLM_EMBEDDING_MODEL || 'openai/text-embedding-3-small',
+            model: process.env.NUXT_AI_GATEWAY_EMBEDDING_MODEL
+                || process.env.NUXT_LITELLM_EMBEDDING_MODEL // legacy pre-rename name
+                || 'openai/text-embedding-3-small',
         },
     ]
 }

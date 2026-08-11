@@ -17,7 +17,7 @@ import { STAGE, STAGE_ORDER } from '@battlestack/core/constants/stages.js'
  */
 export const envFeature: Feature = {
     id: 'shared:env',
-    version: '1.0.2',
+    version: '1.0.3',
     label: 'Write .env / .env.example',
     stage: STAGE.ENV,
 

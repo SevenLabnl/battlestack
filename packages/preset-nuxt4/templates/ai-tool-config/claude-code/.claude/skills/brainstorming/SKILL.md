@@ -29,7 +29,7 @@ Identify hard constraints from the project stack:
 - **Nuxt UI v4**: use existing components before building custom ones
 - **i18n**: all user-facing text needs NL and EN translations
 - **vitest**: tests must pass with 2-minute timeout
-- **LiteLLM proxy**: AI calls go through the gateway URL configured in `NUXT_LITELLM_URL` (set at scaffold time; see this project's `.env`)
+- **AI gateway**: AI calls go through the OpenAI-compatible gateway URL configured in `NUXT_AI_GATEWAY_URL` (sluis.ai preset or custom; set at scaffold time; see this project's `.env`)
 
 ### 3. Generate Options
 Produce 2-3 distinct approaches. For each:

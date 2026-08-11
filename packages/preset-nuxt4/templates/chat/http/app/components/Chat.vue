@@ -72,8 +72,8 @@ async function onSubmit(e?: Event) {
 
 const errorMessage = computed(() => {
     const raw = (error.value as { message?: string } | null | undefined)?.message ?? ''
-    if (/NUXT_LITELLM_KEY/i.test(raw)) return t('chat.errorMissingKey')
-    if (/NUXT_LITELLM_URL/i.test(raw)) return t('chat.errorMissingUrl')
+    if (/NUXT_(?:AI_GATEWAY|LITELLM)_KEY/i.test(raw)) return t('chat.errorMissingKey')
+    if (/NUXT_(?:AI_GATEWAY|LITELLM)_URL/i.test(raw)) return t('chat.errorMissingUrl')
     return raw || t('chat.errorGeneric')
 })
 </script>

@@ -105,12 +105,15 @@ export interface FeatureState {
     policies?: ProjectManifest['policies']
     storageRegion?: string
 
-    // LiteLLM / Mastra prompt answers
-    litellmUrl?: string
-    litellmKey?: string
-    litellmChatModel?: string
-    litellmChatModels?: string[]
-    litellmEmbeddingModels?: string[]
+    // AI gateway / Mastra prompt answers. The gateway is any OpenAI-compatible
+    // proxy; `sluis` is the only named preset, `custom` covers everything else
+    // (a LiteLLM proxy, a vendor's own compatible endpoint, ...).
+    aiGatewayPreset?: 'sluis' | 'custom'
+    aiGatewayUrl?: string
+    aiGatewayKey?: string
+    aiGatewayChatModel?: string
+    aiGatewayChatModels?: string[]
+    aiGatewayEmbeddingModels?: string[]
 
     // RAG prompt answers
     ragEmbeddingModel?: string

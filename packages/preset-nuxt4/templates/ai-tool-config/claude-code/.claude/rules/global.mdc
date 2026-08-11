@@ -51,7 +51,7 @@ This project is scaffolded with the following features already built:
 - **User management**: admin-only CRUD at `/app/settings/users`
 - **Role system**: `Role.Admin` and `Role.User` enum, `requireRole()` helper
 - **Prompt management**: editable prompts at `/app/settings/prompts`, seeded via `seed.ts`
-- **AI model configuration**: LiteLLM-backed model selection at `/app/settings/ai`
+- **AI model configuration**: gateway-backed model selection at `/app/settings/ai`
 - **PWA**: installable progressive web app via `@vite-pwa/nuxt`
 - **WebSockets**: Nitro `defineWebSocketHandler` at `/_ws` (multiplexed on port 3000)
 - **Linting**: @nuxt/eslint + eslint-plugin-drizzle + eslint-plugin-security

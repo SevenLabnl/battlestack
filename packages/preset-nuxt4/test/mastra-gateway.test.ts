@@ -15,7 +15,7 @@ const GATEWAY = path.join(
     'server',
     'mastra',
     'gateways',
-    'litellm.ts',
+    'openai-compat.ts',
 )
 
 const source = (): Promise<string> => readFile(GATEWAY, 'utf8')
@@ -30,7 +30,7 @@ async function code(): Promise<string> {
         .replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
 
-describe('LiteLLM gateway template: AI SDK generation compatibility', () => {
+describe('AI gateway template: AI SDK generation compatibility', () => {
     it('types resolveLanguageModel against Mastra\'s own union', async () => {
         const src = await source()
         expect(src).toContain('type GatewayLanguageModel')
@@ -49,5 +49,38 @@ describe('LiteLLM gateway template: AI SDK generation compatibility', () => {
         // The provider package's generation-specific type exports are that trap; Mastra
         // re-exports what this file needs and tracks whatever it actually accepts.
         expect(src).not.toMatch(/from '@ai-sdk\/provider'/)
+    })
+})
+
+describe('AI gateway template: generic OpenAI-compatible configuration', () => {
+    it('registers under the generic `gateway` id', async () => {
+        const src = await code()
+        expect(src).toMatch(/readonly id = 'gateway'/)
+        // Control: the pre-rename id must be gone from code (not just renamed in prose).
+        expect(src).not.toMatch(/readonly id = 'litellm'/)
+    })
+
+    it('reads NUXT_AI_GATEWAY_URL with the legacy NUXT_LITELLM_URL fallback', async () => {
+        const src = await code()
+        expect(src).toContain('NUXT_AI_GATEWAY_URL')
+        expect(src).toContain('NUXT_LITELLM_URL')
+        expect(src).toContain('NUXT_AI_GATEWAY_KEY')
+        expect(src).toContain('NUXT_LITELLM_KEY')
+    })
+
+    it('parses optional NUXT_AI_GATEWAY_HEADERS as JSON and sends them on gateway calls', async () => {
+        const src = await code()
+        expect(src).toContain('NUXT_AI_GATEWAY_HEADERS')
+        expect(src).toMatch(/JSON\.parse/)
+        // Both the chat factory and the embedding factory must carry the headers.
+        expect(src).toMatch(/headers: \{ \.\.\.gatewayHeaders\(\), \.\.\.args\.headers \}/)
+        expect(src).toMatch(/headers: gatewayHeaders\(\),/)
+    })
+
+    it('has no sluis-specific code path (sluis is only a scaffold-time preset)', async () => {
+        const src = await code()
+        // The gateway stays generic: sluis.ai works via URL + headers alone. A
+        // NUXT_SLUIS_* env read appearing here would mean provider-specific branching.
+        expect(src).not.toMatch(/NUXT_SLUIS_/)
     })
 })

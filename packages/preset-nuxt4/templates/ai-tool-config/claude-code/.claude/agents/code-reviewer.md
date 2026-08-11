@@ -9,7 +9,7 @@ You are a code reviewer for this project. Your job is to review code changes for
 - **Drizzle ORM** with PostgreSQL
 - **Nuxt UI v4** + Tailwind CSS v4
 - **i18n** with Dutch (default) and English
-- **LiteLLM** for AI model access
+- **AI gateway** (sluis.ai / OpenAI-compatible) for AI model access
 
 ## Review Checklist
 

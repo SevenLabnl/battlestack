@@ -8,18 +8,20 @@ export default defineWebSocketHandler({
 
             // Fail fast before invoking Mastra so its retry loop + stack trace
             // doesn't spam server logs when env config is incomplete.
+            // `litellmUrl`/`litellmKey` are the legacy pre-rename bindings, still
+            // honored so an upgraded project's old `.env` keeps working.
             const config = useRuntimeConfig()
-            if (!config.litellmUrl) {
+            if (!config.aiGatewayUrl && !config.litellmUrl) {
                 peer.send(JSON.stringify({
                     type: 'error',
-                    message: 'NUXT_LITELLM_URL is not set',
+                    message: 'NUXT_AI_GATEWAY_URL is not set',
                 }))
                 return
             }
-            if (!config.litellmKey) {
+            if (!config.aiGatewayKey && !config.litellmKey) {
                 peer.send(JSON.stringify({
                     type: 'error',
-                    message: 'NUXT_LITELLM_KEY is not set',
+                    message: 'NUXT_AI_GATEWAY_KEY is not set',
                 }))
                 return
             }

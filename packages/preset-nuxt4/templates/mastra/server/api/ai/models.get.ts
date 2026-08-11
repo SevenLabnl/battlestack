@@ -1,7 +1,7 @@
-import { litellmEndpoints } from '#server/mastra/gateways/litellm'
+import { gatewayEndpoints, gatewayHeaders } from '#server/mastra/gateways/openai-compat'
 
-// LiteLLM's `/v1/models` returns either `{data: [...]}` or a bare array depending on deployment; handle both.
-// `/model_group/info` has richer metadata but is admin-only and 403s under virtual keys, so mode is inferred from the model id instead.
+// The gateway's `/v1/models` returns either `{data: [...]}` or a bare array depending on deployment (LiteLLM does both; sluis.ai uses `{data}`); handle both.
+// Richer metadata endpoints tend to be admin-only (LiteLLM's `/model_group/info` 403s under virtual keys), so mode is inferred from the model id instead.
 interface OpenAIModelEntry {
     id?: string
 }
@@ -12,7 +12,7 @@ export default defineEventHandler(async () => {
     let root: string
     let apiKey: string
     try {
-        ;({ root, apiKey } = litellmEndpoints())
+        ;({ root, apiKey } = gatewayEndpoints())
     } catch {
         return { models: [] }
     }
@@ -22,7 +22,7 @@ export default defineEventHandler(async () => {
     try {
         const raw = await $fetch<{ data?: OpenAIModelEntry[] } | OpenAIModelEntry[]>(
             `${root}/v1/models`,
-            { headers: { Authorization: `Bearer ${apiKey}` } },
+            { headers: { Authorization: `Bearer ${apiKey}`, ...gatewayHeaders() } },
         )
         const entries = Array.isArray(raw) ? raw : (raw.data ?? [])
         const models = entries
