@@ -11,6 +11,21 @@ battlestack dev
 
 Then open the URL it prints. That is the whole happy path.
 
+## Why this exists
+
+Every new project at SevenLab started the same way: scaffold Nuxt, then spend
+days wiring the same things — auth, Postgres, migrations, Docker, CI, health
+checks, agent config — before writing the first line of product code. Starters
+and boilerplates only half-solve this: they hand you the wiring once, and from
+that moment your copy drifts. A fix upstream never reaches you.
+
+battlestack fixes both halves. The scaffold is assembled from versioned
+features rather than copied from a frozen template, and every generated
+project keeps a manifest of which feature versions produced which files — so
+`battlestack pull` can bring upstream fixes into a project you scaffolded
+months ago, and `battlestack doctor` can tell you when you've drifted. It is
+the difference between a starter kit and a maintained one.
+
 ## Before you start
 
 **Node 24 or newer** is the only hard requirement. Check with `node -v`.
@@ -75,6 +90,33 @@ Leave `battlestack dev` running in one terminal and use another for `login`.
 Start with `nuxt4-minimal` if you only want a well-configured Nuxt app. Pick
 `nuxt4-fullstack` if you know you need users and a database. Nothing is a dead
 end: `battlestack add <feature>` pulls in more later.
+
+## What you can do with it
+
+Templates are curated bundles of *features*, and `battlestack add` picks from
+the same catalog. What is in it today:
+
+- **Auth, properly done.** Session auth with argon2id, optional passkeys
+  (WebAuthn), TOTP two-factor with secrets encrypted at rest, password
+  recovery, email verification, and GitHub/Google OAuth.
+- **Data layer.** Postgres + Drizzle running in Docker with `db:push`, `seed`,
+  `studio` and `shell` commands; optional Redis rate limiting with a circuit
+  breaker that fails over to Postgres; object storage (RustFS locally, S3 in
+  production).
+- **AI features.** Mastra agents behind a LiteLLM proxy, an HTTP-streaming
+  chat UI, opt-in RAG on pgvector (ingest, chunk, embed, query), and
+  admin-editable agent prompts.
+- **App surface.** Landing shell, authenticated dashboard, admin-gated user
+  management, an append-only security audit log, PWA, i18n (EN + NL), Nuxt UI
+  v4 + Tailwind v4, Pinia.
+- **Ops and quality.** Production Dockerfile and compose setup, a real
+  `/api/health`, GitHub Actions, pre-commit hooks, Vitest, security headers,
+  and a supply-chain release-age policy for dependencies.
+
+Local development gets extras too: `battlestack gateway:up` runs a shared
+Traefik proxy so each project serves at `https://<name>.battlestack.test`
+with locally-trusted TLS, and `battlestack login` opens a browser already
+signed in as the seeded admin.
 
 ## Everyday commands
 
@@ -173,8 +215,37 @@ is a no-op instead of a second attempt at the same change.
 `.env` is generated from the features you enabled, not a template with
 placeholders left in it for you to find later.
 
+## Parts and components
+
+battlestack is a small plugin system, not a monolith. Four packages:
+
+| Package | What it is |
+| --- | --- |
+| `battlestack` | The CLI binary you run. Thin: arg parsing, plugin loading, command dispatch. |
+| `@battlestack/core` | The plugin SDK — types, registries, and the orchestrator that turns enabled features into an execution plan. |
+| `@battlestack/preset-nuxt4` | The Nuxt 4 preset: one framework, three templates and 39 features. It uses the same plugin API a third-party plugin would. |
+| `@battlestack/tui` | Shared terminal UI (prompts, spinners, banner). |
+
+The units compose as **framework → template → feature**: a template is a
+curated list of features, and a feature is a versioned unit that contributes
+files, dependencies, env vars, docs sections and its own CLI subcommands.
+Anyone can ship more of them: a plugin is an npm package built with
+`defineBattlestackPlugin()` that registers features, templates, commands or
+deploy targets — including private, unpublished plugins that extend a public
+install without the public code referencing them. `ARCHITECTURE.md` has the
+full picture.
+
 ## More
 
 `ARCHITECTURE.md` covers how the plugin system and package split fit together.
 
 `CONTRIBUTING.md` covers local dev setup and what CI checks.
+
+## Who built this
+
+battlestack is built and maintained by **SevenLab**, where it scaffolds the
+projects we build for ourselves and for clients — the public spine of the
+stack we use every day.
+
+Questions, ideas, or want to work with us? Reach out at
+[hello@sevenlab.ai](mailto:hello@sevenlab.ai), or open an issue.
