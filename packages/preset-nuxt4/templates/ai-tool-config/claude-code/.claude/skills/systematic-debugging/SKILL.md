@@ -29,7 +29,7 @@ Common root causes in this stack:
 - **Drizzle schema mismatch**: Schema does not match database (run `pnpm run db:generate` + `pnpm run db:migrate`)
 - **Missing env var**: Variable not in `.env` or not in `runtimeConfig`
 - **Auth middleware**: Route not protected or incorrectly protected
-- **WebSocket streaming**: Nitro WS handler at `/_ws` not registered, connection dropped, message not flushed, or upstream LiteLLM stream not consumed before close
+- **WebSocket streaming**: Nitro WS handler at `/_ws` not registered, connection dropped, message not flushed, or upstream AI-gateway stream not consumed before close
 - **i18n key missing**: Key exists in NL but not EN, or vice versa
 - **Type mismatch**: Zod schema does not match TypeScript interface
 - **Unresolved `#server/...` / `#imports` import or duplicate exports**: an import points at a path that does not exist, or two files export the same name. Nitro fails its build on an unresolvable import, so the server binds the port but never serves: looks like a hung startup. Check the import path resolves to a real file, and look for stray pull-merge artifacts (see below)

@@ -3,7 +3,7 @@ import { PinoLogger } from '@mastra/loggers'
 import { PostgresStore } from '@mastra/pg'
 import { Observability, DefaultExporter } from '@mastra/observability'
 import { defaultAgent } from './agents/default'
-import { LiteLLMGateway } from './gateways/litellm'
+import { OpenAICompatGateway } from './gateways/openai-compat'
 
 /**
  * Shared by Nuxt server routes and the standalone `mastra dev` Studio process, so it reads `process.env`: `useRuntimeConfig()` is undefined outside Nitro.
@@ -22,8 +22,8 @@ const storage = new PostgresStore({
 
 export const mastra = new Mastra({
     agents: { default: defaultAgent },
-    // Every `<provider>/<model>` request routes through this gateway; discovery hits `/v1/models` at runtime so any provider LiteLLM serves is registered automatically.
-    gateways: { litellm: new LiteLLMGateway() },
+    // Every `<provider>/<model>` request routes through this gateway; discovery hits `/v1/models` at runtime so any provider the configured AI gateway (sluis.ai, a LiteLLM proxy, ...) serves is registered automatically.
+    gateways: { gateway: new OpenAICompatGateway() },
     storage,
     logger: new PinoLogger({ name: 'mastra', level: 'info' }),
     observability: new Observability({

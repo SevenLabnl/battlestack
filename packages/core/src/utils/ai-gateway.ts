@@ -1,5 +1,5 @@
 import { EMBEDDING_PATTERNS } from '../constants/ai.js'
-import type { LiteLLMModels, LiteLLMFetchError, LiteLLMFetchResult } from '../types/litellm.js'
+import type { GatewayFetchError, GatewayFetchResult } from '../types/ai-gateway.js'
 
 export function isEmbeddingModel(modelId: string): boolean {
     const lower = modelId.toLowerCase()
@@ -24,22 +24,17 @@ export function unifyModelIds(ids: string[]): string[] {
     return cleaned.filter((id) => id.includes('/') || !prefixedTails.has(id))
 }
 
-export async function fetchLiteLLMModels(
+/**
+ * Fetch and classify a gateway's models, with a discriminated error: auth, network or empty gateway.
+ * Works against any OpenAI-compatible gateway (`GET /v1/models` + bearer auth):
+ * sluis.ai, a LiteLLM proxy, or anything else speaking the same surface.
+ */
+export async function fetchGatewayModelsDetailed(
     apiKey: string,
     baseUrl: string,
     timeoutMs = 10_000,
-): Promise<LiteLLMModels | null> {
-    const { models } = await fetchLiteLLMModelsDetailed(apiKey, baseUrl, timeoutMs)
-    return models
-}
-
-/** `fetchLiteLLMModels` with a discriminated error: auth, network or empty proxy. */
-export async function fetchLiteLLMModelsDetailed(
-    apiKey: string,
-    baseUrl: string,
-    timeoutMs = 10_000,
-): Promise<LiteLLMFetchResult> {
-    const url = baseUrl.replace(/\/+$/, '') + '/v1/models'
+): Promise<GatewayFetchResult> {
+    const url = baseUrl.replace(/\/+$/, '').replace(/\/v1$/i, '') + '/v1/models'
     const ac = new AbortController()
     const timer = setTimeout(() => ac.abort(), timeoutMs)
     try {
@@ -84,17 +79,18 @@ export async function fetchLiteLLMModelsDetailed(
     }
 }
 
-export function describeLiteLLMError(err: LiteLLMFetchError): string {
+/** `label` names the gateway in user-facing copy: `LiteLLM`, `sluis.ai`, or the generic default. */
+export function describeGatewayError(err: GatewayFetchError, label = 'AI gateway'): string {
     switch (err.kind) {
-        case 'timeout': return 'LiteLLM request timed out; check the URL is reachable from your network'
-        case 'network': return `LiteLLM network error: ${err.message}`
+        case 'timeout': return `${label} request timed out; check the URL is reachable from your network`
+        case 'network': return `${label} network error: ${err.message}`
         case 'http': {
             const auth = err.status === 401 || err.status === 403
             return auth
-                ? `LiteLLM rejected the key (${err.status} ${err.statusText}); check NUXT_LITELLM_KEY`
-                : `LiteLLM returned ${err.status} ${err.statusText}`
+                ? `${label} rejected the key (${err.status} ${err.statusText}); check NUXT_AI_GATEWAY_KEY`
+                : `${label} returned ${err.status} ${err.statusText}`
         }
-        case 'parse': return `LiteLLM response was not valid JSON: ${err.message}`
-        case 'empty': return 'LiteLLM proxy returned no models'
+        case 'parse': return `${label} response was not valid JSON: ${err.message}`
+        case 'empty': return `${label} returned no models`
     }
 }

@@ -26,7 +26,7 @@ Non-interactive (CI, scripts): add `--yes`.
 | --- | --- |
 | `nuxt4-minimal` | Nuxt 4 + UI v4 + Tailwind v4 only. No backend, no auth. |
 | `nuxt4-fullstack` | Nuxt + UI + i18n + Postgres + Drizzle + custom auth + Mastra + Docker. |
-| `nuxt4-ai` | Full stack + Mastra agents + HTTP streaming chat + Docker. RAG opt-in. |
+| `nuxt4-ai` | Full stack + Mastra agents + HTTP streaming chat via an OpenAI-compatible AI gateway ([sluis.ai](https://sluis.ai) preset, 50k free tokens) + Docker. RAG opt-in. |
 
 Each also prompts for optional features on top — storage, PWA, CI workflows,
 passkeys, and more, depending on the template.

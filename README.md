@@ -85,7 +85,7 @@ Leave `battlestack dev` running in one terminal and use another for `login`.
 | --- | --- | --- |
 | `nuxt4-minimal` | Nuxt 4 + UI v4 + Tailwind v4, i18n, Pinia, a `/api/health` route, production Dockerfile + CI. No database, no auth. | no |
 | `nuxt4-fullstack` | The above plus Postgres, Drizzle, custom auth, Mastra and Docker Compose. | yes |
-| `nuxt4-ai` | Full stack plus Mastra agents and HTTP streaming chat. RAG opt-in. | yes |
+| `nuxt4-ai` | Full stack plus Mastra agents and HTTP streaming chat behind an OpenAI-compatible AI gateway (sluis.ai preset). RAG opt-in. | yes |
 
 Start with `nuxt4-minimal` if you only want a well-configured Nuxt app. Pick
 `nuxt4-fullstack` if you know you need users and a database. Nothing is a dead
@@ -103,9 +103,9 @@ the same catalog. What is in it today:
   `studio` and `shell` commands; optional Redis rate limiting with a circuit
   breaker that fails over to Postgres; object storage (RustFS locally, S3 in
   production).
-- **AI features.** Mastra agents behind a LiteLLM proxy, an HTTP-streaming
-  chat UI, opt-in RAG on pgvector (ingest, chunk, embed, query), and
-  admin-editable agent prompts.
+- **AI features.** Mastra agents behind an OpenAI-compatible AI gateway
+  (sluis.ai preset — see below), an HTTP-streaming chat UI, opt-in RAG on
+  pgvector (ingest, chunk, embed, query), and admin-editable agent prompts.
 - **App surface.** Landing shell, authenticated dashboard, admin-gated user
   management, an append-only security audit log, PWA, i18n (EN + NL), Nuxt UI
   v4 + Tailwind v4, Pinia.
@@ -117,6 +117,21 @@ Local development gets extras too: `battlestack gateway:up` runs a shared
 Traefik proxy so each project serves at `https://<name>.battlestack.test`
 with locally-trusted TLS, and `battlestack login` opens a browser already
 signed in as the seeded admin.
+
+### The AI gateway, and sluis.ai
+
+The AI templates never talk to model providers directly: everything goes
+through one OpenAI-compatible AI gateway, configured by `NUXT_AI_GATEWAY_URL`
+and `NUXT_AI_GATEWAY_KEY` in `.env`. The scaffold's built-in preset is
+[sluis.ai](https://sluis.ai), SevenLab's own hosted AI gateway: one API for
+every AI model, EU data residency by default, PII stripped from prompts before
+they leave (and restored in the answers), and a tamper-evident audit ledger
+that proves compliance. New accounts start with 50,000 free tokens, so a fresh
+`nuxt4-ai` scaffold can chat before you have set up anything else.
+
+Prefer your own infrastructure? Pick the custom option at scaffold time and
+point `NUXT_AI_GATEWAY_URL` at any OpenAI-compatible endpoint — a self-hosted
+LiteLLM proxy works fine.
 
 ## Everyday commands
 

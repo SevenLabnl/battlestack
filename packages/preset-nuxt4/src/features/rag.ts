@@ -32,7 +32,7 @@ function defaultDimensionsFor(model: string | undefined): number {
 /** RAG on Mastra: chunk → embedMany → PgVector.upsert/query. pgvector ships with `nuxt4:database`. */
 export const ragFeature: Feature = {
     id: 'nuxt4:rag',
-    version: '1.3.1',
+    version: '1.4.0',
     label: 'RAG (Mastra + pgvector)',
     description: 'Ingest, chunk, embed, and query documents with Mastra + pgvector.',
     frameworks: ['nuxt4'],
@@ -50,7 +50,7 @@ export const ragFeature: Feature = {
         if (ctx.state.nonInteractive === true) return
 
         const embeddingModel = await promptEmbeddingModel(
-            ctx.state.litellmEmbeddingModels ?? [],
+            ctx.state.aiGatewayEmbeddingModels ?? [],
         )
         if (embeddingModel) ctx.state.ragEmbeddingModel = embeddingModel
 
@@ -132,12 +132,12 @@ export const ragFeature: Feature = {
                 body: [
                     'Retrieval-augmented generation. pgvector + Mastra.',
                     '',
-                    'Pipeline (`server/utils/rag.ts`): `MDocument.fromText` → recursive chunking → `embedMany` (LiteLLM via `@ai-sdk/openai`) → `PgVector.upsert`.',
+                    'Pipeline (`server/utils/rag.ts`): `MDocument.fromText` → recursive chunking → `embedMany` (through the AI gateway via `@ai-sdk/openai-compatible`) → `PgVector.upsert`.',
                     '',
                     '- `POST /api/rag/ingest` body: `{ title, source, text, metadata? }`',
                     '- `POST /api/rag/query` body: `{ query }` returns top-K chunks with scores',
                     '- UI: `/dashboard/rag` (ingest form + query box; nav entry under Admin, gated by the public `rag` flag). Both endpoints require a session.',
-                    '- Agent: `server/mastra/agents/rag.ts`: same LiteLLM model as `default`, distinct system prompt',
+                    '- Agent: `server/mastra/agents/rag.ts`: same gateway chat model as `default`, distinct system prompt',
                     '',
                     'Embedding model is admin-controllable: ingestion + query resolve it from the `embedding` row of `ai_model_configs` (registered on boot, edited at `/dashboard/settings/ai`) via `getActiveEmbeddingModelId()`, falling back to `runtimeConfig.rag.embeddingModel` (`NUXT_RAG_*`) / env. So a staging/prod deploy has a working, changeable embedding model with no redeploy. Caveat: switching to a model with a different vector dimension needs a reindex, because `NUXT_RAG_EMBEDDING_DIMENSIONS` is fixed at index creation.',
                     '',

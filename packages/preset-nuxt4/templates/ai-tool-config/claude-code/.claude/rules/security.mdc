@@ -53,7 +53,7 @@ const body = await readValidatedBody(event, schema.parse)
 - Secrets in `.env`; never hardcode API keys, passwords, or tokens
 - `.env` is in `.gitignore`; `.env.example` is committed (with placeholder values)
 - Use `useRuntimeConfig()` in server routes for Nuxt env access
-- LiteLLM key, admin password, session secret: all from `.env`
+- AI gateway key, admin password, session secret: all from `.env`
 
 ## Headers and Cookies
 

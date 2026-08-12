@@ -3,6 +3,8 @@ import { eq } from 'drizzle-orm'
 // `#server/*` is a Nuxt/Nitro alias that doesn't exist inside Mastra's bundle.
 import { db } from '../../database/client'
 import { aiModelConfigs } from '../../database/schema/ai'
+import { inferProviderFromName } from '../gateways/openai-compat'
+import { envModelDefault } from './env-defaults'
 
 interface CacheEntry {
     value: string
@@ -12,18 +14,14 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>()
 const TTL_MS = 30_000
 
-// Reads `process.env` directly (not `useRuntimeConfig`) since this is reachable from Mastra Studio's standalone process, which has no Nitro runtime context.
 // `key === 'embedding'` falls back to the embedding env default; every other key (chat + custom configs) falls back to the chat model env.
 function readFallback(key: string): string {
-    if (key === 'embedding') {
-        return process.env.NUXT_LITELLM_EMBEDDING_MODEL || 'openai/text-embedding-3-small'
-    }
-    return process.env.NUXT_LITELLM_CHAT_MODEL || 'openai/gpt-4o-mini'
+    return envModelDefault(key === 'embedding' ? 'embedding' : 'chat')
 }
 
 /**
- * Returns the full `litellm/<provider>/<model>` id Mastra requires, since it throws on shorter forms; a bare DB value gets a provider inferred.
- * Embeddings bypass this and call `litellmEmbedding(rawId)` directly, because Mastra core has no embedding gateway.
+ * Returns the full `gateway/<provider>/<model>` id Mastra requires, since it throws on shorter forms; a bare DB value gets a provider inferred.
+ * Embeddings bypass this and call `gatewayEmbedding(rawId)` directly, because Mastra core has no embedding gateway.
  */
 export async function getActiveModelId(key: string): Promise<string> {
     const cached = cache.get(key)
@@ -43,7 +41,7 @@ export async function getActiveModelId(key: string): Promise<string> {
     }
 }
 
-// Embeddings reuse the `ai_model_configs.key = 'embedding'` row but resolve to a RAW id (no `litellm/` prefix) since Mastra core doesn't gateway embedding models.
+// Embeddings reuse the `ai_model_configs.key = 'embedding'` row but resolve to a RAW id (no `gateway/` prefix) since Mastra core doesn't gateway embedding models.
 // Cached under a distinct key so it never collides with the (prefixed) chat lookup.
 const EMBEDDING_CACHE_KEY = 'embedding:raw'
 
@@ -68,44 +66,19 @@ export async function getActiveEmbeddingModelId(fallback?: string): Promise<stri
     }
 }
 
-/** Build the Mastra router id `litellm/<provider>/<model>` from a DB-stored value: already-prefixed strings, bare names (provider inferred), or `<provider>/<model>` shorthand. */
+/**
+ * Build the Mastra router id `gateway/<provider>/<model>` from a DB-stored value: already-prefixed strings, bare names (provider inferred), or `<provider>/<model>` shorthand.
+ * An existing `gateway/` prefix is stripped first and the rest re-normalized, so a malformed
+ * two-segment value like `gateway/gpt-4o-mini` (the admin PUT accepts any string) is repaired
+ * instead of short-circuiting into a router id Mastra rejects.
+ */
 function toRouterId(stored: string): string {
-    if (stored.startsWith('litellm/')) return stored
-    if (stored.includes('/')) return `litellm/${stored}`
-    const provider = inferProviderFromName(stored) ?? 'openai'
-    return `litellm/${provider}/${stored}`
+    const bare = stored.startsWith('gateway/') ? stored.slice('gateway/'.length) : stored
+    if (bare.includes('/')) return `gateway/${bare}`
+    const provider = inferProviderFromName(bare) ?? 'openai'
+    return `gateway/${provider}/${bare}`
 }
 
-function inferProviderFromName(modelGroup: string): string | null {
-    const name = modelGroup.toLowerCase()
-    if (
-        name.startsWith('gpt-') ||
-        name.startsWith('o1') ||
-        name.startsWith('o3') ||
-        name === 'chatgpt-4o-latest' ||
-        name.startsWith('babbage') ||
-        name.startsWith('davinci')
-    ) {
-        return 'openai'
-    }
-    if (name.startsWith('claude')) return 'anthropic'
-    if (name.startsWith('gemini')) return 'gemini'
-    if (name.startsWith('command') || name.startsWith('c4ai')) return 'cohere'
-    if (
-        name.startsWith('mistral') ||
-        name.startsWith('mixtral') ||
-        name.startsWith('codestral') ||
-        name.startsWith('open-mistral') ||
-        name.startsWith('open-mixtral')
-    ) {
-        return 'mistral'
-    }
-    if (name.startsWith('grok')) return 'xai'
-    if (name.startsWith('deepseek')) return 'deepseek'
-    if (name.startsWith('llama')) return 'meta'
-    if (name.startsWith('voyage')) return 'voyage'
-    return null
-}
 
 /** Drop cached entry so the next call re-reads the DB. Called from the admin PUT endpoint. */
 export function invalidateActiveModel(key?: string): void {

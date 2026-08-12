@@ -1,13 +1,13 @@
 import { MDocument } from '@mastra/rag'
 import { PgVector } from '@mastra/pg'
 import { embedMany } from 'ai'
-import { litellmEmbedding } from '#server/mastra/gateways/litellm'
+import { gatewayEmbedding } from '#server/mastra/gateways/openai-compat'
 import { getActiveEmbeddingModelId } from '#server/mastra/utils/ai-model'
 
 export const INDEX_NAME = 'rag_vectors'
 
 let _store: PgVector | null = null
-let _embeddingModel: ReturnType<typeof litellmEmbedding> | null = null
+let _embeddingModel: ReturnType<typeof gatewayEmbedding> | null = null
 let _embeddingModelId: string | null = null
 let _initPromise: Promise<void> | null = null
 
@@ -52,10 +52,10 @@ function getStore(cfg: RagConfig): PgVector {
 
 // Admin-controllable via `ai_model_configs.embedding`, memoised by id so a change takes effect without rebuilding the model object.
 // HAZARD: switching to a model with a different vector dimension requires reindexing; the pgvector column width is fixed at index creation.
-async function getModel(cfg: RagConfig): Promise<ReturnType<typeof litellmEmbedding>> {
+async function getModel(cfg: RagConfig): Promise<ReturnType<typeof gatewayEmbedding>> {
     const id = await getActiveEmbeddingModelId(cfg.embeddingModel || undefined)
     if (!_embeddingModel || _embeddingModelId !== id) {
-        _embeddingModel = litellmEmbedding(id)
+        _embeddingModel = gatewayEmbedding(id)
         _embeddingModelId = id
     }
     return _embeddingModel

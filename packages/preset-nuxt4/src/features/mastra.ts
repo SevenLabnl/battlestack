@@ -5,7 +5,7 @@ import prompts from 'prompts'
 import { ui } from '@battlestack/tui'
 import { emitTemplate, emitTemplateUpdateMany } from '../utils/emit-template.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
-import { describeLiteLLMError, fetchLiteLLMModelsDetailed } from '@battlestack/core/utils/litellm.js'
+import { describeGatewayError, fetchGatewayModelsDetailed } from '@battlestack/core/utils/ai-gateway.js'
 import { readDotEnv } from '@battlestack/core/utils/dotenv.js'
 import {
     readJson,
@@ -23,10 +23,13 @@ import {
     DEFAULT_EMBEDDING_MODEL,
 } from '@battlestack/core/constants/ai.js'
 
-/** Mastra AI runtime. Talks to LiteLLM via `@ai-sdk/openai-compatible`. */
+/** Default URL for the sluis.ai preset; any OpenAI-compatible gateway URL works. */
+const SLUIS_URL = 'https://api.sluis.ai'
+
+/** Mastra AI runtime. Talks to an OpenAI-compatible AI gateway (sluis.ai preset, or any compatible URL) via `@ai-sdk/openai-compatible`. */
 export const mastraFeature: Feature = {
     id: 'nuxt4:mastra',
-    version: '1.2.0',
+    version: '2.0.0',
     label: 'Mastra AI runtime',
     frameworks: ['nuxt4'],
     stage: STAGE.AI_CORE,
@@ -62,45 +65,69 @@ export const mastraFeature: Feature = {
     async prompt(ctx) {
         if (ctx.state.nonInteractive === true) return
 
-        ui.section('AI / LiteLLM')
-        ui.dim('  AI features talk to a LiteLLM proxy (OpenAI-compatible).')
+        ui.section('AI gateway')
+        ui.dim('  AI features talk to an OpenAI-compatible AI gateway.')
 
-        // No default. `validate` requires the user to supply a proxy URL.
+        const { preset } = await prompts({
+            type: 'select',
+            name: 'preset',
+            message: 'AI gateway',
+            choices: [
+                {
+                    title: 'sluis.ai (hosted, EU data residency)',
+                    value: 'sluis',
+                },
+                {
+                    title: 'Custom OpenAI-compatible gateway (LiteLLM proxy, ...)',
+                    value: 'custom',
+                },
+            ],
+            initial: ctx.state.aiGatewayPreset === 'custom' ? 1 : 0,
+        })
+        if (preset === 'sluis' || preset === 'custom') ctx.state.aiGatewayPreset = preset
+        // Strict equality: an ESC-cancelled select must not silently become the
+        // hosted preset (and prefill an external URL the user never chose).
+        const isSluis = ctx.state.aiGatewayPreset === 'sluis'
+
+        // The sluis preset prefills its hosted URL (still editable); custom
+        // requires one — `validate` refuses anything that isn't http(s).
         const { url } = await prompts({
             type: 'text',
             name: 'url',
-            message: 'LiteLLM proxy URL',
-            initial: ctx.state.litellmUrl,
+            message: 'Gateway URL',
+            initial: ctx.state.aiGatewayUrl ?? (isSluis ? SLUIS_URL : undefined),
             validate: (v: string) => v.startsWith('http') || 'Must be http(s) URL',
         })
-        if (typeof url === 'string') ctx.state.litellmUrl = url.trim()
+        if (typeof url === 'string') ctx.state.aiGatewayUrl = url.trim()
 
         const { key } = await prompts({
             type: 'password',
             name: 'key',
-            message: 'LiteLLM API key (optional, leave blank to set later in .env)',
+            message: isSluis
+                ? 'sluis.ai API key (sk_live_..., optional, leave blank to set later in .env)'
+                : 'Gateway API key (optional, leave blank to set later in .env)',
         })
         const trimmedKey = ((key as string | undefined) ?? '').trim()
-        if (trimmedKey) ctx.state.litellmKey = trimmedKey
+        if (trimmedKey) ctx.state.aiGatewayKey = trimmedKey
 
+        const gatewayLabel = isSluis ? 'sluis.ai' : 'AI gateway'
         let chatChoices: string[] = []
         if (trimmedKey) {
             ui.dim('  Fetching available models…')
-            const { models, error } = await fetchLiteLLMModelsDetailed(
+            const { models, error } = await fetchGatewayModelsDetailed(
                 trimmedKey,
-                ctx.state.litellmUrl ?? '',
+                ctx.state.aiGatewayUrl ?? '',
             )
-            if (models && (models.chat.length > 0 || models.embedding.length > 0)) {
+            // fetchGatewayModelsDetailed guarantees models XOR error, and non-null
+            // models always carry at least one id, so two branches cover everything.
+            if (models) {
                 ui.ok(
                     `${models.chat.length} chat models, ${models.embedding.length} embedding models`,
                 )
-                ctx.state.litellmChatModels = models.chat
-                ctx.state.litellmEmbeddingModels = models.embedding
+                ctx.state.aiGatewayEmbeddingModels = models.embedding
                 chatChoices = models.chat
-            } else if (error) {
-                ui.warn(`${describeLiteLLMError(error)}; falling back to defaults`)
             } else {
-                ui.warn('LiteLLM returned no models; falling back to defaults')
+                ui.warn(`${describeGatewayError(error!, gatewayLabel)}; falling back to defaults`)
             }
         }
 
@@ -110,7 +137,7 @@ export const mastraFeature: Feature = {
             name: 'chatModel',
             message: useAutocomplete
                 ? 'Chat model'
-                : 'Chat model name (no proxy fetch, type freely)',
+                : 'Chat model name (no gateway fetch, type freely)',
             initial: useAutocomplete ? undefined : DEFAULT_CHAT_MODEL,
             choices: useAutocomplete
                 ? chatChoices.map((m) => ({ title: m, value: m }))
@@ -124,62 +151,81 @@ export const mastraFeature: Feature = {
                         )
                 : undefined,
         })
-        if (typeof chatModel === 'string') ctx.state.litellmChatModel = chatModel.trim()
+        if (typeof chatModel === 'string') ctx.state.aiGatewayChatModel = chatModel.trim()
     },
 
     collectEnv(ctx): EnvVar[] {
-        // No fallback hostname. A non-interactive scaffold leaves this blank.
-        const url = ctx.state.litellmUrl ?? ''
-        const key = ctx.state.litellmKey
+        // A non-interactive scaffold leaves the URL blank; the sluis.ai preset
+        // fills it during the prompt.
+        const url = ctx.state.aiGatewayUrl ?? ''
+        const key = ctx.state.aiGatewayKey
         const chatModel
-            = ctx.state.litellmChatModel ?? DEFAULT_CHAT_MODEL
+            = ctx.state.aiGatewayChatModel ?? DEFAULT_CHAT_MODEL
         const embeddingModel
             = ctx.state.ragEmbeddingModel ?? DEFAULT_EMBEDDING_MODEL
         return [
             {
-                key: 'NUXT_LITELLM_URL',
+                key: 'NUXT_AI_GATEWAY_URL',
                 value: url,
-                example: 'https://your-litellm-proxy.example/',
+                example: SLUIS_URL,
                 group: 'AI',
-                description: 'LiteLLM proxy base URL. Mastra calls it via @ai-sdk/openai. '
-                    + 'Required before AI features will work; no default is shipped.',
+                description: 'OpenAI-compatible AI gateway base URL: sluis.ai, a self-hosted '
+                    + 'LiteLLM proxy, or any compatible endpoint. Mastra calls it via '
+                    + '@ai-sdk/openai-compatible. Required before AI features will work.',
             },
             {
-                key: 'NUXT_LITELLM_KEY',
+                key: 'NUXT_AI_GATEWAY_KEY',
                 value: key ?? '',
-                example: 'sk-litellm-replace-me',
+                example: 'sk_live_replace_me',
                 group: 'AI',
                 secret: true,
-                description: 'LiteLLM proxy API key.',
+                description: 'AI gateway API key (sluis.ai keys look like sk_live_...).',
             },
             {
-                key: 'NUXT_LITELLM_CHAT_MODEL',
+                key: 'NUXT_AI_GATEWAY_CHAT_MODEL',
                 value: chatModel,
                 group: 'AI',
-                description: 'Default chat model id served by the proxy.',
+                description: 'Default chat model id served by the gateway.',
             },
             {
-                key: 'NUXT_LITELLM_EMBEDDING_MODEL',
+                key: 'NUXT_AI_GATEWAY_EMBEDDING_MODEL',
                 value: embeddingModel,
                 group: 'AI',
                 description: 'Default embedding model id (used by RAG).',
             },
+            {
+                key: 'NUXT_AI_GATEWAY_HEADERS',
+                value: '',
+                group: 'AI',
+                description: 'Optional JSON object of extra request headers, e.g. '
+                    + '{"X-Sluis-Residency":"eu-only"} for a per-request sluis.ai '
+                    + 'residency override.',
+            },
         ]
     },
 
-    collectDocs() {
+    collectDocs(ctx) {
+        // The gateway blurb reflects what THIS project was scaffolded with, so the AI
+        // tools reading these docs don't act on the wrong provider or key format.
+        const gatewayBlurb = ctx.state.aiGatewayPreset === 'custom'
+            ? 'The gateway is configured with `NUXT_AI_GATEWAY_URL` + `NUXT_AI_GATEWAY_KEY` in `.env`'
+                + (ctx.state.aiGatewayUrl ? ` (this project: \`${ctx.state.aiGatewayUrl}\`)` : '')
+                + '. Any OpenAI-compatible endpoint works — a self-hosted LiteLLM proxy, a vendor gateway, or [sluis.ai](https://sluis.ai). Gateway-specific request headers go in `NUXT_AI_GATEWAY_HEADERS` (JSON object).'
+            : 'The gateway is configured with `NUXT_AI_GATEWAY_URL` + `NUXT_AI_GATEWAY_KEY` in `.env`. This project uses the [sluis.ai](https://sluis.ai) preset: hosted, EU data residency, PII redaction, tamper-evident audit ledger; keys look like `sk_live_...`; per-request residency override via `NUXT_AI_GATEWAY_HEADERS`, e.g. `{"X-Sluis-Residency":"eu-only"}`. Any other OpenAI-compatible endpoint also works by swapping the URL.'
         return [
             {
                 heading: 'AI (Mastra)',
                 body: [
-                    'Mastra is the default AI runtime. The OpenAI SDK is **not** a direct dependency; Mastra talks to LiteLLM via `@ai-sdk/openai`.',
+                    'Mastra is the default AI runtime. The OpenAI SDK is **not** a direct dependency; Mastra talks to an OpenAI-compatible AI gateway via `@ai-sdk/openai-compatible`.',
+                    '',
+                    gatewayBlurb,
                     '',
                     '- Runtime: `server/mastra/index.ts`',
                     '- Default agent: `server/mastra/agents/default.ts`',
                     '- Add agents/tools/workflows to the Mastra constructor in `index.ts`',
                     '- Swap models by editing the agent (no code path change)',
                     '',
-                    'Admins also swap models at runtime from `/dashboard/settings/ai`. The `ai_model_configs` table holds `chat` + `embedding` rows; agents resolve a `key` and use the row\'s `model` value. The page calls `/api/ai/models` (LiteLLM passthrough) for the picker and `PUT /api/ai/configs/:id` to commit changes (admin-only, audit-logged).',
+                    'Admins also swap models at runtime from `/dashboard/settings/ai`. The `ai_model_configs` table holds `chat` + `embedding` rows; agents resolve a `key` and use the row\'s `model` value. The page calls `/api/ai/models` (gateway passthrough) for the picker and `PUT /api/ai/configs/:id` to commit changes (admin-only, audit-logged).',
                     '',
                     'Boot-time registration: `server/plugins/10-sync-ai-on-boot.ts` runs on EVERY boot (dev/staging/prod, advisory-locked) and ensures the `ai_model_configs` rows plus an `agents` row per registered agent exist: insert-if-missing, never update or delete. This replaces relying on the dev-only `db:seed` (which refuses to run in production), so a fresh staging/prod deploy is never left with empty tables.',
                     '',
@@ -230,7 +276,7 @@ export const mastraFeature: Feature = {
             await clearMastraGatewayCache()
             const studioUrl = ui.color.accent(`http://localhost:${port}`)
             ui.ok(`Mastra Studio → ${studioUrl}  ${ui.color.dim('(dev-only, do not run in prod)')}`)
-            // `mastra dev` does not load `.env`, so NUXT_LITELLM_* is passed through explicitly.
+            // `mastra dev` does not load `.env`, so NUXT_AI_GATEWAY_* is passed through explicitly.
             const env: Record<string, string> = {}
             for (const [k, v] of await readDotEnv(ctx.projectDir)) env[k] = v
             env.PORT = String(port)
@@ -276,12 +322,12 @@ async function addStudioScript(ctx: RunContext): Promise<void> {
     await writeJson(pkgPath, pkg)
 }
 
-// Registers the runtimeConfig keys NUXT_LITELLM_* binds onto.
+// Registers the runtimeConfig keys NUXT_AI_GATEWAY_* binds onto.
 async function patchBundling(projectDir: string): Promise<void> {
     await patchNuxtConfig(projectDir, (c) => {
         c.mergeRuntimeConfig({
-            litellmUrl: '',
-            litellmKey: '',
+            aiGatewayUrl: '',
+            aiGatewayKey: '',
         })
     })
 }

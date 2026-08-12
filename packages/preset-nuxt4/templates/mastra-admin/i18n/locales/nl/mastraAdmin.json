@@ -4,7 +4,7 @@
         "subtitle": "Kies welk model elke agent-rol gebruikt. Wijzigingen zijn direct actief — geen redeploy nodig.",
         "configsHeader": "Modelconfiguraties",
         "loadingModels": "Modellen laden…",
-        "noModels": "Geen modellen beschikbaar. Stel NUXT_LITELLM_KEY in .env in en herstart.",
+        "noModels": "Geen modellen beschikbaar. Stel NUXT_AI_GATEWAY_KEY in .env in en herstart.",
         "selectModel": "Kies een model",
         "searchModels": "Zoek modellen",
         "updated": "Bijgewerkt",
