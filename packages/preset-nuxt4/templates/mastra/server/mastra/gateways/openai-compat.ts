@@ -18,7 +18,7 @@ export class OpenAICompatGateway extends MastraModelGateway {
         for (const id of await fetchGatewayModelIds()) {
             if (isNonChatModelName(id)) continue
 
-            let provider: string | null = null
+            let provider: string | null
             let modelName = id
             if (id.includes('/')) {
                 provider = id.slice(0, id.indexOf('/'))
@@ -157,7 +157,7 @@ export function gatewayHeaders(): Record<string, string> {
     const out: Record<string, string> = {}
     const raw = String(process.env.NUXT_AI_GATEWAY_HEADERS ?? '').trim()
     if (raw) {
-        let parsed: unknown = null
+        let parsed: unknown
         try {
             parsed = JSON.parse(raw)
         } catch {
