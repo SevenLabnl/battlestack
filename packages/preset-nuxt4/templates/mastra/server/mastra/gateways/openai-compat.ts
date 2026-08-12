@@ -5,6 +5,8 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
  * The only file calling the OpenAI-compatible SDK directly; everything else routes through Mastra agents or this gateway.
  * The upstream is ANY OpenAI-compatible AI gateway — sluis.ai, a self-hosted LiteLLM proxy, or another compatible endpoint — configured by `NUXT_AI_GATEWAY_URL`.
  * Mastra throws on router ids shorter than `<gateway>/<provider>/<model>`, so providers are discovered as buckets from the gateway's `/v1/models`.
+ *
+ * Header precedence on every request, lowest to highest: SDK auth (from the API key) → `NUXT_AI_GATEWAY_HEADERS` → per-call headers.
  */
 export class OpenAICompatGateway extends MastraModelGateway {
     readonly id = 'gateway'
@@ -12,63 +14,26 @@ export class OpenAICompatGateway extends MastraModelGateway {
 
     async fetchProviders(): Promise<Record<string, ProviderConfig>> {
         const modelsByProvider = new Map<string, Set<string>>()
-        const { root, apiKey } = gatewayEndpoints()
 
-        if (process.env.DEBUG_AI_GATEWAY) {
-            process.stderr.write(
-                `[ai-gateway] fetchProviders() invoked, root=${root || '<unset>'} key=${apiKey ? '<set>' : '<unset>'}\n`,
-            )
-        }
+        for (const id of await fetchGatewayModelIds()) {
+            if (isNonChatModelName(id)) continue
 
-        try {
-            const res = await fetch(`${root}/v1/models`, {
-                headers: {
-                    ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-                    ...gatewayHeaders(),
-                },
-            })
-            if (res.ok) {
-                const raw = (await res.json()) as
-                    | { data?: Array<{ id?: string }> }
-                    | Array<{ id?: string }>
-                const entries = Array.isArray(raw) ? raw : (raw.data ?? [])
-
-                if (process.env.DEBUG_AI_GATEWAY) {
-                    process.stderr.write(
-                        `[ai-gateway] /v1/models returned ${entries.length} entries\n`,
-                    )
-                }
-
-                for (const entry of entries) {
-                    const id = entry.id
-                    if (!id) continue
-                    if (id.includes('*')) continue
-                    if (isNonChatModelName(id)) continue
-
-                    let provider: string | null = null
-                    let modelName = id
-                    if (id.includes('/')) {
-                        provider = id.slice(0, id.indexOf('/'))
-                        modelName = id.slice(id.indexOf('/') + 1)
-                    } else {
-                        provider = inferProviderFromName(id)
-                    }
-                    if (!provider) continue
-
-                    const bucket = modelsByProvider.get(provider) ?? new Set<string>()
-                    bucket.add(modelName)
-                    modelsByProvider.set(provider, bucket)
-                }
-            } else if (process.env.DEBUG_AI_GATEWAY) {
-                process.stderr.write(
-                    `[ai-gateway] /v1/models → ${res.status} ${res.statusText}\n`,
-                )
+            let provider: string | null = null
+            let modelName = id
+            if (id.includes('/')) {
+                provider = id.slice(0, id.indexOf('/'))
+                modelName = id.slice(id.indexOf('/') + 1)
+            } else {
+                provider = inferProviderFromName(id)
+                // The gateway serves this model under its bare name; remember that so
+                // resolveLanguageModel doesn't re-join the inferred provider onto it.
+                if (provider) bareUpstreamIds.add(`${provider}/${id}`)
             }
-        } catch (err) {
-            if (process.env.DEBUG_AI_GATEWAY) {
-                const msg = err instanceof Error ? err.message : String(err)
-                process.stderr.write(`[ai-gateway] /v1/models fetch failed: ${msg}\n`)
-            }
+            if (!provider) continue
+
+            const bucket = modelsByProvider.get(provider) ?? new Set<string>()
+            bucket.add(modelName)
+            modelsByProvider.set(provider, bucket)
         }
 
         const out: Record<string, ProviderConfig> = {}
@@ -83,9 +48,16 @@ export class OpenAICompatGateway extends MastraModelGateway {
         return gatewayEndpoints().apiRoot
     }
 
+    /**
+     * The key is optional when `NUXT_AI_GATEWAY_HEADERS` carries its own auth (an `Authorization`
+     * header), matching discovery and embeddings, which already work keyless. Only a config with
+     * neither fails loudly here.
+     */
     async getApiKey(): Promise<string> {
         const { apiKey } = gatewayEndpoints()
-        if (!apiKey) throw new Error('runtimeConfig.aiGatewayKey is not set')
+        if (!apiKey && !hasHeaderAuth()) {
+            throw new Error('NUXT_AI_GATEWAY_KEY is not set')
+        }
         return apiKey
     }
 
@@ -132,56 +104,127 @@ export function gatewayEmbedding(modelId: string) {
     }).textEmbeddingModel(modelId)
 }
 
+let _endpoints: { root: string; apiRoot: string; apiKey: string } | null = null
+
 /**
  * Normalizes the gateway URL (strips/re-appends trailing `/v1`) and throws if unset, so an unconfigured project fails loudly instead of silently hitting a bad upstream.
  * Reads `process.env` directly (not `useRuntimeConfig`) because this gateway also loads under standalone `mastra dev` Studio, which has no Nitro runtime context.
- * `NUXT_LITELLM_URL`/`NUXT_LITELLM_KEY` are read as a legacy fallback so a project scaffolded before the generic-gateway rename keeps working after `battlestack pull`.
+ * Memoized: env is process-constant and this is on the per-message hot path.
  */
 export function gatewayEndpoints(): { root: string; apiRoot: string; apiKey: string } {
-    const raw = String(
-        process.env.NUXT_AI_GATEWAY_URL ?? process.env.NUXT_LITELLM_URL ?? '',
-    ).trim()
+    if (_endpoints) return _endpoints
+    const raw = String(process.env.NUXT_AI_GATEWAY_URL ?? '').trim()
     if (!raw) {
         throw new Error(
             'NUXT_AI_GATEWAY_URL is not set. Point it at your OpenAI-compatible AI gateway (e.g. https://api.sluis.ai) in `.env`.',
         )
     }
     const root = raw.replace(/\/+$/, '').replace(/\/v1$/i, '')
-    return {
+    _endpoints = {
         root,
         apiRoot: `${root}/v1`,
-        apiKey: String(
-            process.env.NUXT_AI_GATEWAY_KEY ?? process.env.NUXT_LITELLM_KEY ?? '',
-        ),
+        apiKey: String(process.env.NUXT_AI_GATEWAY_KEY ?? '').trim(),
     }
+    return _endpoints
 }
 
-let warnedBadHeaders = false
+export type GatewayConfigErrorCode = 'gateway-url-missing' | 'gateway-key-missing'
 
 /**
- * Optional extra request headers from `NUXT_AI_GATEWAY_HEADERS` (a JSON object), sent on every gateway call.
+ * The single fail-fast check the chat endpoints share, resolving config exactly like
+ * `gatewayEndpoints()` does (process.env), so the guard can never pass while the
+ * gateway itself would throw. Returns null when chat calls can proceed.
+ */
+export function gatewayConfigError(): { code: GatewayConfigErrorCode, message: string } | null {
+    if (!String(process.env.NUXT_AI_GATEWAY_URL ?? '').trim()) {
+        return { code: 'gateway-url-missing', message: 'NUXT_AI_GATEWAY_URL is not set' }
+    }
+    if (!String(process.env.NUXT_AI_GATEWAY_KEY ?? '').trim() && !hasHeaderAuth()) {
+        return { code: 'gateway-key-missing', message: 'NUXT_AI_GATEWAY_KEY is not set' }
+    }
+    return null
+}
+
+let _headers: Record<string, string> | null = null
+
+/**
+ * Optional extra request headers from `NUXT_AI_GATEWAY_HEADERS` (a JSON object of string/number/boolean values), sent on every gateway call.
  * This is how gateway-specific knobs are passed without dedicated code paths — e.g. sluis.ai's per-request residency override: `{"X-Sluis-Residency":"eu-only"}`.
+ * Parsed once per process; entries with nested values are skipped with a warning instead of being sent as "[object Object]".
  */
 export function gatewayHeaders(): Record<string, string> {
+    if (_headers) return _headers
+    const out: Record<string, string> = {}
     const raw = String(process.env.NUXT_AI_GATEWAY_HEADERS ?? '').trim()
-    if (!raw) return {}
-    try {
-        const parsed = JSON.parse(raw) as unknown
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            const out: Record<string, string> = {}
-            for (const [k, v] of Object.entries(parsed)) out[k] = String(v)
-            return out
+    if (raw) {
+        let parsed: unknown = null
+        try {
+            parsed = JSON.parse(raw)
+        } catch {
+            parsed = null
         }
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            for (const [k, v] of Object.entries(parsed)) {
+                if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+                    out[k] = String(v)
+                } else {
+                    process.stderr.write(
+                        `[ai-gateway] NUXT_AI_GATEWAY_HEADERS entry "${k}" is not a string/number/boolean; skipping it\n`,
+                    )
+                }
+            }
+        } else {
+            process.stderr.write(
+                '[ai-gateway] NUXT_AI_GATEWAY_HEADERS is not a JSON object; ignoring it\n',
+            )
+        }
+    }
+    _headers = out
+    return _headers
+}
+
+function hasHeaderAuth(): boolean {
+    return Object.keys(gatewayHeaders()).some((k) => k.toLowerCase() === 'authorization')
+}
+
+/**
+ * Raw model ids from the gateway's `/v1/models` (`{data: [...]}` or a bare array, depending on
+ * deployment), wildcards dropped. Shared by provider discovery and the admin model picker.
+ * Errors resolve to an empty list — discovery and the picker both degrade gracefully.
+ */
+export async function fetchGatewayModelIds(): Promise<string[]> {
+    let endpoints: { root: string; apiKey: string }
+    try {
+        endpoints = gatewayEndpoints()
     } catch {
-        // Fall through to the warning below.
+        return []
     }
-    if (!warnedBadHeaders) {
-        warnedBadHeaders = true
-        process.stderr.write(
-            '[ai-gateway] NUXT_AI_GATEWAY_HEADERS is not a JSON object; ignoring it\n',
-        )
+    try {
+        const res = await fetch(`${endpoints.root}/v1/models`, {
+            headers: {
+                ...(endpoints.apiKey ? { Authorization: `Bearer ${endpoints.apiKey}` } : {}),
+                ...gatewayHeaders(),
+            },
+        })
+        if (!res.ok) {
+            if (process.env.DEBUG_AI_GATEWAY) {
+                process.stderr.write(`[ai-gateway] /v1/models → ${res.status} ${res.statusText}\n`)
+            }
+            return []
+        }
+        const raw = (await res.json()) as { data?: Array<{ id?: string }> } | Array<{ id?: string }>
+        const entries = Array.isArray(raw) ? raw : (raw.data ?? [])
+        return entries
+            .map((m) => m.id)
+            .filter((id): id is string => Boolean(id))
+            .filter((id) => !id.includes('*'))
+    } catch (err) {
+        if (process.env.DEBUG_AI_GATEWAY) {
+            const msg = err instanceof Error ? err.message : String(err)
+            process.stderr.write(`[ai-gateway] /v1/models fetch failed: ${msg}\n`)
+        }
+        return []
     }
-    return {}
 }
 
 /**
@@ -205,13 +248,24 @@ function isNonChatModelName(id: string): boolean {
     )
 }
 
+// `provider/model` router pairs whose upstream id is the BARE model name: the gateway listed the
+// model without a provider prefix and discovery inferred one for Mastra's router. Populated during
+// fetchProviders; when a pair isn't here (e.g. Mastra served its registry from cache in a fresh
+// process), toUpstreamId falls back to the prefixed join.
+const bareUpstreamIds = new Set<string>()
+
 function toUpstreamId(providerId: string, modelId: string): string {
     if (providerId === 'custom') return modelId
     if (modelId.startsWith(`${providerId}/`)) return modelId
+    if (bareUpstreamIds.has(`${providerId}/${modelId}`)) return modelId
     return `${providerId}/${modelId}`
 }
 
-function inferProviderFromName(modelGroup: string): string | null {
+/**
+ * Provider inference for bare model names. Also consumed by `utils/ai-model.ts` when repairing
+ * DB-stored ids, so both sides of the router agree on the bucket a bare name lands in.
+ */
+export function inferProviderFromName(modelGroup: string): string | null {
     const name = modelGroup.toLowerCase()
     if (
         name.startsWith('gpt-') ||

@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * Source-text assertions over every template consumer of the AI gateway. CI never
- * type-checks `templates/`, so a consumer left pointing at the pre-rename
- * `gateways/litellm` module would only surface when someone scaffolds a project.
+ * type-checks `templates/`, so a consumer left pointing at a renamed module or a
+ * retired export would only surface when someone scaffolds a project.
  */
 const TEMPLATES = path.join(
     path.dirname(fileURLToPath(import.meta.url)),
@@ -18,27 +18,32 @@ const read = (...parts: string[]): Promise<string> =>
     readFile(path.join(TEMPLATES, ...parts), 'utf8')
 
 describe('model resolution routes through the generic gateway', () => {
-    it('ai-model.ts builds `gateway/`-prefixed router ids and strips the legacy prefix', async () => {
+    it('ai-model.ts repairs any stored shape into gateway/<provider>/<model>', async () => {
         const src = await read('mastra', 'server', 'mastra', 'utils', 'ai-model.ts')
         expect(src).toMatch(/`gateway\/\$\{/)
-        // Legacy DB rows written before the rename carry `litellm/`; they must be
-        // re-prefixed, not returned as-is (the `litellm` gateway no longer exists).
-        expect(src).toContain("stored.startsWith('litellm/')")
-        expect(src).not.toContain("if (stored.startsWith('litellm/')) return stored")
-        // Control: no `litellm/`-prefixed id is ever *produced* anymore.
-        expect(src).not.toMatch(/`litellm\/\$\{/)
+        // A stored `gateway/` prefix is stripped and re-normalized, so a malformed
+        // two-segment id is repaired rather than passed through to a router throw.
+        expect(src).toContain("stored.startsWith('gateway/')")
+        expect(src).not.toContain("if (stored.startsWith('gateway/')) return stored")
+        // Control: no legacy handling and no second provider-inference table.
+        expect(src).not.toContain('litellm')
+        expect(src).toContain("import { inferProviderFromName } from '../gateways/openai-compat'")
+        expect(src).not.toMatch(/function inferProviderFromName/)
     })
 
-    it('env fallbacks prefer NUXT_AI_GATEWAY_* over the legacy names', async () => {
+    it('env model defaults resolve through the single shared helper', async () => {
+        const shared = await read('mastra', 'server', 'mastra', 'utils', 'env-defaults.ts')
+        expect(shared).toContain('NUXT_AI_GATEWAY_CHAT_MODEL')
+        expect(shared).toContain('NUXT_AI_GATEWAY_EMBEDDING_MODEL')
+        expect(shared).not.toContain('NUXT_LITELLM_')
         for (const file of [
             ['mastra', 'server', 'mastra', 'utils', 'ai-model.ts'],
             ['mastra', 'server', 'mastra', 'utils', 'model-configs.ts'],
         ]) {
             const src = await read(...file)
-            const gatewayFirst = src.indexOf('NUXT_AI_GATEWAY_CHAT_MODEL')
-            const legacy = src.indexOf('NUXT_LITELLM_CHAT_MODEL')
-            expect(gatewayFirst).toBeGreaterThan(-1)
-            expect(legacy).toBeGreaterThan(gatewayFirst)
+            expect(src).toContain("from './env-defaults'")
+            // Control: no consumer keeps its own copy of the fallback chain.
+            expect(src).not.toContain('NUXT_AI_GATEWAY_CHAT_MODEL')
         }
     })
 
@@ -48,39 +53,66 @@ describe('model resolution routes through the generic gateway', () => {
         expect(src).not.toContain('LiteLLMGateway')
     })
 
-    it('the admin model picker and RAG embeddings import from gateways/openai-compat', async () => {
-        const models = await read('mastra', 'server', 'api', 'ai', 'models.get.ts')
-        expect(models).toContain("from '#server/mastra/gateways/openai-compat'")
-        const rag = await read('rag', 'server', 'utils', 'rag.ts')
-        expect(rag).toContain("from '#server/mastra/gateways/openai-compat'")
-        expect(rag).toContain('gatewayEmbedding')
-        // Control: the pre-rename exports must be gone.
-        expect(models).not.toContain('litellmEndpoints')
-        expect(rag).not.toContain('litellmEmbedding')
+    it('the admin model picker reuses the gateway module\'s models fetch', async () => {
+        const src = await read('mastra', 'server', 'api', 'ai', 'models.get.ts')
+        expect(src).toContain("import { fetchGatewayModelIds } from '#server/mastra/gateways/openai-compat'")
+        // Control: no second hand-rolled models request in this route (prose may
+        // still name the endpoint; an actual call would need a fetch invocation).
+        expect(src).not.toMatch(/\$fetch|await fetch\(/)
+        expect(src).not.toContain('Authorization')
+    })
+
+    it('RAG embeddings import from gateways/openai-compat', async () => {
+        const src = await read('rag', 'server', 'utils', 'rag.ts')
+        expect(src).toContain("from '#server/mastra/gateways/openai-compat'")
+        expect(src).toContain('gatewayEmbedding')
+        expect(src).not.toContain('litellmEmbedding')
     })
 })
 
-describe('chat endpoints fail fast on the renamed config keys', () => {
+describe('chat endpoints fail fast through the shared gateway guard', () => {
     it.each([
         ['http', ['chat', 'http', 'server', 'api', 'chat.post.ts']],
         ['ws-nitro', ['chat', 'ws-nitro', 'server', 'routes', '_ws.ts']],
-    ])('%s transport checks aiGateway config with the legacy binding as fallback', async (_label, file) => {
+    ])('%s transport uses gatewayConfigError with a machine-readable code', async (_label, file) => {
         const src = await read(...file)
-        expect(src).toContain('config.aiGatewayUrl')
-        expect(src).toContain('config.aiGatewayKey')
-        expect(src).toContain('NUXT_AI_GATEWAY_URL is not set')
-        expect(src).toContain('NUXT_AI_GATEWAY_KEY is not set')
-        // Upgraded projects still bind the old env names onto these keys.
-        expect(src).toContain('config.litellmUrl')
-        expect(src).toContain('config.litellmKey')
+        expect(src).toContain('gatewayConfigError')
+        expect(src).toContain('configError.code')
+        // Control: no per-endpoint duplicate of the guard remains.
+        expect(src).not.toContain('config.aiGatewayUrl')
+        expect(src).not.toContain('config.litellmUrl')
     })
 
+    it('the ws frontend classifies by code first, message sniff as fallback', async () => {
+        const src = await read('chat', 'ws-nitro', 'app', 'composables', 'useChatAgent.ts')
+        expect(src).toContain("code === 'gateway-key-missing'")
+        expect(src).toContain("code === 'gateway-url-missing'")
+        expect(src).toMatch(/NUXT_AI_GATEWAY_KEY/)
+        expect(src).not.toContain('LITELLM')
+    })
+
+    it('the http frontend matches the current env names only', async () => {
+        const src = await read('chat', 'http', 'app', 'components', 'Chat.vue')
+        expect(src).toMatch(/NUXT_AI_GATEWAY_KEY/)
+        expect(src).toMatch(/NUXT_AI_GATEWAY_URL/)
+        expect(src).not.toContain('LITELLM')
+    })
+})
+
+describe('no legacy gateway wiring remains anywhere in templates', () => {
+    // Prose may still say "e.g. a self-hosted LiteLLM proxy" — that's a product name,
+    // not wiring. These are the identifiers that would mean live legacy code paths.
+    const LEGACY = /NUXT_LITELLM_|litellmUrl|litellmKey|litellmEndpoints|litellmEmbedding|LiteLLMGateway|litellm\//
+
     it.each([
-        ['http', ['chat', 'http', 'app', 'components', 'Chat.vue']],
-        ['ws-nitro', ['chat', 'ws-nitro', 'app', 'composables', 'useChatAgent.ts']],
-    ])('%s frontend classifies both current and legacy error strings', async (_label, file) => {
+        ['mastra runtime config', ['mastra', 'server', 'mastra', 'index.ts']],
+        ['gateway module', ['mastra', 'server', 'mastra', 'gateways', 'openai-compat.ts']],
+        ['env defaults', ['mastra', 'server', 'mastra', 'utils', 'env-defaults.ts']],
+        ['model configs', ['mastra', 'server', 'mastra', 'utils', 'model-configs.ts']],
+        ['chat http server', ['chat', 'http', 'server', 'api', 'chat.post.ts']],
+        ['chat ws server', ['chat', 'ws-nitro', 'server', 'routes', '_ws.ts']],
+    ])('%s contains no legacy identifiers', async (_label, file) => {
         const src = await read(...file)
-        expect(src).toContain('NUXT_(?:AI_GATEWAY|LITELLM)_KEY')
-        expect(src).toContain('NUXT_(?:AI_GATEWAY|LITELLM)_URL')
+        expect(src).not.toMatch(LEGACY)
     })
 })

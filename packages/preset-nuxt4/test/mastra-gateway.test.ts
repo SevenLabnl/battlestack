@@ -60,21 +60,47 @@ describe('AI gateway template: generic OpenAI-compatible configuration', () => {
         expect(src).not.toMatch(/readonly id = 'litellm'/)
     })
 
-    it('reads NUXT_AI_GATEWAY_URL with the legacy NUXT_LITELLM_URL fallback', async () => {
+    it('reads NUXT_AI_GATEWAY_URL/KEY with no legacy env names left', async () => {
         const src = await code()
         expect(src).toContain('NUXT_AI_GATEWAY_URL')
-        expect(src).toContain('NUXT_LITELLM_URL')
         expect(src).toContain('NUXT_AI_GATEWAY_KEY')
-        expect(src).toContain('NUXT_LITELLM_KEY')
+        // The legacy names were dropped outright (nothing scaffolded pre-rename is deployed).
+        expect(src).not.toContain('NUXT_LITELLM_')
     })
 
     it('parses optional NUXT_AI_GATEWAY_HEADERS as JSON and sends them on gateway calls', async () => {
         const src = await code()
         expect(src).toContain('NUXT_AI_GATEWAY_HEADERS')
         expect(src).toMatch(/JSON\.parse/)
-        // Both the chat factory and the embedding factory must carry the headers.
+        // Both the chat factory and the embedding factory must carry the headers,
+        // with per-call headers taking precedence over env headers.
         expect(src).toMatch(/headers: \{ \.\.\.gatewayHeaders\(\), \.\.\.args\.headers \}/)
         expect(src).toMatch(/headers: gatewayHeaders\(\),/)
+    })
+
+    it('skips non-scalar header values instead of sending "[object Object]"', async () => {
+        const src = await code()
+        expect(src).toMatch(/typeof v === 'string' \|\| typeof v === 'number' \|\| typeof v === 'boolean'/)
+    })
+
+    it('exposes the shared config guard with machine-readable codes', async () => {
+        const src = await code()
+        expect(src).toContain('gatewayConfigError')
+        expect(src).toContain("'gateway-url-missing'")
+        expect(src).toContain("'gateway-key-missing'")
+    })
+
+    it('accepts header-based auth in place of an API key', async () => {
+        const src = await code()
+        expect(src).toContain('hasHeaderAuth')
+        // getApiKey must not unconditionally throw on an empty key.
+        expect(src).toMatch(/if \(!apiKey && !hasHeaderAuth\(\)\)/)
+    })
+
+    it('remembers bare upstream ids so inferred providers are not re-joined', async () => {
+        const src = await code()
+        expect(src).toContain('bareUpstreamIds')
+        expect(src).toMatch(/bareUpstreamIds\.has\(`\$\{providerId\}\/\$\{modelId\}`\)\) return modelId/)
     })
 
     it('has no sluis-specific code path (sluis is only a scaffold-time preset)', async () => {

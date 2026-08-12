@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, vi } from 'vitest'
-import { fetchGatewayModels, isEmbeddingModel, unifyModelIds } from '../src/utils/ai-gateway.js'
+import { fetchGatewayModelsDetailed, isEmbeddingModel, unifyModelIds } from '../src/utils/ai-gateway.js'
 
 describe('unifyModelIds', () => {
     it('dedupes repeated ids (one row per backend)', () => {
@@ -62,15 +62,16 @@ describe('isEmbeddingModel', () => {
     })
 })
 
-describe('fetchGatewayModels', () => {
+describe('fetchGatewayModelsDetailed', () => {
     const original = globalThis.fetch
     afterEach(() => {
         globalThis.fetch = original
     })
 
-    it('returns null on non-ok response', async () => {
+    it('returns null models on non-ok response', async () => {
         globalThis.fetch = vi.fn().mockResolvedValue({ ok: false } as never) as never
-        expect(await fetchGatewayModels('k', 'https://x.test')).toBeNull()
+        const { models } = await fetchGatewayModelsDetailed('k', 'https://x.test')
+        expect(models).toBeNull()
     })
 
     it('classifies returned models into chat + embedding', async () => {
@@ -85,7 +86,7 @@ describe('fetchGatewayModels', () => {
                 ],
             }),
         } as never) as never
-        const models = await fetchGatewayModels('k', 'https://x.test')
+        const { models } = await fetchGatewayModelsDetailed('k', 'https://x.test')
         expect(models?.chat).toEqual(['claude-sonnet-4-6', 'gpt-4o-mini'])
         expect(models?.embedding).toEqual(['text-embedding-3-small', 'voyage-3'])
     })
@@ -105,7 +106,7 @@ describe('fetchGatewayModels', () => {
                 ],
             }),
         } as never) as never
-        const models = await fetchGatewayModels('k', 'https://x.test')
+        const { models } = await fetchGatewayModelsDetailed('k', 'https://x.test')
         expect(models?.chat).toEqual(['gemini/gemini-2.5-flash', 'openai/gpt-4o-mini'])
         expect(models?.embedding).toEqual(['voyage/voyage-3'])
     })
@@ -123,7 +124,7 @@ describe('fetchGatewayModels', () => {
                 ],
             }),
         } as never) as never
-        const models = await fetchGatewayModels('k', 'https://x.test')
+        const { models } = await fetchGatewayModelsDetailed('k', 'https://x.test')
         expect(models?.chat).toEqual(['gemini/gemini-2.5-flash'])
         expect(models?.embedding).toEqual([
             'gemini/text-embedding-004',
@@ -138,7 +139,7 @@ describe('fetchGatewayModels', () => {
             json: async () => ({ data: [] }),
         } as never)
         globalThis.fetch = fetchSpy as never
-        await fetchGatewayModels('k', 'https://x.test///')
+        await fetchGatewayModelsDetailed('k', 'https://x.test///')
         expect(fetchSpy).toHaveBeenCalledWith(
             'https://x.test/v1/models',
             expect.objectContaining({
@@ -153,15 +154,16 @@ describe('fetchGatewayModels', () => {
             json: async () => ({ data: [] }),
         } as never)
         globalThis.fetch = fetchSpy as never
-        await fetchGatewayModels('k', 'https://api.sluis.ai/v1')
+        await fetchGatewayModelsDetailed('k', 'https://api.sluis.ai/v1')
         expect(fetchSpy).toHaveBeenCalledWith(
             'https://api.sluis.ai/v1/models',
             expect.anything(),
         )
     })
 
-    it('returns null on fetch throw', async () => {
+    it('returns null models on fetch throw', async () => {
         globalThis.fetch = vi.fn().mockRejectedValue(new Error('network')) as never
-        expect(await fetchGatewayModels('k', 'https://x.test')).toBeNull()
+        const { models } = await fetchGatewayModelsDetailed('k', 'https://x.test')
+        expect(models).toBeNull()
     })
 })

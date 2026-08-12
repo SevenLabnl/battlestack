@@ -107,8 +107,12 @@ function printAnswerSummary(state: FeatureState, has: (id: string) => boolean): 
     if (aiTool) rows.push(['AI tool', aiTool])
 
     if (has('nuxt4:mastra')) {
+        // Guarded like every sibling row: an unanswered preset (non-interactive run,
+        // ESC-cancelled select) must not be presented as a sluis.ai choice.
         const preset = pickString(state.aiGatewayPreset)
-        rows.push(['AI gateway', preset === 'custom' ? 'custom (OpenAI-compatible)' : 'sluis.ai'])
+        if (preset) {
+            rows.push(['AI gateway', preset === 'sluis' ? 'sluis.ai' : 'custom (OpenAI-compatible)'])
+        }
         const url = pickString(state.aiGatewayUrl)
         if (url) rows.push(['Gateway URL', url])
         const key = pickString(state.aiGatewayKey)

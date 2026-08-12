@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { handleChatStream } from '@mastra/ai-sdk'
 import { createUIMessageStreamResponse } from 'ai'
 import { mastra } from '#server/mastra'
+import { gatewayConfigError } from '#server/mastra/gateways/openai-compat'
 import { rateLimit, RATE_LIMIT_POLICIES } from '#server/utils/rate-limit'
 
 const chatSchema = z.object({
@@ -35,15 +36,15 @@ export default defineEventHandler(async (event) => {
     }
 
     // Fail fast before invoking Mastra so its retry loop + stack trace
-    // doesn't spam server logs when env config is incomplete.
-    // `litellmUrl`/`litellmKey` are the legacy pre-rename bindings, still
-    // honored so an upgraded project's old `.env` keeps working.
-    const config = useRuntimeConfig(event)
-    if (!config.aiGatewayUrl && !config.litellmUrl) {
-        throw createError({ statusCode: 503, statusMessage: 'NUXT_AI_GATEWAY_URL is not set' })
-    }
-    if (!config.aiGatewayKey && !config.litellmKey) {
-        throw createError({ statusCode: 503, statusMessage: 'NUXT_AI_GATEWAY_KEY is not set' })
+    // doesn't spam server logs when env config is incomplete. The check lives in the
+    // gateway module and resolves config exactly like the gateway itself will.
+    const configError = gatewayConfigError()
+    if (configError) {
+        throw createError({
+            statusCode: 503,
+            statusMessage: configError.message,
+            data: { code: configError.code },
+        })
     }
 
     const stream = await handleChatStream({

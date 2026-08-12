@@ -11,9 +11,14 @@ export interface ChatError {
     message: string
 }
 
-function classifyError(raw: string): ChatError {
-    if (/NUXT_(?:AI_GATEWAY|LITELLM)_KEY/i.test(raw)) return { kind: 'missing-key', message: raw }
-    if (/NUXT_(?:AI_GATEWAY|LITELLM)_URL/i.test(raw)) return { kind: 'missing-url', message: raw }
+// The server's config guard sends a machine-readable `code` alongside the message;
+// classification switches on that, with a message sniff only for codeless errors
+// (e.g. an exception thrown past the guard).
+function classifyError(raw: string, code?: string): ChatError {
+    if (code === 'gateway-key-missing') return { kind: 'missing-key', message: raw }
+    if (code === 'gateway-url-missing') return { kind: 'missing-url', message: raw }
+    if (/NUXT_AI_GATEWAY_KEY/i.test(raw)) return { kind: 'missing-key', message: raw }
+    if (/NUXT_AI_GATEWAY_URL/i.test(raw)) return { kind: 'missing-url', message: raw }
     return { kind: 'generic', message: raw }
 }
 
@@ -35,7 +40,7 @@ export function useChatAgent() {
             const data = JSON.parse(e.data as string) as
                 | { type: 'delta', content: string }
                 | { type: 'done' }
-                | { type: 'error', message: string }
+                | { type: 'error', message: string, code?: string }
             if (data.type === 'delta') {
                 assistantBuffer += data.content
                 const last = messages.value.at(-1)
@@ -44,7 +49,7 @@ export function useChatAgent() {
                 status.value = 'idle'
             } else if (data.type === 'error') {
                 status.value = 'idle'
-                error.value = classifyError(data.message)
+                error.value = classifyError(data.message, data.code)
                 // Drop the empty assistant placeholder so the error surfaces
                 // instead of a phantom blank bubble.
                 const last = messages.value.at(-1)

@@ -1,4 +1,5 @@
 import { mastra } from '#server/mastra'
+import { gatewayConfigError } from '#server/mastra/gateways/openai-compat'
 
 export default defineWebSocketHandler({
     async message(peer, message) {
@@ -7,21 +8,14 @@ export default defineWebSocketHandler({
             if (!Array.isArray(payload?.messages)) return
 
             // Fail fast before invoking Mastra so its retry loop + stack trace
-            // doesn't spam server logs when env config is incomplete.
-            // `litellmUrl`/`litellmKey` are the legacy pre-rename bindings, still
-            // honored so an upgraded project's old `.env` keeps working.
-            const config = useRuntimeConfig()
-            if (!config.aiGatewayUrl && !config.litellmUrl) {
+            // doesn't spam server logs when env config is incomplete. The check lives in
+            // the gateway module and resolves config exactly like the gateway itself will.
+            const configError = gatewayConfigError()
+            if (configError) {
                 peer.send(JSON.stringify({
                     type: 'error',
-                    message: 'NUXT_AI_GATEWAY_URL is not set',
-                }))
-                return
-            }
-            if (!config.aiGatewayKey && !config.litellmKey) {
-                peer.send(JSON.stringify({
-                    type: 'error',
-                    message: 'NUXT_AI_GATEWAY_KEY is not set',
+                    code: configError.code,
+                    message: configError.message,
                 }))
                 return
             }

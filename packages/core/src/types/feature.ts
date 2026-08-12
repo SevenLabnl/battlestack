@@ -112,7 +112,6 @@ export interface FeatureState {
     aiGatewayUrl?: string
     aiGatewayKey?: string
     aiGatewayChatModel?: string
-    aiGatewayChatModels?: string[]
     aiGatewayEmbeddingModels?: string[]
 
     // RAG prompt answers

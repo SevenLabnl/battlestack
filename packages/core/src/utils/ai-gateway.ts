@@ -1,5 +1,5 @@
 import { EMBEDDING_PATTERNS } from '../constants/ai.js'
-import type { GatewayModels, GatewayFetchError, GatewayFetchResult } from '../types/ai-gateway.js'
+import type { GatewayFetchError, GatewayFetchResult } from '../types/ai-gateway.js'
 
 export function isEmbeddingModel(modelId: string): boolean {
     const lower = modelId.toLowerCase()
@@ -24,19 +24,10 @@ export function unifyModelIds(ids: string[]): string[] {
     return cleaned.filter((id) => id.includes('/') || !prefixedTails.has(id))
 }
 
-export async function fetchGatewayModels(
-    apiKey: string,
-    baseUrl: string,
-    timeoutMs = 10_000,
-): Promise<GatewayModels | null> {
-    const { models } = await fetchGatewayModelsDetailed(apiKey, baseUrl, timeoutMs)
-    return models
-}
-
 /**
- * `fetchGatewayModels` with a discriminated error: auth, network or empty gateway.
+ * Fetch and classify a gateway's models, with a discriminated error: auth, network or empty gateway.
  * Works against any OpenAI-compatible gateway (`GET /v1/models` + bearer auth):
- * a LiteLLM proxy, sluis.ai, or anything else speaking the same surface.
+ * sluis.ai, a LiteLLM proxy, or anything else speaking the same surface.
  */
 export async function fetchGatewayModelsDetailed(
     apiKey: string,

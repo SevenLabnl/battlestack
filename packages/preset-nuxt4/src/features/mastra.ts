@@ -85,7 +85,9 @@ export const mastraFeature: Feature = {
             initial: ctx.state.aiGatewayPreset === 'custom' ? 1 : 0,
         })
         if (preset === 'sluis' || preset === 'custom') ctx.state.aiGatewayPreset = preset
-        const isSluis = ctx.state.aiGatewayPreset !== 'custom'
+        // Strict equality: an ESC-cancelled select must not silently become the
+        // hosted preset (and prefill an external URL the user never chose).
+        const isSluis = ctx.state.aiGatewayPreset === 'sluis'
 
         // The sluis preset prefills its hosted URL (still editable); custom
         // requires one — `validate` refuses anything that isn't http(s).
@@ -116,17 +118,16 @@ export const mastraFeature: Feature = {
                 trimmedKey,
                 ctx.state.aiGatewayUrl ?? '',
             )
-            if (models && (models.chat.length > 0 || models.embedding.length > 0)) {
+            // fetchGatewayModelsDetailed guarantees models XOR error, and non-null
+            // models always carry at least one id, so two branches cover everything.
+            if (models) {
                 ui.ok(
                     `${models.chat.length} chat models, ${models.embedding.length} embedding models`,
                 )
-                ctx.state.aiGatewayChatModels = models.chat
                 ctx.state.aiGatewayEmbeddingModels = models.embedding
                 chatChoices = models.chat
-            } else if (error) {
-                ui.warn(`${describeGatewayError(error, gatewayLabel)}; falling back to defaults`)
             } else {
-                ui.warn(`${gatewayLabel} returned no models; falling back to defaults`)
+                ui.warn(`${describeGatewayError(error!, gatewayLabel)}; falling back to defaults`)
             }
         }
 
@@ -203,14 +204,21 @@ export const mastraFeature: Feature = {
         ]
     },
 
-    collectDocs() {
+    collectDocs(ctx) {
+        // The gateway blurb reflects what THIS project was scaffolded with, so the AI
+        // tools reading these docs don't act on the wrong provider or key format.
+        const gatewayBlurb = ctx.state.aiGatewayPreset === 'custom'
+            ? 'The gateway is configured with `NUXT_AI_GATEWAY_URL` + `NUXT_AI_GATEWAY_KEY` in `.env`'
+                + (ctx.state.aiGatewayUrl ? ` (this project: \`${ctx.state.aiGatewayUrl}\`)` : '')
+                + '. Any OpenAI-compatible endpoint works — a self-hosted LiteLLM proxy, a vendor gateway, or [sluis.ai](https://sluis.ai). Gateway-specific request headers go in `NUXT_AI_GATEWAY_HEADERS` (JSON object).'
+            : 'The gateway is configured with `NUXT_AI_GATEWAY_URL` + `NUXT_AI_GATEWAY_KEY` in `.env`. This project uses the [sluis.ai](https://sluis.ai) preset: hosted, EU data residency, PII redaction, tamper-evident audit ledger; keys look like `sk_live_...`; per-request residency override via `NUXT_AI_GATEWAY_HEADERS`, e.g. `{"X-Sluis-Residency":"eu-only"}`. Any other OpenAI-compatible endpoint also works by swapping the URL.'
         return [
             {
                 heading: 'AI (Mastra)',
                 body: [
                     'Mastra is the default AI runtime. The OpenAI SDK is **not** a direct dependency; Mastra talks to an OpenAI-compatible AI gateway via `@ai-sdk/openai-compatible`.',
                     '',
-                    'The gateway is configured with `NUXT_AI_GATEWAY_URL` + `NUXT_AI_GATEWAY_KEY` in `.env`. [sluis.ai](https://sluis.ai) is the built-in preset (hosted, EU data residency, PII redaction, tamper-evident audit ledger; per-request residency override via `NUXT_AI_GATEWAY_HEADERS`, e.g. `{"X-Sluis-Residency":"eu-only"}`), but any OpenAI-compatible endpoint works — a self-hosted LiteLLM proxy included. Projects scaffolded before the generic-gateway rename can keep their `NUXT_LITELLM_*` vars: they are read as a legacy fallback.',
+                    gatewayBlurb,
                     '',
                     '- Runtime: `server/mastra/index.ts`',
                     '- Default agent: `server/mastra/agents/default.ts`',
@@ -314,16 +322,12 @@ async function addStudioScript(ctx: RunContext): Promise<void> {
     await writeJson(pkgPath, pkg)
 }
 
-// Registers the runtimeConfig keys NUXT_AI_GATEWAY_* binds onto. The legacy
-// `litellm*` keys stay registered so a pre-rename `.env` still binds after
-// `battlestack pull`.
+// Registers the runtimeConfig keys NUXT_AI_GATEWAY_* binds onto.
 async function patchBundling(projectDir: string): Promise<void> {
     await patchNuxtConfig(projectDir, (c) => {
         c.mergeRuntimeConfig({
             aiGatewayUrl: '',
             aiGatewayKey: '',
-            litellmUrl: '',
-            litellmKey: '',
         })
     })
 }
