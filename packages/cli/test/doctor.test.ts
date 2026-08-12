@@ -430,7 +430,7 @@ describe('doctorCommand: orphaned plugin state', () => {
     it('warns on an orphaned namespace reachable only through optedOut', async () => {
         await writeProjectManifest(tmpDir, {
             features: [{ id: 'doctortest:shared:known', version: '1.0.0', files: {} }],
-            optedOut: ['someplugin:shared:k8s'],
+            optedOut: ['someplugin:shared:deploy'],
         })
         const line = (await run()).find((l) => l.includes('plugin state'))!
         expect(line).toContain('someplugin')
