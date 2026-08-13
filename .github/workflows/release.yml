@@ -1,10 +1,10 @@
 name: Release
 
-# Publishes all four packages to npm when a `v*` tag is pushed.
+# Publishes all five packages to npm when a `v*` tag is pushed.
 #
 # `pnpm publish`, never `npm publish`: the packages depend on each other with
 # `workspace:*`, and only pnpm rewrites that to a real version at pack time. npm
-# would upload four tarballs nobody can install.
+# would upload tarballs nobody can install.
 #
 # `-r` publishes every workspace package in dependency order and skips any whose
 # version is already on the registry, so a re-run after a partial failure

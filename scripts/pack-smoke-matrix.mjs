@@ -18,11 +18,12 @@
  * resolution of the scoped packages.
  *
  * `pnpm pack` rewrites `workspace:*` deps to real semver, so the packed
- * `battlestack` tarball depends on `@battlestack/core: "0.1.0"` — a version
- * that does not exist on the public registry. Declaring every package as a
- * top-level `file:` dependency is NOT enough: a package manager resolves
- * `battlestack`'s OWN dependency against the registry, not against a
- * same-named sibling `file:` entry in the consumer's manifest. It 404s.
+ * `@battlestack/cli` tarball depends on `@battlestack/core: "0.1.0"` (and the
+ * `battlestack` wrapper on `@battlestack/cli: "0.1.0"`) — versions that do
+ * not exist on the public registry. Declaring every package as a top-level
+ * `file:` dependency is NOT enough: a package manager resolves a package's
+ * OWN dependency against the registry, not against a same-named sibling
+ * `file:` entry in the consumer's manifest. It 404s.
  *
  * Each package manager needs a different override mechanism to redirect those
  * transitive references at the local tarballs, and that difference is the thing
@@ -72,7 +73,8 @@ const PACKAGES = [
     { dir: 'packages/core', name: '@battlestack/core' },
     { dir: 'packages/tui', name: '@battlestack/tui' },
     { dir: 'packages/preset-nuxt4', name: '@battlestack/preset-nuxt4' },
-    { dir: 'packages/cli', name: 'battlestack' },
+    { dir: 'packages/cli', name: '@battlestack/cli' },
+    { dir: 'packages/battlestack', name: 'battlestack' },
 ]
 
 /** The template both this and task #21's pnpm leg use, so results are comparable. */

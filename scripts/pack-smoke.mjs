@@ -1,8 +1,11 @@
-// Proves the publish path actually works: pack all 4 workspace packages with
+// Proves the publish path actually works: pack all 5 workspace packages with
 // `pnpm pack` (which rewrites `workspace:*` deps to real semver ranges, same
 // as a real `pnpm publish` would), install the tarballs — and ONLY the
 // tarballs, nothing from the workspace — into a fresh throwaway project, then
-// run the installed `battlestack` binary's `--version` and `--help`.
+// run the installed `battlestack` binary's `--version` and `--help`. The
+// binary belongs to the unscoped `battlestack` wrapper (the only package with
+// bin entries), so a passing run also proves the wrapper → @battlestack/cli
+// import chain.
 //
 // This does NOT scaffold a project end-to-end (that's another track's e2e
 // smoke test); it proves the narrower, blocking thing this track owns: the
@@ -25,7 +28,8 @@ const PACKAGES = [
     { dir: 'packages/core', name: '@battlestack/core' },
     { dir: 'packages/tui', name: '@battlestack/tui' },
     { dir: 'packages/preset-nuxt4', name: '@battlestack/preset-nuxt4' },
-    { dir: 'packages/cli', name: 'battlestack' },
+    { dir: 'packages/cli', name: '@battlestack/cli' },
+    { dir: 'packages/battlestack', name: 'battlestack' },
 ]
 
 function run(cmd, args, opts = {}) {
@@ -74,7 +78,7 @@ for (const pkg of PACKAGES) {
 // `workspace:*` to real versions by `pnpm pack`) from these exact tarballs,
 // not from a registry — proving the workspace:* rewrite is real and correct.
 // A direct `file:` dependency on every package is not sufficient by itself:
-// **pnpm and bun** resolve `battlestack`'s own OWN `@battlestack/tui: "0.1.0"`
+// **pnpm and bun** resolve `@battlestack/cli`'s own `@battlestack/tui: "0.1.0"`
 // dependency (rewritten from `workspace:*` at pack time) against the
 // registry, not against a same-named sibling `file:` dependency declared at
 // the consumer's top level — measured, not assumed (a bare direct-deps-only
@@ -99,10 +103,10 @@ writeFileSync(path.join(consumerDir, 'package.json'), JSON.stringify(consumerPkg
 // Isolate from the monorepo's own pnpm-workspace.yaml / lockfile — this must
 // resolve as a standalone install, not get folded back into the workspace
 // graph above it. `overrides` moved out of package.json#pnpm into
-// pnpm-workspace.yaml as of pnpm 10 — needed so `battlestack`'s OWN
-// `@battlestack/tui`/`@battlestack/core` deps (rewritten from `workspace:*`
-// to plain semver by `pnpm pack`) resolve to these local tarballs instead of
-// the real npm registry (where the scoped packages don't exist yet).
+// pnpm-workspace.yaml as of pnpm 10 — needed so the wrapper's own
+// `@battlestack/cli` dep and the CLI's `@battlestack/tui`/`@battlestack/core`
+// deps (rewritten from `workspace:*` to plain semver by `pnpm pack`) resolve
+// to these local tarballs instead of the real npm registry.
 writeFileSync(
     path.join(consumerDir, 'pnpm-workspace.yaml'),
     `packages: []\noverrides:\n${

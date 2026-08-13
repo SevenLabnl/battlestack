@@ -4,7 +4,8 @@ import path from 'node:path'
 import { getUiPort } from '../ui-port.js'
 import { spawnSyncResolved } from './win-exec.js'
 
-// Public npm package name (`packages/cli/package.json#name`).
+// Public npm package name of the unscoped wrapper (`packages/battlestack`),
+// the thing users install/run; kept in version lockstep with @battlestack/cli.
 const PACKAGE_NAME = 'battlestack'
 const CACHE_FILE = path.join(os.homedir(), '.battlestack', 'update-check.json')
 const TTL_MS = 24 * 60 * 60 * 1000

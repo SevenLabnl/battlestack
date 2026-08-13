@@ -15,7 +15,10 @@ import {
     type UpdateDecision,
 } from '@battlestack/core'
 
-// Unscoped public package name, used by npm view, `<pm> add -g` and the bun regex.
+// Unscoped public package name (the `packages/battlestack` wrapper — what users
+// globally install), used by npm view, `<pm> add -g` and the bun regex. The
+// wrapper is published in version lockstep with @battlestack/cli, so comparing
+// its registry version against our own package.json version stays valid.
 const PACKAGE_NAME = 'battlestack'
 
 export async function selfUpdateCommand(options: SelfUpdateOptions = {}): Promise<void> {

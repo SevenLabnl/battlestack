@@ -1,4 +1,9 @@
-# battlestack
+# @battlestack/cli
+
+The battlestack CLI engine. Users don't install this package directly — the
+unscoped [`battlestack`](https://www.npmjs.com/package/battlestack) wrapper
+(published in version lockstep) is the entry point that provides the
+`battlestack`/`bstack` commands and makes `npx battlestack` resolve.
 
 battlestack is a plugin-based scaffolding CLI for Nuxt 4. Answer a few
 prompts and it hands you a running app — not a folder of TODOs you still

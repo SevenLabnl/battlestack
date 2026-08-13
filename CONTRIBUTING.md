@@ -14,7 +14,7 @@ Two separate things get called "package manager support" here, and conflating
 them is how this section previously came to claim more than was true. They are
 verified independently:
 
-**As the tool that installs `battlestack` itself** — pack the four packages,
+**As the tool that installs `battlestack` itself** — pack the five packages,
 install *only* those tarballs into a fresh consumer, run the installed binary.
 `scripts/pack-smoke.mjs` covers pnpm; `scripts/pack-smoke-matrix.mjs` covers
 npm and bun. All three pass.

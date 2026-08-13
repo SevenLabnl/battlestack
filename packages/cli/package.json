@@ -1,7 +1,7 @@
 {
-    "name": "battlestack",
+    "name": "@battlestack/cli",
     "version": "0.1.0",
-    "description": "Battlestack CLI — open-source scaffolding tool. Loads extra capabilities from installed battlestack plugins.",
+    "description": "Battlestack CLI engine — open-source scaffolding tool. Loads extra capabilities from installed battlestack plugins. Install/run via the unscoped `battlestack` wrapper (`npx battlestack`).",
     "license": "MIT",
     "author": "SevenLab",
     "homepage": "https://github.com/SevenLabnl/battlestack#readme",
@@ -32,14 +32,13 @@
     "type": "module",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
-    "bin": {
-        "battlestack": "./dist/index.js",
-        "bstack": "./dist/index.js"
-    },
     "files": [
         "dist"
     ],
     "sideEffects": false,
+    "publishConfig": {
+        "access": "public"
+    },
     "dependencies": {
         "@battlestack/core": "workspace:*",
         "@battlestack/preset-nuxt4": "workspace:*",
