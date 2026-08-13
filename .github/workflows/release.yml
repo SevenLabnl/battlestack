@@ -19,8 +19,14 @@ on:
         type: boolean
         default: true
 
+# `id-token: write` is what lets the job mint a GitHub OIDC token. Auth is npm
+# Trusted Publishing: every package on npmjs.com is configured (Settings →
+# Trusted Publisher) to accept publishes only from this repo + this workflow
+# file + the `release` environment. pnpm exchanges the OIDC token for a
+# short-lived registry credential at publish time — no NPM_TOKEN secret exists.
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   release:
@@ -34,14 +40,15 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
 
-      # `registry-url` is what writes the .npmrc that makes NODE_AUTH_TOKEN
-      # work. Without it the token is ignored and the publish fails on auth.
+      # No `registry-url` here on purpose: it would write an .npmrc line that
+      # dereferences ${NODE_AUTH_TOKEN}, and with trusted publishing no such
+      # token is ever set — the publish would die on env replacement. OIDC
+      # needs no .npmrc auth at all.
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: pnpm
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -81,8 +88,6 @@ jobs:
       - name: Publish
         if: github.event.inputs.dry_run != 'true'
         run: pnpm -r publish --access public --no-git-checks --report-summary
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Dry run (no publish)
         if: github.event.inputs.dry_run == 'true'
