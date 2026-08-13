@@ -1,0 +1,44 @@
+{
+    "name": "battlestack",
+    "version": "0.1.0",
+    "description": "Battlestack — plugin-based scaffolding CLI for Nuxt 4. This unscoped package is the `npx battlestack` entry point; the implementation lives in @battlestack/cli.",
+    "license": "MIT",
+    "author": "SevenLab",
+    "homepage": "https://github.com/SevenLabnl/battlestack#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/SevenLabnl/battlestack.git",
+        "directory": "packages/battlestack"
+    },
+    "bugs": {
+        "url": "https://github.com/SevenLabnl/battlestack/issues"
+    },
+    "keywords": [
+        "nuxt",
+        "nuxt4",
+        "scaffold",
+        "scaffolding",
+        "boilerplate",
+        "generator",
+        "cli",
+        "starter",
+        "template",
+        "drizzle",
+        "tailwind"
+    ],
+    "engines": {
+        "node": ">=24"
+    },
+    "type": "module",
+    "bin": {
+        "battlestack": "./bin.js",
+        "bstack": "./bin.js"
+    },
+    "files": [
+        "bin.js"
+    ],
+    "sideEffects": false,
+    "dependencies": {
+        "@battlestack/cli": "workspace:*"
+    }
+}

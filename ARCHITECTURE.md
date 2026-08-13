@@ -9,15 +9,25 @@ it only knows how to load plugins and run whatever they registered.
 This document describes what the code actually does. Where something is a
 known rough edge rather than a deliberate design, it says so.
 
-## 1. The four packages
+## 1. The five packages
 
 ```
 packages/
 ├── core/            @battlestack/core        plugin SDK: types, registries, loader, orchestrator
 ├── tui/              @battlestack/tui         terminal UI: banner, spinner, colors, prompts
 ├── preset-nuxt4/     @battlestack/preset-nuxt4  the Nuxt 4 framework preset (a plugin)
-└── cli/              battlestack               the `battlestack` binary
+├── cli/              @battlestack/cli          the CLI engine (all command logic)
+└── battlestack/      battlestack               unscoped npx wrapper: owns the `battlestack`/`bstack` bins, imports @battlestack/cli
 ```
+
+The `battlestack` wrapper exists so `npx battlestack` resolves while every
+real package lives under the `@battlestack` scope. It is a single `bin.js`
+that imports `@battlestack/cli` (whose module entry runs `main()` on import)
+and carries no logic of its own. Its `workspace:*` dependency is rewritten to
+the exact sibling version at pack time, so the wrapper and the CLI are
+published together in version lockstep — `self-update` and the daily update
+check compare the CLI's own version against the wrapper's registry version,
+which only works because the versions never diverge.
 
 **`core` is a dependency-light spine.** It exports every type a plugin author
 needs (`Feature`, `Framework`, `Template`, `RunContext`, `DeployTarget`,
