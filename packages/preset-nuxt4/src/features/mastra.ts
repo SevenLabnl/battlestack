@@ -19,7 +19,7 @@ import {
 } from '@battlestack/core'
 import type { EnvVar, Feature, ProjectCommand, RunContext } from '@battlestack/core'
 import {
-    DEFAULT_CHAT_MODEL,
+    SLUIS_DEFAULT_CHAT_MODEL,
     DEFAULT_EMBEDDING_MODEL,
 } from '@battlestack/core/constants/ai.js'
 
@@ -127,31 +127,45 @@ export const mastraFeature: Feature = {
                 ctx.state.aiGatewayEmbeddingModels = models.embedding
                 chatChoices = models.chat
             } else {
-                ui.warn(`${describeGatewayError(error!, gatewayLabel)}; falling back to defaults`)
+                ui.warn(describeGatewayError(error!, gatewayLabel))
             }
         }
 
-        const useAutocomplete = chatChoices.length > 0
-        const { chatModel } = await prompts({
-            type: useAutocomplete ? 'autocomplete' : 'text',
-            name: 'chatModel',
-            message: useAutocomplete
-                ? 'Chat model'
-                : 'Chat model name (no gateway fetch, type freely)',
-            initial: useAutocomplete ? undefined : DEFAULT_CHAT_MODEL,
-            choices: useAutocomplete
-                ? chatChoices.map((m) => ({ title: m, value: m }))
-                : undefined,
-            suggest: useAutocomplete
-                ? (input: string, choices: Array<{ title: string }>) =>
-                        Promise.resolve(
-                            choices.filter((c) =>
-                                c.title.toLowerCase().includes(input.toLowerCase()),
-                            ),
-                        )
-                : undefined,
-        })
-        if (typeof chatModel === 'string') ctx.state.aiGatewayChatModel = chatModel.trim()
+        if (isSluis) {
+            // sluis.ai serves stable model aliases, so the scaffold pins the chat
+            // alias instead of a vendor model id. Still editable in `.env` later.
+            ctx.state.aiGatewayChatModel = SLUIS_DEFAULT_CHAT_MODEL
+            ui.dim(`  Chat model: ${SLUIS_DEFAULT_CHAT_MODEL} (sluis.ai alias, change in .env)`)
+        } else {
+            // A custom gateway has no known-good default, so the user must name a
+            // model themselves: picked from the live-pulled list when a key was
+            // given, typed freely otherwise. No hardcoded vendor fallback.
+            const useAutocomplete = chatChoices.length > 0
+            const { chatModel } = await prompts({
+                type: useAutocomplete ? 'autocomplete' : 'text',
+                name: 'chatModel',
+                message: useAutocomplete
+                    ? 'Chat model'
+                    : 'Chat model name (no gateway fetch, type freely)',
+                choices: useAutocomplete
+                    ? chatChoices.map((m) => ({ title: m, value: m }))
+                    : undefined,
+                validate: useAutocomplete
+                    ? undefined
+                    : (v: string) => v.trim().length > 0 || 'A model id is required',
+                suggest: useAutocomplete
+                    ? (input: string, choices: Array<{ title: string }>) =>
+                            Promise.resolve(
+                                choices.filter((c) =>
+                                    c.title.toLowerCase().includes(input.toLowerCase()),
+                                ),
+                            )
+                    : undefined,
+            })
+            if (typeof chatModel === 'string' && chatModel.trim()) {
+                ctx.state.aiGatewayChatModel = chatModel.trim()
+            }
+        }
     },
 
     collectEnv(ctx): EnvVar[] {
@@ -159,8 +173,11 @@ export const mastraFeature: Feature = {
         // fills it during the prompt.
         const url = ctx.state.aiGatewayUrl ?? ''
         const key = ctx.state.aiGatewayKey
+        // The sluis chat alias only backstops flows that never reached the model
+        // prompt (non-interactive scaffold, ESC-cancelled prompt); interactive
+        // runs always set `aiGatewayChatModel` above.
         const chatModel
-            = ctx.state.aiGatewayChatModel ?? DEFAULT_CHAT_MODEL
+            = ctx.state.aiGatewayChatModel ?? SLUIS_DEFAULT_CHAT_MODEL
         const embeddingModel
             = ctx.state.ragEmbeddingModel ?? DEFAULT_EMBEDDING_MODEL
         return [

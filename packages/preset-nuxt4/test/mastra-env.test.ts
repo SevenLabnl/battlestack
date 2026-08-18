@@ -43,8 +43,8 @@ describe('nuxt4:mastra collectEnv — generic AI gateway vars', () => {
         expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.value).toBe('mistral/mistral-large-latest')
     })
 
-    it('falls back to the shipped default chat model when no answer was given', () => {
+    it('falls back to the sluis chat alias when no answer was given', () => {
         const env = envOf({})
-        expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.value).toBe('openai/gpt-4o-mini')
+        expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.value).toBe('sluis/chat')
     })
 })
