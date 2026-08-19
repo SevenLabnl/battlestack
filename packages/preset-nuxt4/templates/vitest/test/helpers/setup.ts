@@ -183,11 +183,15 @@ export async function createTestUser(
     return { id: data.id, name: data.name, email: data.email, role: data.role, cookie }
 }
 
-/** Returns true when `BASE_URL` answers any HTTP status. */
+/**
+ * Returns true when `BASE_URL` answers with a served response. A 503 counts as DOWN: it is the
+ * dev proxy's worker-unavailable page (Nitro worker crashed or mid-restart), and running the
+ * e2e suite against it fails every test with an opaque 503 instead of self-skipping cleanly.
+ */
 export async function isServerUp(): Promise<boolean> {
     try {
-        await fetch(BASE_URL, { method: 'HEAD' })
-        return true
+        const res = await fetch(BASE_URL, { method: 'HEAD' })
+        return res.status !== 503
     } catch {
         return false
     }

@@ -5,7 +5,7 @@ import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
 /** Always-on Nuxt essentials: `@nuxt/eslint`, `@nuxt/fonts`, `@nuxt/image`, datepicker, `@iconify/vue`. */
 export const essentialsFeature: Feature = {
     id: 'nuxt4:essentials',
-    version: '1.0.3',
+    version: '1.0.4',
     label: 'Nuxt essentials (eslint, fonts, image, iconify, datepicker, nodemailer)',
     frameworks: ['nuxt4'],
     stage: STAGE.BASE_CONFIG,
