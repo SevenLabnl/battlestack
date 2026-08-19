@@ -70,8 +70,8 @@ describe('nuxt4:mastra collectEnv — generic AI gateway vars', () => {
     it('keeps an explicit answer on the custom preset', () => {
         const env = envOf({
             aiGatewayPreset: 'custom',
-            aiGatewayChatModel: 'openai/gpt-4o-mini',
+            aiGatewayChatModel: 'openai/gpt-5.6-luna',
         })
-        expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.value).toBe('openai/gpt-4o-mini')
+        expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.value).toBe('openai/gpt-5.6-luna')
     })
 })
