@@ -19,12 +19,12 @@ import {
 } from '@battlestack/core'
 import type { EnvVar, Feature, ProjectCommand, RunContext } from '@battlestack/core'
 import {
-    DEFAULT_CHAT_MODEL,
     DEFAULT_EMBEDDING_MODEL,
+    DEFAULT_GATEWAY_PRESET,
+    FALLBACK_CHAT_MODEL,
+    GATEWAY_PRESETS,
+    presetChatModel,
 } from '@battlestack/core/constants/ai.js'
-
-/** Default URL for the sluis.ai preset; any OpenAI-compatible gateway URL works. */
-const SLUIS_URL = 'https://api.sluis.ai'
 
 /** Mastra AI runtime. Talks to an OpenAI-compatible AI gateway (sluis.ai preset, or any compatible URL) via `@ai-sdk/openai-compatible`. */
 export const mastraFeature: Feature = {
@@ -73,14 +73,8 @@ export const mastraFeature: Feature = {
             name: 'preset',
             message: 'AI gateway',
             choices: [
-                {
-                    title: 'sluis.ai (hosted, EU data residency)',
-                    value: 'sluis',
-                },
-                {
-                    title: 'Custom OpenAI-compatible gateway (LiteLLM proxy, ...)',
-                    value: 'custom',
-                },
+                { title: GATEWAY_PRESETS.sluis.label, value: 'sluis' },
+                { title: GATEWAY_PRESETS.custom.label, value: 'custom' },
             ],
             initial: ctx.state.aiGatewayPreset === 'custom' ? 1 : 0,
         })
@@ -95,7 +89,7 @@ export const mastraFeature: Feature = {
             type: 'text',
             name: 'url',
             message: 'Gateway URL',
-            initial: ctx.state.aiGatewayUrl ?? (isSluis ? SLUIS_URL : undefined),
+            initial: ctx.state.aiGatewayUrl ?? (isSluis ? GATEWAY_PRESETS.sluis.url : undefined),
             validate: (v: string) => v.startsWith('http') || 'Must be http(s) URL',
         })
         if (typeof url === 'string') ctx.state.aiGatewayUrl = url.trim()
@@ -127,31 +121,46 @@ export const mastraFeature: Feature = {
                 ctx.state.aiGatewayEmbeddingModels = models.embedding
                 chatChoices = models.chat
             } else {
-                ui.warn(`${describeGatewayError(error!, gatewayLabel)}; falling back to defaults`)
+                ui.warn(describeGatewayError(error!, gatewayLabel))
             }
         }
 
-        const useAutocomplete = chatChoices.length > 0
-        const { chatModel } = await prompts({
-            type: useAutocomplete ? 'autocomplete' : 'text',
-            name: 'chatModel',
-            message: useAutocomplete
-                ? 'Chat model'
-                : 'Chat model name (no gateway fetch, type freely)',
-            initial: useAutocomplete ? undefined : DEFAULT_CHAT_MODEL,
-            choices: useAutocomplete
-                ? chatChoices.map((m) => ({ title: m, value: m }))
-                : undefined,
-            suggest: useAutocomplete
-                ? (input: string, choices: Array<{ title: string }>) =>
-                        Promise.resolve(
-                            choices.filter((c) =>
-                                c.title.toLowerCase().includes(input.toLowerCase()),
-                            ),
-                        )
-                : undefined,
-        })
-        if (typeof chatModel === 'string') ctx.state.aiGatewayChatModel = chatModel.trim()
+        const pinned = presetChatModel(ctx.state.aiGatewayPreset)
+        if (pinned) {
+            // A named preset ships a known catalogue, so the scaffold pins its alias
+            // instead of a vendor model id. Still editable in `.env` later.
+            ctx.state.aiGatewayChatModel = pinned
+            ui.dim(`  Chat model: ${pinned} (gateway alias, change in .env)`)
+        } else {
+            // A custom gateway has no known-good default, so the user must name a
+            // model themselves: picked from the live-pulled list when a key was
+            // given, typed freely otherwise. No hardcoded vendor fallback.
+            const useAutocomplete = chatChoices.length > 0
+            const { chatModel } = await prompts({
+                type: useAutocomplete ? 'autocomplete' : 'text',
+                name: 'chatModel',
+                message: useAutocomplete
+                    ? 'Chat model'
+                    : 'Chat model name (no gateway fetch, type freely)',
+                choices: useAutocomplete
+                    ? chatChoices.map((m) => ({ title: m, value: m }))
+                    : undefined,
+                validate: useAutocomplete
+                    ? undefined
+                    : (v: string) => v.trim().length > 0 || 'A model id is required',
+                suggest: useAutocomplete
+                    ? (input: string, choices: Array<{ title: string }>) =>
+                            Promise.resolve(
+                                choices.filter((c) =>
+                                    c.title.toLowerCase().includes(input.toLowerCase()),
+                                ),
+                            )
+                    : undefined,
+            })
+            if (typeof chatModel === 'string' && chatModel.trim()) {
+                ctx.state.aiGatewayChatModel = chatModel.trim()
+            }
+        }
     },
 
     collectEnv(ctx): EnvVar[] {
@@ -159,15 +168,20 @@ export const mastraFeature: Feature = {
         // fills it during the prompt.
         const url = ctx.state.aiGatewayUrl ?? ''
         const key = ctx.state.aiGatewayKey
+        // Falls back to the preset's own alias, never across presets: a `custom`
+        // gateway that never reached the model prompt (ESC) gets a blank value to
+        // fill in, not another gateway's model id it would 404 on.
         const chatModel
-            = ctx.state.aiGatewayChatModel ?? DEFAULT_CHAT_MODEL
+            = ctx.state.aiGatewayChatModel
+                ?? presetChatModel(ctx.state.aiGatewayPreset ?? DEFAULT_GATEWAY_PRESET)
+                ?? ''
         const embeddingModel
             = ctx.state.ragEmbeddingModel ?? DEFAULT_EMBEDDING_MODEL
         return [
             {
                 key: 'NUXT_AI_GATEWAY_URL',
                 value: url,
-                example: SLUIS_URL,
+                example: GATEWAY_PRESETS.sluis.url,
                 group: 'AI',
                 description: 'OpenAI-compatible AI gateway base URL: sluis.ai, a self-hosted '
                     + 'LiteLLM proxy, or any compatible endpoint. Mastra calls it via '
@@ -184,8 +198,12 @@ export const mastraFeature: Feature = {
             {
                 key: 'NUXT_AI_GATEWAY_CHAT_MODEL',
                 value: chatModel,
+                // A sluis alias is a useless placeholder for a gateway that cannot serve it.
+                example: presetChatModel(ctx.state.aiGatewayPreset) ?? FALLBACK_CHAT_MODEL,
                 group: 'AI',
-                description: 'Default chat model id served by the gateway.',
+                description: 'Default chat model id served by the gateway, in the '
+                    + '`<provider>/<model>` form the router requires. Required before '
+                    + 'AI features will work.',
             },
             {
                 key: 'NUXT_AI_GATEWAY_EMBEDDING_MODEL',

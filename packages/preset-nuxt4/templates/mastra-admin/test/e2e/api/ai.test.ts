@@ -46,7 +46,7 @@ describe('e2e: ai model admin', () => {
         if (!target) return
         const { status } = await apiPut(
             `/api/ai/configs/${target.id}`,
-            { model: 'openai/gpt-4o-mini' },
+            { model: 'openai/gpt-5.6-luna' },
             user.cookie,
         )
         expect(status).toBe(403)
@@ -57,7 +57,7 @@ describe('e2e: ai model admin', () => {
         const list = await apiGet<ModelConfig[]>('/api/ai/configs', adminCookie)
         const target = list.data?.[0]
         if (!target) return
-        const next = 'openai/gpt-4o-mini'
+        const next = 'openai/gpt-5.6-luna'
         const { status, data } = await apiPut<ModelConfig>(
             `/api/ai/configs/${target.id}`,
             { model: next },

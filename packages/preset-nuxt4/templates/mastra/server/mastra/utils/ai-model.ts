@@ -69,7 +69,7 @@ export async function getActiveEmbeddingModelId(fallback?: string): Promise<stri
 /**
  * Build the Mastra router id `gateway/<provider>/<model>` from a DB-stored value: already-prefixed strings, bare names (provider inferred), or `<provider>/<model>` shorthand.
  * An existing `gateway/` prefix is stripped first and the rest re-normalized, so a malformed
- * two-segment value like `gateway/gpt-4o-mini` (the admin PUT accepts any string) is repaired
+ * two-segment value like `gateway/gpt-5.6-luna` (the admin PUT accepts any string) is repaired
  * instead of short-circuiting into a router id Mastra rejects.
  */
 function toRouterId(stored: string): string {

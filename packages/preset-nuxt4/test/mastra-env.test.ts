@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RunContext } from '@battlestack/core'
+import { FALLBACK_CHAT_MODEL } from '@battlestack/core/constants/ai.js'
 import { mastraFeature } from '../src/features/mastra.js'
 import { mockRunContext } from './test-utils.js'
 
@@ -43,8 +44,34 @@ describe('nuxt4:mastra collectEnv — generic AI gateway vars', () => {
         expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.value).toBe('mistral/mistral-large-latest')
     })
 
-    it('falls back to the shipped default chat model when no answer was given', () => {
+    it('falls back to the default preset chat alias when no answer was given', () => {
         const env = envOf({})
-        expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.value).toBe('openai/gpt-4o-mini')
+        expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.value).toBe('sluis/chat')
+    })
+
+    it('falls back to the sluis alias for the sluis preset', () => {
+        const env = envOf({ aiGatewayPreset: 'sluis' })
+        expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.value).toBe('sluis/chat')
+        expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.example).toBe('sluis/chat')
+    })
+
+    // Regression: a custom gateway must never inherit another gateway's model id.
+    // Reachable by ESC-ing the chat-model prompt after choosing `custom`.
+    it('leaves the chat model blank for a custom gateway with no answer', () => {
+        const env = envOf({
+            aiGatewayPreset: 'custom',
+            aiGatewayUrl: 'http://litellm.internal:4000',
+        })
+        expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.value).toBe('')
+        // A sluis alias would be a placeholder this gateway cannot serve.
+        expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.example).toBe(FALLBACK_CHAT_MODEL)
+    })
+
+    it('keeps an explicit answer on the custom preset', () => {
+        const env = envOf({
+            aiGatewayPreset: 'custom',
+            aiGatewayChatModel: 'openai/gpt-5.6-luna',
+        })
+        expect(env.NUXT_AI_GATEWAY_CHAT_MODEL!.value).toBe('openai/gpt-5.6-luna')
     })
 })

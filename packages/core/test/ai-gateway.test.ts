@@ -30,14 +30,14 @@ describe('unifyModelIds', () => {
     it('drops bare form when prefixed form exists', () => {
         expect(
             unifyModelIds([
-                'openai/gpt-4o-mini',
-                'gpt-4o-mini',
+                'openai/gpt-5.6-luna',
+                'gpt-5.6-luna',
                 'gemini/gemini-2.5-flash',
                 'gemini-2.5-flash',
                 'standalone-model',
             ]),
         ).toEqual([
-            'openai/gpt-4o-mini',
+            'openai/gpt-5.6-luna',
             'gemini/gemini-2.5-flash',
             'standalone-model',
         ])
@@ -55,7 +55,7 @@ describe('isEmbeddingModel', () => {
         ['text-embedding-3-small', true],
         ['voyage-3', true],
         ['cohere-embed-english-v3', true],
-        ['gpt-4o-mini', false],
+        ['gpt-5.6-luna', false],
         ['claude-sonnet-4-6', false],
     ])('classifies %s -> %s', (id, expected) => {
         expect(isEmbeddingModel(id)).toBe(expected)
@@ -79,7 +79,7 @@ describe('fetchGatewayModelsDetailed', () => {
             ok: true,
             json: async () => ({
                 data: [
-                    { id: 'gpt-4o-mini' },
+                    { id: 'gpt-5.6-luna' },
                     { id: 'text-embedding-3-small' },
                     { id: 'claude-sonnet-4-6' },
                     { id: 'voyage-3' },
@@ -87,7 +87,7 @@ describe('fetchGatewayModelsDetailed', () => {
             }),
         } as never) as never
         const { models } = await fetchGatewayModelsDetailed('k', 'https://x.test')
-        expect(models?.chat).toEqual(['claude-sonnet-4-6', 'gpt-4o-mini'])
+        expect(models?.chat).toEqual(['claude-sonnet-4-6', 'gpt-5.6-luna'])
         expect(models?.embedding).toEqual(['text-embedding-3-small', 'voyage-3'])
     })
 
@@ -99,15 +99,15 @@ describe('fetchGatewayModelsDetailed', () => {
                     { id: 'gemini/gemini-2.5-flash' },
                     { id: 'gemini/gemini-2.5-flash' },
                     { id: 'gemini/gemini-2.5-flash' },
-                    { id: 'openai/gpt-4o-mini' },
-                    { id: 'openai/gpt-4o-mini' },
+                    { id: 'openai/gpt-5.6-luna' },
+                    { id: 'openai/gpt-5.6-luna' },
                     { id: 'voyage/voyage-3' },
                     { id: 'voyage/voyage-3' },
                 ],
             }),
         } as never) as never
         const { models } = await fetchGatewayModelsDetailed('k', 'https://x.test')
-        expect(models?.chat).toEqual(['gemini/gemini-2.5-flash', 'openai/gpt-4o-mini'])
+        expect(models?.chat).toEqual(['gemini/gemini-2.5-flash', 'openai/gpt-5.6-luna'])
         expect(models?.embedding).toEqual(['voyage/voyage-3'])
     })
 

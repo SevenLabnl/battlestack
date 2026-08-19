@@ -8,6 +8,7 @@ import type { Stage } from './stage.js'
 import type { ProjectManifest } from './project-manifest.js'
 import type { ChatTransport } from './chat-transport.js'
 import type { PackageManager } from './package-manager.js'
+import type { GatewayPreset } from '../constants/ai.js'
 
 export interface FeatureDeps {
     prod?: string[]
@@ -107,8 +108,8 @@ export interface FeatureState {
 
     // AI gateway / Mastra prompt answers. The gateway is any OpenAI-compatible
     // proxy; `sluis` is the only named preset, `custom` covers everything else
-    // (a LiteLLM proxy, a vendor's own compatible endpoint, ...).
-    aiGatewayPreset?: 'sluis' | 'custom'
+    // (a LiteLLM proxy, OpenAI itself, a vendor's own compatible endpoint, ...).
+    aiGatewayPreset?: GatewayPreset
     aiGatewayUrl?: string
     aiGatewayKey?: string
     aiGatewayChatModel?: string
