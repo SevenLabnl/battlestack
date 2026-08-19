@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { FALLBACK_CHAT_MODEL } from '@battlestack/core/constants/ai.js'
 
 /**
  * Source-text assertions over every template consumer of the AI gateway. CI never
@@ -29,6 +30,23 @@ describe('model resolution routes through the generic gateway', () => {
         expect(src).not.toContain('litellm')
         expect(src).toContain("import { inferProviderFromName } from '../gateways/openai-compat'")
         expect(src).not.toMatch(/function inferProviderFromName/)
+    })
+
+    // The template cannot import `@battlestack/core`, so it keeps its own copy of the
+    // fallback id. This is the only thing keeping the two in step.
+    it('the scaffolded chat fallback matches FALLBACK_CHAT_MODEL', async () => {
+        const shared = await read('mastra', 'server', 'mastra', 'utils', 'env-defaults.ts')
+        expect(shared).toContain(`const FALLBACK_CHAT_MODEL = '${FALLBACK_CHAT_MODEL}'`)
+    })
+
+    it('reaches for the sluis alias only when the gateway is sluis', async () => {
+        const shared = await read('mastra', 'server', 'mastra', 'utils', 'env-defaults.ts')
+        // A non-sluis gateway 404s on `sluis/chat`, so the alias must sit behind the host check.
+        expect(shared).toMatch(/gatewayIsSluis\(\)\s*\?\s*'sluis\/chat'\s*:\s*FALLBACK_CHAT_MODEL/)
+        expect(shared).toContain("const SLUIS_HOST = 'sluis.ai'")
+        // Host-matched, not substring-matched: `sluis.ai.evil.test` must not read as sluis.
+        expect(shared).toContain('new URL(raw).hostname')
+        expect(shared).toContain('host.endsWith(`.${SLUIS_HOST}`)')
     })
 
     it('env model defaults resolve through the single shared helper', async () => {

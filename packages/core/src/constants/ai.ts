@@ -22,6 +22,13 @@ export const GATEWAY_PRESETS = {
 
 export type GatewayPreset = keyof typeof GATEWAY_PRESETS
 
+/**
+ * Chat model for a gateway whose catalogue is unknown: the `.env.example` placeholder for the
+ * `custom` preset, and the scaffolded runtime's last-resort fallback (`env-defaults.ts`, which
+ * cannot import this module and keeps its own copy under test).
+ */
+export const FALLBACK_CHAT_MODEL = 'openai/gpt-5.6'
+
 export const DEFAULT_GATEWAY_PRESET: GatewayPreset = 'sluis'
 
 /**

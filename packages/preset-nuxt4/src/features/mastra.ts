@@ -21,6 +21,7 @@ import type { EnvVar, Feature, ProjectCommand, RunContext } from '@battlestack/c
 import {
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_GATEWAY_PRESET,
+    FALLBACK_CHAT_MODEL,
     GATEWAY_PRESETS,
     presetChatModel,
 } from '@battlestack/core/constants/ai.js'
@@ -197,7 +198,8 @@ export const mastraFeature: Feature = {
             {
                 key: 'NUXT_AI_GATEWAY_CHAT_MODEL',
                 value: chatModel,
-                example: GATEWAY_PRESETS.sluis.chatModel,
+                // A sluis alias is a useless placeholder for a gateway that cannot serve it.
+                example: presetChatModel(ctx.state.aiGatewayPreset) ?? FALLBACK_CHAT_MODEL,
                 group: 'AI',
                 description: 'Default chat model id served by the gateway, in the '
                     + '`<provider>/<model>` form the router requires. Required before '
