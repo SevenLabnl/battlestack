@@ -19,12 +19,11 @@ import {
 } from '@battlestack/core'
 import type { EnvVar, Feature, ProjectCommand, RunContext } from '@battlestack/core'
 import {
-    SLUIS_DEFAULT_CHAT_MODEL,
     DEFAULT_EMBEDDING_MODEL,
+    DEFAULT_GATEWAY_PRESET,
+    GATEWAY_PRESETS,
+    presetChatModel,
 } from '@battlestack/core/constants/ai.js'
-
-/** Default URL for the sluis.ai preset; any OpenAI-compatible gateway URL works. */
-const SLUIS_URL = 'https://api.sluis.ai'
 
 /** Mastra AI runtime. Talks to an OpenAI-compatible AI gateway (sluis.ai preset, or any compatible URL) via `@ai-sdk/openai-compatible`. */
 export const mastraFeature: Feature = {
@@ -73,14 +72,8 @@ export const mastraFeature: Feature = {
             name: 'preset',
             message: 'AI gateway',
             choices: [
-                {
-                    title: 'sluis.ai (hosted, EU data residency)',
-                    value: 'sluis',
-                },
-                {
-                    title: 'Custom OpenAI-compatible gateway (LiteLLM proxy, ...)',
-                    value: 'custom',
-                },
+                { title: GATEWAY_PRESETS.sluis.label, value: 'sluis' },
+                { title: GATEWAY_PRESETS.custom.label, value: 'custom' },
             ],
             initial: ctx.state.aiGatewayPreset === 'custom' ? 1 : 0,
         })
@@ -95,7 +88,7 @@ export const mastraFeature: Feature = {
             type: 'text',
             name: 'url',
             message: 'Gateway URL',
-            initial: ctx.state.aiGatewayUrl ?? (isSluis ? SLUIS_URL : undefined),
+            initial: ctx.state.aiGatewayUrl ?? (isSluis ? GATEWAY_PRESETS.sluis.url : undefined),
             validate: (v: string) => v.startsWith('http') || 'Must be http(s) URL',
         })
         if (typeof url === 'string') ctx.state.aiGatewayUrl = url.trim()
@@ -131,11 +124,12 @@ export const mastraFeature: Feature = {
             }
         }
 
-        if (isSluis) {
-            // sluis.ai serves stable model aliases, so the scaffold pins the chat
-            // alias instead of a vendor model id. Still editable in `.env` later.
-            ctx.state.aiGatewayChatModel = SLUIS_DEFAULT_CHAT_MODEL
-            ui.dim(`  Chat model: ${SLUIS_DEFAULT_CHAT_MODEL} (sluis.ai alias, change in .env)`)
+        const pinned = presetChatModel(ctx.state.aiGatewayPreset)
+        if (pinned) {
+            // A named preset ships a known catalogue, so the scaffold pins its alias
+            // instead of a vendor model id. Still editable in `.env` later.
+            ctx.state.aiGatewayChatModel = pinned
+            ui.dim(`  Chat model: ${pinned} (gateway alias, change in .env)`)
         } else {
             // A custom gateway has no known-good default, so the user must name a
             // model themselves: picked from the live-pulled list when a key was
@@ -173,18 +167,20 @@ export const mastraFeature: Feature = {
         // fills it during the prompt.
         const url = ctx.state.aiGatewayUrl ?? ''
         const key = ctx.state.aiGatewayKey
-        // The sluis chat alias only backstops flows that never reached the model
-        // prompt (non-interactive scaffold, ESC-cancelled prompt); interactive
-        // runs always set `aiGatewayChatModel` above.
+        // Falls back to the preset's own alias, never across presets: a `custom`
+        // gateway that never reached the model prompt (ESC) gets a blank value to
+        // fill in, not another gateway's model id it would 404 on.
         const chatModel
-            = ctx.state.aiGatewayChatModel ?? SLUIS_DEFAULT_CHAT_MODEL
+            = ctx.state.aiGatewayChatModel
+                ?? presetChatModel(ctx.state.aiGatewayPreset ?? DEFAULT_GATEWAY_PRESET)
+                ?? ''
         const embeddingModel
             = ctx.state.ragEmbeddingModel ?? DEFAULT_EMBEDDING_MODEL
         return [
             {
                 key: 'NUXT_AI_GATEWAY_URL',
                 value: url,
-                example: SLUIS_URL,
+                example: GATEWAY_PRESETS.sluis.url,
                 group: 'AI',
                 description: 'OpenAI-compatible AI gateway base URL: sluis.ai, a self-hosted '
                     + 'LiteLLM proxy, or any compatible endpoint. Mastra calls it via '
@@ -201,8 +197,11 @@ export const mastraFeature: Feature = {
             {
                 key: 'NUXT_AI_GATEWAY_CHAT_MODEL',
                 value: chatModel,
+                example: GATEWAY_PRESETS.sluis.chatModel,
                 group: 'AI',
-                description: 'Default chat model id served by the gateway.',
+                description: 'Default chat model id served by the gateway, in the '
+                    + '`<provider>/<model>` form the router requires. Required before '
+                    + 'AI features will work.',
             },
             {
                 key: 'NUXT_AI_GATEWAY_EMBEDDING_MODEL',

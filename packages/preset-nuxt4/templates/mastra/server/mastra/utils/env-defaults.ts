@@ -7,7 +7,8 @@ export function envModelDefault(kind: 'chat' | 'embedding'): string {
     if (kind === 'embedding') {
         return process.env.NUXT_AI_GATEWAY_EMBEDDING_MODEL || 'openai/text-embedding-3-small'
     }
-    // `sluis/chat` is the sluis.ai chat alias — the scaffold's built-in preset.
-    // Projects on a custom gateway always have NUXT_AI_GATEWAY_CHAT_MODEL set.
+    // Last-resort fallback only: the scaffold writes NUXT_AI_GATEWAY_CHAT_MODEL for every
+    // project. `sluis/chat` is the default preset's managed alias, so a project on another
+    // gateway that blanks the var gets an id its upstream will reject. Set the var.
     return process.env.NUXT_AI_GATEWAY_CHAT_MODEL || 'sluis/chat'
 }
