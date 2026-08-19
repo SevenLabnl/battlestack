@@ -14,8 +14,12 @@ export default defineNuxtPlugin({
     dependsOn: ['@nuxt/icon'],
     setup() {
         const event = useRequestEvent()
-        if (!event || typeof useRequestFetch().native === 'function') return
+        // `useRequestFetch()` returns a union whose server-side member has no `.native` in its
+        // type (nor at runtime, which is the whole bug), so probe it structurally.
+        const requestFetch = useRequestFetch() as unknown as { native?: unknown }
+        if (!event || typeof requestFetch.native === 'function') return
+        // Iconify only ever passes string URLs; `event.fetch` declares a narrower request type.
         _api.setFetch(((input: string | URL | Request, init?: RequestInit) =>
-            event.fetch(input, init)) as typeof fetch)
+            event.fetch(input as string, init)) as typeof fetch)
     },
 })
