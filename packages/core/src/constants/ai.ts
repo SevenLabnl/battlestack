@@ -27,7 +27,7 @@ export type GatewayPreset = keyof typeof GATEWAY_PRESETS
  * `custom` preset, and the scaffolded runtime's last-resort fallback (`env-defaults.ts`, which
  * cannot import this module and keeps its own copy under test).
  */
-export const FALLBACK_CHAT_MODEL = 'openai/gpt-5.6'
+export const FALLBACK_CHAT_MODEL = 'openai/gpt-5.6-luna'
 
 export const DEFAULT_GATEWAY_PRESET: GatewayPreset = 'sluis'
 

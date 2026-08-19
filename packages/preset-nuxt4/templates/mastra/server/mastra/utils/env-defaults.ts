@@ -7,7 +7,7 @@
 const SLUIS_HOST = 'sluis.ai'
 
 /** Chat model for a gateway whose catalogue is unknown. Widely served by OpenAI-compatible proxies. */
-const FALLBACK_CHAT_MODEL = 'openai/gpt-5.6'
+const FALLBACK_CHAT_MODEL = 'openai/gpt-5.6-luna'
 
 export function envModelDefault(kind: 'chat' | 'embedding'): string {
     if (kind === 'embedding') {
