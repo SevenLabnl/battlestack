@@ -19,7 +19,7 @@ import { ui } from '@battlestack/tui'
 /** Vitest config, a sample unit test and `test` scripts. Three projects: unit, nuxt, e2e. */
 export const vitestFeature: Feature = {
     id: 'nuxt4:vitest',
-    version: '1.0.5',
+    version: '1.0.6',
     label: 'Vitest config + scripts',
     frameworks: ['nuxt4'],
     stage: STAGE.NAMING, // run after naming so package.json exists
@@ -47,7 +47,7 @@ export const vitestFeature: Feature = {
                     '- `test/nuxt/`: Nuxt env (happy-dom), components + auto-imports',
                     '- `test/e2e/`: hits a live dev server (`await setup({ server: true })`)',
                     '',
-                    'Run: `battlestack test`. It probes `/api/health` first and warns if `battlestack dev` isn\'t running (the e2e suite needs a live server, otherwise every e2e block self-skips). Pass extra flags after `--`: `battlestack test -- --coverage` / `battlestack test -- --watch`. Use `pnpm test` directly if you want to skip the guard.',
+                    'Run: `battlestack test`. It probes the dev server first and refuses if `battlestack dev` isn\'t running or is answering 503 (the e2e suite needs a live server, otherwise every e2e block self-skips). Pass extra flags after `--`: `battlestack test -- --coverage` / `battlestack test -- --watch`. Use `pnpm test` directly if you want to skip the guard.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },
@@ -82,15 +82,28 @@ async function runTest(ctx: RunContext): Promise<void> {
     const baseUrl = `http://localhost:${port}`
     const force = ctx.state.force === true
 
-    const up = await isDevServerUp(baseUrl)
-    if (!up && !force) {
+    // A 503 means the dev server answered but its Nitro worker is down (restarting after a
+    // crash or rebuild). Every e2e request would fail with an opaque 503, so wait it out
+    // briefly and refuse rather than report "reachable" and let 40+ tests fail confusingly.
+    let state = await probeDevServer(baseUrl)
+    for (let retry = 0; state === 'unavailable' && retry < 5; retry++) {
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+        state = await probeDevServer(baseUrl)
+    }
+    if (state === 'unavailable' && !force) {
+        throw new CLIError(
+            ErrorCode.SCAFFOLD_FAILED,
+            `Dev server at ${baseUrl} is answering 503: it is up, but its Nitro worker is down (crashed or mid-restart). Check the \`battlestack dev\` terminal for errors, then re-run \`battlestack test\`. Pass \`--force\` to run anyway (e2e tests will skip themselves).`,
+        )
+    }
+    if (state === 'down' && !force) {
         throw new CLIError(
             ErrorCode.SCAFFOLD_FAILED,
             `Dev server not reachable at ${baseUrl}. Start it in another terminal with \`battlestack dev\`, then re-run \`battlestack test\`. Pass \`--force\` to run anyway (e2e tests will skip themselves).`,
         )
     }
-    if (!up && force) {
-        ui.warn(`Dev server not reachable at ${baseUrl}. Running anyway (e2e tests will skip themselves).`)
+    if (state !== 'up' && force) {
+        ui.warn(`Dev server not ready at ${baseUrl} (${state}). Running anyway (e2e tests will skip themselves).`)
     } else {
         ui.dim(`Dev server reachable at ${baseUrl}`)
     }
@@ -103,18 +116,23 @@ async function runTest(ctx: RunContext): Promise<void> {
     await run(pm, ['run', 'test', ...passthrough], { cwd: ctx.projectDir, inherit: true })
 }
 
-async function isDevServerUp(baseUrl: string): Promise<boolean> {
+type DevServerState = 'up' | 'unavailable' | 'down'
+
+async function probeDevServer(baseUrl: string): Promise<DevServerState> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 1500)
     try {
+        // Probes `/`, not `/api/health`: health legitimately answers 503 when a dependency is
+        // degraded, while a 503 on the landing page can only be the dev proxy's worker-down page.
         const res = await fetch(`${baseUrl}/`, {
             method: 'HEAD',
             signal: controller.signal,
             redirect: 'manual',
         })
-        return res.status > 0
+        if (res.status === 503) return 'unavailable'
+        return res.status > 0 ? 'up' : 'down'
     } catch {
-        return false
+        return 'down'
     } finally {
         clearTimeout(timer)
     }
