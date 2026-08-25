@@ -254,7 +254,8 @@ export async function createCommand(context: CommandContext): Promise<void> {
  * database needed), but it does need node_modules, hence the skipInstall guard.
  */
 async function generateInitialMigration(ctx: RunContext, enabled: Set<string>): Promise<void> {
-    if (!enabled.has('nuxt4:database')) return
+    // `enabled` holds canonicalized fqids, so a bare `enabled.has('nuxt4:database')` never matches.
+    if (!enabledHas(enabled, 'nuxt4:database', ctx.registries)) return
     if (ctx.dryRun || ctx.state.skipInstall) return
     const pm = await resolveProjectPM({
         projectDir: ctx.projectDir,
