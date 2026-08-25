@@ -248,8 +248,9 @@ async function registerRuntimeConfig(projectDir: string): Promise<void> {
 /** PostgreSQL 18 in Docker, Drizzle ORM, users schema, seed script. */
 export const databaseFeature: Feature = {
     id: 'nuxt4:database',
-    // 1.5.0: `buildComposeYml` grows a `redis` service when `nuxt4:redis` is enabled.
-    version: '1.5.0',
+    // 1.6.0: migrate.mjs and the boot migrator apply `server/database/extensions/*.sql` before
+    // migrations, so CREATE EXTENSION / CREATE SCHEMA no longer need a manual step in prod.
+    version: '1.6.0',
     label: 'PostgreSQL + Drizzle ORM (Docker)',
     frameworks: ['nuxt4'],
     stage: STAGE.DATABASE,
@@ -313,6 +314,9 @@ export const databaseFeature: Feature = {
                     '',
                     '### Shipping a schema change to production',
                     '',
+                    'The initial `0000_*.sql` migration and `meta/_journal.json` are generated at scaffold',
+                    'time, so a fresh project deploys without any manual step. For every later change:',
+                    '',
                     '1. Edit `server/database/schema/*.ts`',
                     '2. `battlestack db:generate` (or `pnpm run db:generate`): drizzle-kit emits a new `NNNN_*.sql` file in `server/database/migrations/`',
                     '3. Review + commit the SQL file and the updated `meta/_journal.json`',
@@ -335,6 +339,16 @@ export const databaseFeature: Feature = {
                     'rollouts block, then no-op). It locates the SQL files at `server/database/migrations`',
                     'in dev and `/app/migrations` in the container. Set `NUXT_DISABLE_DB_MIGRATE_ON_BOOT=true`',
                     'on read-only replicas pointed at a follower.',
+                    '',
+                    '### Database extensions (`server/database/extensions/*.sql`)',
+                    '',
+                    'Features that need Postgres objects drizzle cannot emit (e.g. `CREATE EXTENSION vector`',
+                    'for rag, `CREATE SCHEMA mastra` for mastra) ship idempotent SQL files in',
+                    '`server/database/extensions/`. They are applied automatically before any drizzle DDL,',
+                    'in every flow: the `battlestack db:*` commands run them ahead of `db:push`/`db:migrate`,',
+                    'and both `migrate.mjs` and the boot migrator run them ahead of migrations (the Dockerfile',
+                    'stages the directory at `/app/extensions`). Never hand-edit generated migration files to',
+                    'add extension DDL.',
                     '',
                     '### Reference-data seeds (non-admin)',
                     '',

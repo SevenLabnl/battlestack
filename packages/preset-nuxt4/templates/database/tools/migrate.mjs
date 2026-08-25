@@ -17,6 +17,7 @@ if (!url) {
 }
 
 const migrationsDir = process.env.DRIZZLE_MIGRATIONS_DIR ?? '/app/migrations'
+const extensionsDir = process.env.DB_EXTENSIONS_DIR ?? '/app/extensions'
 
 const sql = postgres(url, { max: 1, onnotice: () => {} })
 let locked = false
@@ -25,6 +26,7 @@ try {
     // another process is about to invalidate. Other migrators block here until release.
     await sql`SELECT pg_advisory_lock(${MIGRATE_ADVISORY_LOCK_KEY})`
     locked = true
+    await applyExtensions(sql, extensionsDir)
     await ensureMigrationsTable(sql)
     const applied = await loadApplied(sql)
     const journal = await loadJournal(migrationsDir)
@@ -47,6 +49,23 @@ try {
         await sql`SELECT pg_advisory_unlock(${MIGRATE_ADVISORY_LOCK_KEY})`.catch(() => undefined)
     }
     await sql.end({ timeout: 5 })
+}
+
+/**
+ * Runs `extensions/*.sql` (CREATE EXTENSION / CREATE SCHEMA) before any migration: drizzle's
+ * generated SQL never contains them, so e.g. a `vector(N)` column would fail without this.
+ * The files ship idempotent (`IF NOT EXISTS`), so rerunning them on every invocation is safe.
+ */
+async function applyExtensions(sql, dir) {
+    const names = (await readdir(dir).catch(() => []))
+        .filter((f) => f.endsWith('.sql'))
+        .sort((a, b) => a.localeCompare(b))
+    for (const name of names) {
+        const body = (await readFile(path.join(dir, name), 'utf8')).trim()
+        if (!body) continue
+        console.log(`[migrate] extension ${name}`)
+        await sql.unsafe(body)
+    }
 }
 
 async function ensureMigrationsTable(sql) {

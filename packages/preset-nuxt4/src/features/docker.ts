@@ -26,7 +26,9 @@ const PROFILE_FLAGS = ['--profile', 'prod']
 /** Production Dockerfile and `battlestack prod` commands, reusing the existing docker-compose.yml. */
 export const dockerFeature: Feature = {
     id: 'shared:docker',
-    version: '1.0.3',
+    // 1.1.0: stages server/database/extensions into /app/extensions so migrate.mjs and the
+    // boot migrator can apply CREATE EXTENSION / CREATE SCHEMA before migrations.
+    version: '1.1.0',
     label: 'Production Dockerfile + prod commands',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,
@@ -228,13 +230,16 @@ function renderVars(
 
 function bundleToolsBlock(_pm: PackageManager): string {
     return [
-        '# Stage standalone migrate/seed scripts + the SQL migrations dir for the runtime image.',
+        '# Stage standalone migrate/seed scripts + the SQL migrations/extensions dirs for the runtime image.',
         'RUN mkdir -p /app/dist-tools && \\',
         '    cp tools/migrate.mjs /app/dist-tools/migrate.mjs && \\',
         '    cp tools/seed.mjs /app/dist-tools/seed.mjs && \\',
-        '    mkdir -p /app/dist-tools/migrations && \\',
+        '    mkdir -p /app/dist-tools/migrations /app/dist-tools/extensions && \\',
         '    if [ -d /app/server/database/migrations ]; then \\',
         '        cp -R /app/server/database/migrations/. /app/dist-tools/migrations/; \\',
+        '    fi && \\',
+        '    if [ -d /app/server/database/extensions ]; then \\',
+        '        cp -R /app/server/database/extensions/. /app/dist-tools/extensions/; \\',
         '    fi',
     ].join('\n')
 }
@@ -249,6 +254,9 @@ function copyToolsBlock(): string {
         'COPY --from=build --chown=node:node /app/dist-tools/migrate.mjs /app/server/migrate.mjs',
         'COPY --from=build --chown=node:node /app/dist-tools/seed.mjs /app/server/seed.mjs',
         'COPY --from=build --chown=node:node /app/dist-tools/migrations/ /app/migrations/',
+        '# extensions/*.sql (CREATE EXTENSION / CREATE SCHEMA) run before migrations, by both',
+        '# migrate.mjs and the boot migrator.',
+        'COPY --from=build --chown=node:node /app/dist-tools/extensions/ /app/extensions/',
     ].join('\n')
 }
 

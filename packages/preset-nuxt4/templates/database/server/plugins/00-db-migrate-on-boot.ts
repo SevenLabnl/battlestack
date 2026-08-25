@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { drizzle } from 'drizzle-orm/postgres-js'
@@ -35,6 +35,7 @@ export default defineNitroPlugin(async () => {
     try {
         // The lock spans this one connection, so other pods block here until release; a no-op migrate returns in well under a second.
         await client`SELECT pg_advisory_lock(${MIGRATE_ADVISORY_LOCK_KEY})`
+        await applyExtensions(client)
         await baselineIfPushManaged(client, migrationsFolder)
         const t0 = Date.now()
         await runMigrate(db, { migrationsFolder })
@@ -52,6 +53,37 @@ export default defineNitroPlugin(async () => {
         await client.end({ timeout: 5 }).catch(() => undefined)
     }
 })
+
+/**
+ * Runs `extensions/*.sql` (CREATE EXTENSION / CREATE SCHEMA) before migrating: drizzle's generated
+ * SQL never contains them, so e.g. a `vector(N)` column would fail without the extension in place.
+ * The files ship idempotent (`IF NOT EXISTS`), so rerunning them on every boot is safe.
+ */
+async function applyExtensions(client: ReturnType<typeof postgres>): Promise<void> {
+    const dir = pickExtensionsFolder()
+    if (!dir) return
+    const names = (await readdir(dir).catch(() => [] as string[]))
+        .filter((f) => f.endsWith('.sql'))
+        .sort((a, b) => a.localeCompare(b))
+    for (const name of names) {
+        const body = (await readFile(path.join(dir, name), 'utf8')).trim()
+        if (!body) continue
+        await client.unsafe(body)
+    }
+}
+
+function pickExtensionsFolder(): string | null {
+    const candidates = [
+        // production container layout: Dockerfile stages extensions to /app/extensions
+        path.resolve('extensions'),
+        // dev layout (`nuxt dev` runs from the project root)
+        path.resolve('server/database/extensions'),
+    ]
+    for (const c of candidates) {
+        if (existsSync(c)) return c
+    }
+    return null
+}
 
 /**
  * Push-vs-migrate drift guard: a `db:push` database has the full schema but an empty journal, so replaying `0000_*`
