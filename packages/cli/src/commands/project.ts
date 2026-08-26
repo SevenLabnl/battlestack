@@ -167,6 +167,20 @@ export async function projectCommand(
 
     const entry = commands.get(requested)
     if (!entry) {
+        // Plugin-contributed top-level commands (addCommand) work inside a
+        // project too: a deploy plugin's `battlestack deploy`/`login` must not
+        // vanish the moment the CLI enters project mode. Built-ins and
+        // feature commands take precedence — this is a fallback, not a shadow.
+        const pluginCommand = registries.commands.has(requested) ? registries.commands.get(requested) : null
+        if (pluginCommand) {
+            await pluginCommand.run({
+                args: args.positionals.slice(1),
+                parsed: args,
+                loader,
+                registries,
+            })
+            return
+        }
         ui.fail(`Unknown command: ${requested}`)
         const suggestion = suggestCommand(requested, ordered)
         if (suggestion) ui.hint(`did you mean: battlestack ${suggestion}?`)
