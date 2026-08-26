@@ -32,7 +32,7 @@ function defaultDimensionsFor(model: string | undefined): number {
 /** RAG on Mastra: chunk → embedMany → PgVector.upsert/query. pgvector ships with `nuxt4:database`. */
 export const ragFeature: Feature = {
     id: 'nuxt4:rag',
-    version: '1.4.0',
+    version: '1.4.1',
     label: 'RAG (Mastra + pgvector)',
     description: 'Ingest, chunk, embed, and query documents with Mastra + pgvector.',
     frameworks: ['nuxt4'],
@@ -141,7 +141,7 @@ export const ragFeature: Feature = {
                     '',
                     'Embedding model is admin-controllable: ingestion + query resolve it from the `embedding` row of `ai_model_configs` (registered on boot, edited at `/dashboard/settings/ai`) via `getActiveEmbeddingModelId()`, falling back to `runtimeConfig.rag.embeddingModel` (`NUXT_RAG_*`) / env. So a staging/prod deploy has a working, changeable embedding model with no redeploy. Caveat: switching to a model with a different vector dimension needs a reindex, because `NUXT_RAG_EMBEDDING_DIMENSIONS` is fixed at index creation.',
                     '',
-                    'First-time setup: `battlestack db:up && battlestack db:push`. `db:push` applies `server/database/extensions/01_pgvector.sql` (CREATE EXTENSION) before drizzle pushes the schema.',
+                    'First-time setup: `battlestack db:up && battlestack db:push`. `server/database/extensions/01_pgvector.sql` (CREATE EXTENSION) is applied automatically before any drizzle DDL, in dev (`db:*` commands) and in prod (`migrate.mjs` + boot migrator); no manual CREATE EXTENSION is ever needed.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },

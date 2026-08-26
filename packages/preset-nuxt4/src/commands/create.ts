@@ -9,6 +9,8 @@ import {
     probeAndFreezePorts,
     projectPorts,
     resolvePackageManager,
+    resolveProjectPM,
+    run,
     runFeatures,
     writeLocalState,
     type BattlestackRegistries,
@@ -221,6 +223,7 @@ export async function createCommand(context: CommandContext): Promise<void> {
     const releaseLock = await acquireProjectLock(projectDir, 'battlestack create')
     try {
         await runFeatures(ctx, loader, { format: formatProject })
+        await generateInitialMigration(ctx, enabled)
     } finally {
         await releaseLock()
     }
@@ -243,6 +246,30 @@ export async function createCommand(context: CommandContext): Promise<void> {
         nonInteractive: isNonInteractive(args),
         verbose: args.verbose,
     })
+}
+
+/**
+ * Emits the initial `0000_*.sql` migration at scaffold time, so a fresh project deploys to
+ * production without a manual `db:generate` first. `drizzle-kit generate` is offline (no
+ * database needed), but it does need node_modules, hence the skipInstall guard.
+ */
+async function generateInitialMigration(ctx: RunContext, enabled: Set<string>): Promise<void> {
+    // `enabled` holds canonicalized fqids, so a bare `enabled.has('nuxt4:database')` never matches.
+    if (!enabledHas(enabled, 'nuxt4:database', ctx.registries)) return
+    if (ctx.dryRun || ctx.state.skipInstall) return
+    const pm = await resolveProjectPM({
+        projectDir: ctx.projectDir,
+        fallback: String(ctx.state.packageManager ?? 'pnpm'),
+    })
+    try {
+        await run(pm, ['run', 'db:generate'], { cwd: ctx.projectDir, inherit: ctx.debug })
+        ui.ok('Initial migration generated (server/database/migrations/)')
+    } catch (err) {
+        ui.warn(
+            'db:generate failed (non-fatal). Run `pnpm run db:generate` once before your first deploy',
+        )
+        if (ctx.debug) console.error(err)
+    }
 }
 
 /** Reports each port assignment. Only shifted ports get a line. */

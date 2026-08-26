@@ -19,6 +19,7 @@ import {
     type ReservedCommand,
     type RunContext,
 } from '@battlestack/core'
+import { applyDbExtensions } from '@battlestack/core/utils/db.js'
 import { applyEnv } from '@battlestack/preset-nuxt4'
 
 /** Static metadata only. `run` is built per-dispatch in `project.ts`. */
@@ -183,6 +184,15 @@ async function ensureDb(ctx: RunContext, pm: string): Promise<void> {
         return
     }
     ui.ok('postgres ready')
+
+    // Extensions (CREATE EXTENSION / CREATE SCHEMA) precede any drizzle DDL: generated SQL never contains them.
+    try {
+        await applyDbExtensions(ctx.projectDir)
+    } catch (err) {
+        ui.fail('applying server/database/extensions/*.sql failed')
+        if (ctx.debug) console.error(err)
+        return
+    }
 
     const migrationsPresent = await hasSqlMigrations(ctx.projectDir)
     if (migrationsPresent) {
