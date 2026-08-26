@@ -14,9 +14,42 @@ permissions:
   contents: read
 
 jobs:
+  # Gates every other job: a feature whose output changed without a version bump
+  # reaches no existing project, because `pull` reports it "up to date" and never
+  # runs its `update()`. Cheap, so it runs first and fails the run on its own.
+  bump-check:
+    name: Feature version bump check
+    runs-on: ubuntu-latest
+    steps:
+      # Full history: the gate diffs against the PR base branch, or the latest
+      # release tag on a plain push. A shallow clone has neither.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Empty on a push event, which makes the script fall back to the release tag.
+      - name: Bump check
+        env:
+          BUMP_CHECK_BASE: ${{ github.base_ref && format('origin/{0}', github.base_ref) || '' }}
+        run: pnpm bump:check
+
   verify:
     name: Type-check and test (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    needs: bump-check
     strategy:
       fail-fast: false
       matrix:
@@ -56,6 +89,7 @@ jobs:
   verify-scaffold:
     name: Scaffold a project and run its own gates
     runs-on: ubuntu-latest
+    needs: bump-check
     timeout-minutes: 30
     # Without a reachable database the DB-gated template tests skip themselves
     # and the file reports one passing assertion that the database is down, so
@@ -137,6 +171,7 @@ jobs:
   verify-windows:
     name: Type-check, test, build, CLI smoke (Windows, Node ${{ matrix.node }})
     runs-on: windows-latest
+    needs: bump-check
     strategy:
       fail-fast: false
       matrix:

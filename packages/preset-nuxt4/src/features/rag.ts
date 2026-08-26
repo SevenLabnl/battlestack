@@ -32,7 +32,7 @@ function defaultDimensionsFor(model: string | undefined): number {
 /** RAG on Mastra: chunk → embedMany → PgVector.upsert/query. pgvector ships with `nuxt4:database`. */
 export const ragFeature: Feature = {
     id: 'nuxt4:rag',
-    version: '1.4.0',
+    version: '1.4.1',
     label: 'RAG (Mastra + pgvector)',
     description: 'Ingest, chunk, embed, and query documents with Mastra + pgvector.',
     frameworks: ['nuxt4'],

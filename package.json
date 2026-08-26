@@ -6,6 +6,8 @@
         "battlestack": "tsx packages/cli/src/index.ts",
         "demo": "tsx scripts/demo.ts",
         "tsc": "tsc --noEmit",
+        "bump": "tsx scripts/bump-check.ts",
+        "bump:check": "tsx scripts/bump-check.ts --check",
         "test": "vitest run",
         "test:watch": "vitest",
         "build": "tsc -b tsconfig.build.json && node scripts/build-post.mjs",
