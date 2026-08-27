@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error plain .mjs release tooling, no declaration file
-import { bump } from '../release-version.mjs'
+import { bump, compare } from '../release-version.mjs'
 
 describe('bump', () => {
     it.each([
@@ -44,5 +44,54 @@ describe('bump', () => {
 
     it('rejects an unknown level', () => {
         expect(() => bump('0.1.0', 'sideways', 'next')).toThrow(/invalid level/)
+    })
+})
+
+describe('bump prerelease identifiers', () => {
+    // The Prepare release workflow passes `--preid` straight from an
+    // operator-editable text input, so an unusable value has to fail loudly
+    // rather than reach package.json.
+    it.each(['', 'my next', 'next.0', 'ünïcode', 'a b'])('rejects %o', (preid) => {
+        expect(() => bump('0.1.0', 'preminor', preid)).toThrow(/invalid prerelease identifier/)
+    })
+
+    it.each(['next', 'rc', 'alpha-1', 'RC2', '0'])('accepts %o', (preid) => {
+        expect(() => bump('0.1.0', 'preminor', preid)).not.toThrow()
+    })
+
+    it('defaults to next when omitted', () => {
+        expect(bump('0.1.0', 'preminor')).toBe('0.2.0-next.0')
+    })
+
+    // A bad identifier only matters for the levels that consume one.
+    it('ignores the identifier for a stable level', () => {
+        expect(bump('0.1.0', 'minor', '')).toBe('0.2.0')
+    })
+})
+
+describe('compare', () => {
+    it.each([
+        ['0.1.0', '0.1.0', 0],
+        ['0.2.0', '0.1.0', 1],
+        ['0.1.0', '0.2.0', -1],
+        ['1.0.0', '0.9.9', 1],
+        ['0.1.10', '0.1.9', 1],
+        // A prerelease sorts below the release it leads to.
+        ['0.2.0-next.0', '0.2.0', -1],
+        ['0.2.0', '0.2.0-next.0', 1],
+        ['0.2.0-next.1', '0.2.0-next.0', 1],
+        ['0.2.0-next.10', '0.2.0-next.9', 1],
+        // Numeric identifiers rank below alphanumeric ones, and a shorter
+        // identifier list ranks below a longer one that shares its prefix.
+        ['0.2.0-1', '0.2.0-alpha', -1],
+        ['0.2.0-next', '0.2.0-next.0', -1],
+        ['0.2.0-alpha', '0.2.0-beta', -1],
+    ])('compare(%s, %s) = %i', (a, b, expected) => {
+        expect(compare(a, b)).toBe(expected)
+    })
+
+    it('rejects a non-semver operand', () => {
+        expect(() => compare('0.1', '0.1.0')).toThrow(/not a semver version/)
+        expect(() => compare('0.1.0', '1.0.0-.0')).toThrow(/not a semver version/)
     })
 })
