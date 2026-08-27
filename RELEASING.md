@@ -27,11 +27,13 @@ Publishable packages:
    `minor` or `major`. It bumps all five `package.json` files, prepends a
    `CHANGELOG.md` stanza and opens a PR titled `release: v<version>`.
 2. Review and merge that PR. This is where the version number gets human
-   approval.
+   approval. CI runs on it like any other PR, because the branch and the PR are
+   authored with `RELEASE_PR_TOKEN` rather than `GITHUB_TOKEN`.
 3. **Actions -> Release -> Run workflow** from `main` with `dry_run: false` and
    `channel: auto`.
-4. The `Gate` job runs the lockstep check, the unpublished check, typecheck,
-   tests, build and the packed-tarball smoke test.
+4. The `Gate` job runs the lockstep check, the unpublished check, the
+   moves-`latest`-forward check, typecheck, tests, build and the
+   packed-tarball smoke test.
 5. The `Publish` job waits for a `release` environment reviewer. Approve it.
 6. On success the workflow publishes to npm, pushes the annotated `v<version>`
    tag, fast-forwards `production` and creates the GitHub release.
@@ -39,6 +41,10 @@ Publishable packages:
 Leave `dry_run: true` (the default) to run every gate and pack the tarballs
 without publishing. A dry run may be dispatched from any branch; a real publish
 may only be dispatched from `main`.
+
+A dry run runs entirely inside `Gate` and the `Publish` job is skipped, so it
+needs no reviewer approval and is not subject to the `release` environment's
+`main`-only deployment branches.
 
 ## Cutting a `next` prerelease
 
@@ -80,6 +86,12 @@ pnpm pack:smoke                 # build, pack, install the tarballs, run the bin
   deployment branches to `main` only.
 - Settings -> Actions -> General: enable "Allow GitHub Actions to create and
   approve pull requests" so Prepare release can open its PR.
+- Settings -> Secrets and variables -> Actions: add `RELEASE_PR_TOKEN`, a
+  fine-grained PAT or GitHub App installation token with **Contents: write** and
+  **Pull requests: write** on this repository. Prepare release refuses to run
+  without it, on purpose: GitHub runs no workflows for a push or PR authored by
+  the built-in `GITHUB_TOKEN`, so a release PR opened with it would show zero
+  checks and a `main` with required status checks could never merge it.
 - Settings -> Branches: protect `main` and `production`. `production` needs to
   accept a push from `github-actions[bot]`, so either leave it unprotected
   against that actor or add the bot to the bypass list.
@@ -94,6 +106,9 @@ with repository `SevenLabnl/battlestack`, workflow `release.yml` and environment
 ## Recovering from a failed release
 
 - **Gate failed.** Nothing was published, nothing was tagged. Fix and re-dispatch.
+- **Gate refused the version.** Either the `v<version>` tag exists, the version
+  is already on npm, or it is not newer than the current `latest`. All three mean
+  the number is spent: run **Prepare release** for a new one.
 - **Publish failed halfway.** Some packages are on the registry, no tag exists.
   Re-dispatch the same run: `pnpm -r publish` skips what already landed. The
   Gate job reports which packages are already published and continues.

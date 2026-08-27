@@ -169,6 +169,25 @@ jobs:
             echo "::warning::$PUBLISHED package(s) at $VERSION are already published; this run resumes the rest"
           fi
 
+      # Being unpublished is not enough. `pnpm publish --tag latest` moves the
+      # dist-tag to whatever it is handed, including a version older than the
+      # one already there, and the only step that would notice is the
+      # `production` fast-forward at the very end of the publish job, long after
+      # npm accepted it. Checked here, before anything irreversible.
+      - name: Verify the version moves latest forward
+        if: steps.plan.outputs.promote == 'true'
+        env:
+          RELEASING: ${{ steps.plan.outputs.version }}
+        run: |
+          set -uo pipefail
+          LATEST=$(npm view battlestack version 2>/dev/null || true)
+          if [ -z "$LATEST" ]; then
+            echo "battlestack has no published version yet, nothing to move backwards"
+            exit 0
+          fi
+          echo "npm latest is $LATEST, releasing $RELEASING"
+          node scripts/release-version.mjs --newer-than "$LATEST"
+
       # The gates run before the publish, not after: an unpublish window is 72
       # hours and a bad version number is permanent, so it is far cheaper to
       # fail here than to ship and retract.
@@ -187,6 +206,17 @@ jobs:
       - name: Smoke-test the packed tarballs
         run: node scripts/pack-smoke.mjs
 
+      # The dry run lives here rather than in `publish`, because `publish`
+      # carries `environment: release`: its required reviewers would make every
+      # dry run wait for a human, and its `main`-only deployment branches would
+      # fail a dry run dispatched from a topic branch outright. Both contradict
+      # the promise that a dry run needs no approval and runs from any branch.
+      - name: Dry run (no publish)
+        if: inputs.dry_run == true
+        env:
+          DIST_TAG: ${{ steps.plan.outputs.dist_tag }}
+        run: pnpm -r publish --access public --tag "$DIST_TAG" --no-git-checks --dry-run
+
   # `environment: release` is the approval gate: configure it with required
   # reviewers, and restrict its deployment branches to `main`. That setting is
   # also what npm Trusted Publishing binds to.
@@ -201,6 +231,7 @@ jobs:
   publish:
     name: Publish to npm
     needs: verify
+    if: inputs.dry_run != true
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -233,12 +264,7 @@ jobs:
         run: pnpm build
 
       - name: Publish
-        if: inputs.dry_run != true
         run: pnpm -r publish --access public --tag "$DIST_TAG" --no-git-checks --report-summary
-
-      - name: Dry run (no publish)
-        if: inputs.dry_run == true
-        run: pnpm -r publish --access public --tag "$DIST_TAG" --no-git-checks --dry-run
 
       - name: Upload the publish summary
         if: always() && hashFiles('pnpm-publish-summary.json') != ''
@@ -252,7 +278,6 @@ jobs:
       # in the release, which is what makes a checkout of the tag readable
       # without consulting the registry.
       - name: Tag the release
-        if: inputs.dry_run != true
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
@@ -270,23 +295,29 @@ jobs:
       # Fast-forwards for as long as releases are cut from `main`. A rejected
       # push means the branches diverged and wants a human, not a force.
       - name: Promote the production branch
-        if: inputs.dry_run != true && needs.verify.outputs.promote == 'true'
+        if: needs.verify.outputs.promote == 'true'
         run: |
           set -euo pipefail
           git push origin "HEAD:refs/heads/$PRODUCTION_BRANCH"
           echo "$PRODUCTION_BRANCH now points at $(git rev-parse --short HEAD) (v$VERSION)"
 
       - name: Create the GitHub release
-        if: inputs.dry_run != true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           FLAGS=(--generate-notes --target "$GITHUB_SHA" --title "v$VERSION")
           if [ "$PRERELEASE" = true ]; then
-            FLAGS+=(--prerelease --latest=false)
-          else
+            FLAGS+=(--prerelease)
+          fi
+          # Keyed on `promote`, not on `prerelease`. A stable version published
+          # to `next` leaves npm's `latest` and the production branch alone, so
+          # marking it "Latest" on the releases page would advertise a version
+          # that no plain `npx battlestack` installs.
+          if [ "$PROMOTE" = true ]; then
             FLAGS+=(--latest)
+          else
+            FLAGS+=(--latest=false)
           fi
           gh release create "v$VERSION" "${FLAGS[@]}"
 
@@ -301,5 +332,4 @@ jobs:
             echo "| install | \`npx battlestack@$DIST_TAG\` |"
             echo "| git tag | \`v$VERSION\` |"
             echo "| $PRODUCTION_BRANCH promoted | $PROMOTE |"
-            echo "| dry run | ${{ inputs.dry_run }} |"
           } >> "$GITHUB_STEP_SUMMARY"
