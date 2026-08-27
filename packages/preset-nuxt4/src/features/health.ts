@@ -2,12 +2,14 @@ import { isFeatureEnabled, STAGE, type Feature, type RunContext } from '@battles
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
 
-/** `/api/health` route + runtimeConfig knobs. Picks `with-db` or `env-only` variant at scaffold time. */
+/** `/api/health` + probe split (`/live`, `/ready`) + runtimeConfig knobs. Picks `with-db` or `env-only` variant at scaffold time. */
 export const healthFeature: Feature = {
     id: 'nuxt4:health',
     // 1.2.0: the env check names NUXT_SESSION_PASSWORD and checks its length.
-    version: '1.2.0',
-    label: 'Health endpoint (/api/health)',
+    // 1.3.0: probe split — dependency-free `/api/health/live` for liveness,
+    // `/api/health/ready` for readiness (DB ping with-db, env check env-only).
+    version: '1.3.0',
+    label: 'Health endpoints (/api/health, /live, /ready)',
     frameworks: ['nuxt4'],
     stage: STAGE.BASE_CONFIG,
 
@@ -16,10 +18,14 @@ export const healthFeature: Feature = {
             {
                 heading: 'Health',
                 body: [
-                    '`GET /api/health` returns `{ status, version, checks }`. Container-orchestrator liveness + readiness probes target this route.',
+                    'Three endpoints, because liveness and readiness answer different questions. The rule: a liveness probe must not depend on anything a restart cannot fix.',
                     '',
-                    '- 200 when ok; 503 when degraded AND `runtimeConfig.health.failOnDegraded` is true (default).',
-                    '- DB ping (when `nuxt4:database` is enabled) is bounded by `runtimeConfig.health.dbTimeoutMs` (default 1000ms).',
+                    '- `GET /api/health/live` — liveness + startup probes. Checks nothing but the process; failing means the pod is restarted. Never add a dependency check here (a test guards this).',
+                    '- `GET /api/health/ready` — readiness probe. Checks Postgres (with `nuxt4:database`) or env config (without); failing takes the pod out of the Service and reverses on its own.',
+                    '- `GET /api/health` — humans and monitoring. Returns `{ status, version, checks }`; wired to no probe.',
+                    '',
+                    '- `/api/health` answers 200 when ok; 503 when degraded AND `runtimeConfig.health.failOnDegraded` is true (default).',
+                    '- DB pings (when `nuxt4:database` is enabled) are bounded by `runtimeConfig.health.dbTimeoutMs` (default 1000ms) — shared by `/api/health` and `/api/health/ready`.',
                     '- Override per env via `NUXT_HEALTH_FAIL_ON_DEGRADED` and `NUXT_HEALTH_DB_TIMEOUT_MS`.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,

@@ -16,7 +16,7 @@ export const docsFeature: Feature = {
     id: 'nuxt4:docs',
     // 1.0.8: redis-gated bullet. 1.0.9: corrected rule globs from `shared:ai-tool-config` 1.1.6.
     // 1.0.11: extensions docs from `nuxt4:database` 1.6.0 and `nuxt4:rag`.
-    version: '1.0.11',
+    version: '1.0.12',
     label: 'Generate AGENTS.md + CLAUDE.md + README.md',
     frameworks: ['nuxt4'],
     stage: STAGE.DOCS,
