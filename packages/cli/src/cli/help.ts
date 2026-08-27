@@ -1,6 +1,7 @@
 import pc from 'picocolors'
 import { ui } from '@battlestack/tui'
 import { collectFeatureCommandHelp, RESERVED_COMMANDS } from '../commands/project.js'
+import { pluginCommandGroups } from './plugin-commands.js'
 import type { BattlestackRegistries, HelpMode } from '@battlestack/core'
 
 /** `printScaffoldHelp`'s template ids and examples are preset-nuxt-specific. */
@@ -12,11 +13,23 @@ export async function printHelp(
     if (mode === 'project') {
         await printProjectHelp(registries, projectRoot)
     } else {
-        printScaffoldHelp()
+        printScaffoldHelp(registries)
     }
 }
 
-function printScaffoldHelp(): void {
+/** Plugin-contributed commands, one block per owning plugin. Scaffold-only ids excluded. */
+function printPluginCommandHelp(registries: BattlestackRegistries): void {
+    for (const { plugin, commands } of pluginCommandGroups(registries)) {
+        ui.blank()
+        ui.plain(pc.bold(plugin))
+        ui.kv(
+            commands.map((cmd) => [`battlestack ${cmd.usage ?? cmd.id}`, cmd.description] as [string, string]),
+            '  ',
+        )
+    }
+}
+
+function printScaffoldHelp(registries: BattlestackRegistries): void {
     ui.section('battlestack')
     ui.dim(`${ui.TAGLINE}.`)
 
@@ -64,6 +77,8 @@ function printScaffoldHelp(): void {
         ],
         '  ',
     )
+
+    printPluginCommandHelp(registries)
 
     ui.blank()
     ui.dim('Inside a generated project, run `battlestack --help` for maintenance commands.')
@@ -124,5 +139,7 @@ async function printProjectHelp(registries: BattlestackRegistries, projectRoot?:
         ui.blank()
         ui.dim('Per-feature commands (`battlestack dev`, `battlestack db:push`, …): see `battlestack` with no args.')
     }
+
+    printPluginCommandHelp(registries)
     ui.blank()
 }

@@ -16,6 +16,7 @@ import {
     type ReservedCommand,
     type RunContext,
 } from '@battlestack/core'
+import { dispatchPluginCommand, pluginCommandGroups, SCAFFOLD_ONLY } from '../cli/plugin-commands.js'
 import { addCommand, addReservedMeta, removeCommand, removeReservedMeta } from './add-remove.js'
 import { describeCommand, describeReservedMeta } from './describe.js'
 import { doctorCommand, doctorReservedMeta } from './doctor.js'
@@ -127,6 +128,8 @@ export async function projectCommand(
     loader: Ora,
     projectRoot: string,
     registries: BattlestackRegistries,
+    /** The unparsed argv, forwarded to plugin commands the same way scaffold mode does. */
+    rawArgv: string[],
 ): Promise<void> {
     const requested = args.projectName
     // preCheck runs before reserved-command dispatch.
@@ -161,30 +164,24 @@ export async function projectCommand(
     const { commands, ordered } = buildCommandMap(ctx, manifest, registries)
 
     if (!requested) {
-        printAvailable(commands, ordered, manifest)
+        printAvailable(commands, ordered, manifest, registries)
         return
     }
 
     const entry = commands.get(requested)
     if (!entry) {
-        // Plugin-contributed top-level commands (addCommand) work inside a
-        // project too: a deploy plugin's `battlestack deploy`/`login` must not
-        // vanish the moment the CLI enters project mode. Built-ins and
-        // feature commands take precedence — this is a fallback, not a shadow.
-        const pluginCommand = registries.commands.has(requested) ? registries.commands.get(requested) : null
-        if (pluginCommand) {
-            await pluginCommand.run({
-                args: args.positionals.slice(1),
-                parsed: args,
-                loader,
-                registries,
-            })
+        // Plugin commands (addCommand) dispatch in project mode too, after built-ins
+        // and feature commands miss. Scaffold-only ids are excluded, and the dry-run
+        // gate below does not cover this path: `parsed.dryRun` is the plugin's job.
+        if (!SCAFFOLD_ONLY.has(requested)
+            && await dispatchPluginCommand(requested, rawArgv.slice(1), loader, registries, projectRoot)) {
             return
         }
         ui.fail(`Unknown command: ${requested}`)
-        const suggestion = suggestCommand(requested, ordered)
+        const pluginIds = registries.commands.all().map((c) => c.id).filter((id) => !SCAFFOLD_ONLY.has(id))
+        const suggestion = suggestCommand(requested, [...ordered, ...pluginIds])
         if (suggestion) ui.hint(`did you mean: battlestack ${suggestion}?`)
-        printAvailable(commands, ordered, manifest)
+        printAvailable(commands, ordered, manifest, registries)
         throw new CLIError(ErrorCode.SCAFFOLD_FAILED, `Unknown project command: ${requested}`)
     }
 
@@ -235,6 +232,7 @@ function printAvailable(
     commands: Map<string, { feature: string, cmd: ProjectCommand }>,
     ordered: string[],
     manifest: ProjectManifest,
+    registries: BattlestackRegistries,
 ): void {
     ui.section('Battlestack project commands')
     ui.dim(`${manifest.framework} / ${manifest.template}`)
@@ -252,6 +250,15 @@ function printAvailable(
         ui.plain('  ' + pc.dim(featureId))
         ui.kv(
             list.map(({ name, cmd }) => [name, cmd.label] as [string, string]),
+            '    ',
+        )
+    }
+
+    for (const { plugin, commands: cmds } of pluginCommandGroups(registries)) {
+        ui.blank()
+        ui.plain('  ' + pc.dim(plugin))
+        ui.kv(
+            cmds.map((cmd) => [cmd.usage ?? cmd.id, cmd.description] as [string, string]),
             '    ',
         )
     }

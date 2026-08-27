@@ -4,10 +4,12 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { collectFeatureCommandHelp, projectCommand } from '../src/commands/project.js'
+import { parseArgs } from '../src/cli/args.js'
 import {
     BattlestackRegistries,
     silentLoader,
     STAGE,
+    type CommandContext,
     type Feature,
     type ParsedArgs,
     type Provenance,
@@ -15,6 +17,7 @@ import {
 
 let projectDir: string
 let executed: string[]
+let pluginContexts: CommandContext[]
 
 const FEATURE_ID = 'test:project-cmd'
 const origin: Provenance = { plugin: '@test/project', namespace: 'projecttest' }
@@ -55,6 +58,30 @@ function ensureRegistered(): void {
         }
         registries.features.register(feature, origin)
     }
+    if (!registries.commands.has('greet')) {
+        registries.commands.register({
+            id: 'greet',
+            description: 'plugin-contributed top-level command',
+            run: (ctx) => {
+                pluginContexts.push(ctx)
+            },
+        }, origin)
+        // Same name as the feature command: must lose to it in project mode.
+        registries.commands.register({
+            id: 'hello',
+            description: 'plugin command shadowing a feature command',
+            run: () => {
+                executed.push('plugin-hello')
+            },
+        }, origin)
+        registries.commands.register({
+            id: 'create',
+            description: 'scaffold-only command',
+            run: () => {
+                executed.push('plugin-create')
+            },
+        }, origin)
+    }
 }
 
 async function writeProjectManifest(): Promise<void> {
@@ -84,6 +111,7 @@ const loader = silentLoader()
 beforeEach(async () => {
     projectDir = await mkdtemp(path.join(os.tmpdir(), 'battlestack-project-cmd-test-'))
     executed = []
+    pluginContexts = []
     ensureRegistered()
     await writeProjectManifest()
     vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -109,7 +137,7 @@ describe('collectFeatureCommandHelp', () => {
 
 describe('projectCommand', () => {
     it('dispatches a feature command', async () => {
-        await projectCommand(args('hello'), loader, projectDir, registries)
+        await projectCommand(args('hello'), loader, projectDir, registries, ['hello'])
         expect(executed).toEqual(['hello'])
     })
 
@@ -118,7 +146,7 @@ describe('projectCommand', () => {
         vi.mocked(console.log).mockImplementation((...a: unknown[]) => {
             lines.push(a.join(' '))
         })
-        await projectCommand(args(undefined), loader, projectDir, registries)
+        await projectCommand(args(undefined), loader, projectDir, registries, [])
         expect(executed).toEqual([])
         expect(lines.join('\n')).toContain('hello')
         expect(lines.join('\n')).toContain(FEATURE_ID)
@@ -129,7 +157,7 @@ describe('projectCommand', () => {
         vi.mocked(console.log).mockImplementation((...a: unknown[]) => {
             lines.push(a.join(' '))
         })
-        await projectCommand(args('hello', { dryRun: true }), loader, projectDir, registries)
+        await projectCommand(args('hello', { dryRun: true }), loader, projectDir, registries, ['hello', '--dry-run'])
         expect(executed).toEqual([])
         expect(lines.join('\n')).toContain('would execute hello')
     })
@@ -139,13 +167,46 @@ describe('projectCommand', () => {
         vi.mocked(console.log).mockImplementation((...a: unknown[]) => {
             lines.push(a.join(' '))
         })
-        await expect(projectCommand(args('helo'), loader, projectDir, registries))
+        await expect(projectCommand(args('helo'), loader, projectDir, registries, ['helo']))
             .rejects.toThrow(/Unknown project command/)
         expect(lines.join('\n')).toContain('did you mean: battlestack hello?')
     })
 
+    it('falls back to a plugin command with the scaffold-mode CommandContext shape', async () => {
+        const argv = ['greet', 'production', '--wait', '--replicas=3']
+        await projectCommand(parseArgs(argv), loader, projectDir, registries, argv)
+        expect(pluginContexts).toHaveLength(1)
+        const ctx = pluginContexts[0]!
+        // Flags survive in `args`, and `parsed` is re-parsed past the command name.
+        expect(ctx.args).toEqual(['production', '--wait', '--replicas=3'])
+        expect(ctx.parsed.projectName).toBe('production')
+        expect(ctx.parsed.secondPositional).toBeUndefined()
+        expect(ctx.projectRoot).toBe(projectDir)
+    })
+
+    it('feature commands win over a plugin command with the same name', async () => {
+        await projectCommand(args('hello'), loader, projectDir, registries, ['hello'])
+        expect(executed).toEqual(['hello'])
+    })
+
+    it('keeps create scaffold-only inside a project', async () => {
+        await expect(projectCommand(parseArgs(['create', 'my-app']), loader, projectDir, registries, ['create', 'my-app']))
+            .rejects.toThrow(/Unknown project command: create/)
+        expect(executed).toEqual([])
+    })
+
+    it('suggests plugin commands on a near miss', async () => {
+        const lines: string[] = []
+        vi.mocked(console.log).mockImplementation((...a: unknown[]) => {
+            lines.push(a.join(' '))
+        })
+        await expect(projectCommand(args('greeet'), loader, projectDir, registries, ['greeet']))
+            .rejects.toThrow(/Unknown project command/)
+        expect(lines.join('\n')).toContain('did you mean: battlestack greet?')
+    })
+
     it('stamps projectName into the manifest on first run (rename reconciliation)', async () => {
-        await projectCommand(args('hello'), loader, projectDir, registries)
+        await projectCommand(args('hello'), loader, projectDir, registries, ['hello'])
         const manifest = JSON.parse(
             await import('node:fs/promises').then((fs) =>
                 fs.readFile(path.join(projectDir, '.battlestack', 'manifest.json'), 'utf8'),

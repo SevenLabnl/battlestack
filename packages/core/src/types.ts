@@ -56,6 +56,8 @@ export interface CommandContext {
     loader: Ora
     /** Finalized registries: features/templates/… from every loaded plugin. */
     registries: BattlestackRegistries
+    /** Project root when dispatched from inside a project; absent in scaffold mode. */
+    projectRoot?: string
 }
 
 /** A CLI subcommand contributed by a plugin. Ids are namespaced. Built-ins always win. */
