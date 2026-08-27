@@ -4,6 +4,41 @@ import { readdir, rm } from 'node:fs/promises'
 import { exists } from './fs.js'
 import { run } from './run.js'
 
+/**
+ * An unreachable Docker daemon does not fail fast. On a host with Docker
+ * installed but not running, `docker ps` sits on the socket or named pipe for
+ * tens of seconds, so an unbounded probe hangs the CLI before it has printed
+ * anything. Same bound the port probes in port-diagnosis.ts use.
+ */
+const DOCKER_PROBE_TIMEOUT_MS = 5000
+
+/** Non-empty stdout lines, or none when docker is absent, broken or too slow. */
+function dockerLines(args: string[]): Promise<string[]> {
+    return new Promise((resolve) => {
+        let settled = false
+        let timer: NodeJS.Timeout | undefined
+        const finish = (lines: string[]): void => {
+            if (settled) return
+            settled = true
+            if (timer) clearTimeout(timer)
+            resolve(lines)
+        }
+
+        const child = spawn('docker', args, { stdio: ['ignore', 'pipe', 'ignore'] })
+        timer = setTimeout(() => {
+            child.kill()
+            finish([])
+        }, DOCKER_PROBE_TIMEOUT_MS)
+
+        let out = ''
+        child.stdout.on('data', (b: Buffer) => (out += b.toString()))
+        child.on('error', () => finish([]))
+        // Trimmed per line: docker on Windows terminates with CRLF, and a
+        // trailing \r rides along into the `docker rm <id>` that follows.
+        child.on('close', () => finish(out.split('\n').map((l) => l.trim()).filter(Boolean)))
+    })
+}
+
 /** Detects a previous scaffold by directory contents, manifest state, or docker compose label. */
 export async function detectStale(
     projectName: string,
@@ -40,17 +75,14 @@ async function detectIncompleteManifest(projectDir: string): Promise<boolean> {
 
 /** True when any container is labeled `com.docker.compose.project=<projectName>`. */
 export async function detectComposeProject(projectName: string): Promise<boolean> {
-    return new Promise((resolve) => {
-        const child = spawn(
-            'docker',
-            ['ps', '-a', '--filter', `label=com.docker.compose.project=${projectName}`, '-q'],
-            { stdio: ['ignore', 'pipe', 'ignore'] },
-        )
-        let out = ''
-        child.stdout.on('data', (b: Buffer) => (out += b.toString()))
-        child.on('error', () => resolve(false))
-        child.on('close', () => resolve(out.trim().length > 0))
-    })
+    const ids = await dockerLines([
+        'ps',
+        '-a',
+        '--filter',
+        `label=com.docker.compose.project=${projectName}`,
+        '-q',
+    ])
+    return ids.length > 0
 }
 
 /** Best-effort. */
@@ -80,22 +112,12 @@ async function rmByLabel(
     rmCmd: string,
     rmArgs: string[],
 ): Promise<void> {
-    const ids = await new Promise<string[]>((resolve) => {
-        const child = spawn(
-            'docker',
-            [
-                listCmd,
-                ...listArgs,
-                '--filter',
-                `label=com.docker.compose.project=${projectName}`,
-            ],
-            { stdio: ['ignore', 'pipe', 'ignore'] },
-        )
-        let out = ''
-        child.stdout.on('data', (b: Buffer) => (out += b.toString()))
-        child.on('error', () => resolve([]))
-        child.on('close', () => resolve(out.split('\n').filter(Boolean)))
-    })
+    const ids = await dockerLines([
+        listCmd,
+        ...listArgs,
+        '--filter',
+        `label=com.docker.compose.project=${projectName}`,
+    ])
     for (const id of ids) {
         try {
             await run('docker', [rmCmd, ...rmArgs, id], { inherit: false })
