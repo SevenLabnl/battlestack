@@ -18,11 +18,17 @@ interface LockData {
 /**
  * Acquires `.battlestack/lock`. A live same-machine pid throws; a lock older than 30 minutes
  * or held by a dead pid is reclaimed. Returns a release fn for `finally`.
+ *
+ * Under `dryRun` no lock is taken and the release fn is a no-op: a run that writes nothing
+ * has no concurrent-write hazard to guard, and taking the lock would itself create
+ * `.battlestack/` under a flag that promises to leave the disk alone.
  */
 export async function acquireProjectLock(
     projectDir: string,
     command: string,
+    opts: { dryRun?: boolean } = {},
 ): Promise<() => Promise<void>> {
+    if (opts.dryRun) return async (): Promise<void> => {}
     await migrateStateDir(projectDir)
     const lockPath = path.join(projectDir, LOCK_REL)
     await mkdir(path.dirname(lockPath), { recursive: true })

@@ -3,7 +3,6 @@ import path from 'node:path'
 import os from 'node:os'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import type { Ora } from 'ora'
 import {
     CLIError,
     discoverPlugins,
@@ -17,7 +16,8 @@ import {
     type RunContext,
 } from '@battlestack/core'
 import { installUiPort, ui } from '@battlestack/tui'
-import { parseArgs } from './cli/args.js'
+import { parseArgs, stripCommandToken } from './cli/args.js'
+import { dispatchPluginCommand } from './cli/plugin-commands.js'
 import { printHelp } from './cli/help.js'
 import { bootstrapProject } from './commands/install.js'
 import { doctorCommand } from './commands/doctor.js'
@@ -110,23 +110,6 @@ function printSkills(result: LoadResult): void {
     for (const s of sources) console.log(`  ${s}`)
 }
 
-/**
- * Dispatches to a plugin-contributed `BattlestackCommand`.
- * @returns false when no plugin registered that id.
- */
-async function dispatchPluginCommand(
-    id: string,
-    args: string[],
-    loader: Ora,
-    result: LoadResult,
-): Promise<boolean> {
-    if (!result.registries.commands.has(id)) return false
-    const cmd = result.registries.commands.get(id)
-    // Re-parsed so positionals line up as `[name] [template]` however the CLI reached it.
-    await cmd.run({ args, parsed: parseArgs(args), loader, registries: result.registries })
-    return true
-}
-
 async function main(): Promise<void> {
     installUiPort()
     setHostServices({ bootstrapProject, gatewayUp, registerProject })
@@ -194,7 +177,7 @@ async function main(): Promise<void> {
     try {
         // Intercepted before mode detection, and routed via the plugin registry.
         if (args.projectName === 'init' && !args.help) {
-            const dispatched = await dispatchPluginCommand('init', rawArgv.slice(1), loader, result)
+            const dispatched = await dispatchPluginCommand('init', stripCommandToken(rawArgv), loader, registries)
             if (!dispatched) {
                 ui.printError('No "init" command available. Is @battlestack/preset-nuxt4 installed?')
                 process.exitCode = 1
@@ -218,20 +201,21 @@ async function main(): Promise<void> {
                 return
             }
             // Inside a project, `--help` lists rather than executes.
-            await projectCommand({ ...args, projectName: undefined }, loader, projectRoot, registries)
+            await projectCommand({ ...args, projectName: undefined }, loader, projectRoot, registries, rawArgv)
             return
         }
 
         if (projectRoot) {
-            await projectCommand(args, loader, projectRoot, registries)
+            await projectCommand(args, loader, projectRoot, registries, rawArgv)
         } else {
             ui.banner(VERSION)
             // A recognized plugin command beats treating the positional as a project name.
-            const asCommand = args.projectName && registries.commands.has(args.projectName)
-                ? await dispatchPluginCommand(args.projectName, rawArgv.slice(1), loader, result)
+            const asCommand = args.projectName
+                ? await dispatchPluginCommand(args.projectName, stripCommandToken(rawArgv), loader, registries)
                 : false
             if (!asCommand) {
-                const dispatched = await dispatchPluginCommand('create', rawArgv, loader, result)
+                // Implicit `create`: the positional is the project name, so nothing is stripped.
+                const dispatched = await dispatchPluginCommand('create', rawArgv, loader, registries)
                 if (!dispatched) {
                     throw new CLIError(
                         ErrorCode.SCAFFOLD_FAILED,

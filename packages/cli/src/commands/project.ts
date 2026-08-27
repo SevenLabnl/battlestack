@@ -16,6 +16,8 @@ import {
     type ReservedCommand,
     type RunContext,
 } from '@battlestack/core'
+import { stripCommandToken } from '../cli/args.js'
+import { dispatchPluginCommand, isScaffoldOnly, pluginCommandGroups, SCAFFOLD_ONLY } from '../cli/plugin-commands.js'
 import { addCommand, addReservedMeta, removeCommand, removeReservedMeta } from './add-remove.js'
 import { describeCommand, describeReservedMeta } from './describe.js'
 import { doctorCommand, doctorReservedMeta } from './doctor.js'
@@ -122,11 +124,38 @@ export async function collectFeatureCommandHelp(
     return [...grouped].map(([feature, cmds]) => ({ feature, commands: cmds }))
 }
 
+/**
+ * Names that beat a plugin command of the same name in project-mode dispatch:
+ * the scaffold-only ids, the reserved subcommands, then `featureCommands`.
+ */
+function claimedNames(registries: BattlestackRegistries, featureCommands: Iterable<string>): Set<string> {
+    return new Set([...SCAFFOLD_ONLY, ...Object.keys(buildReservedRunners(registries)), ...featureCommands])
+}
+
+/** `claimedNames` for the project at `projectRoot`, reading its manifest. Never throws. */
+export async function claimedProjectCommands(
+    registries: BattlestackRegistries,
+    projectRoot?: string,
+): Promise<Set<string>> {
+    if (!projectRoot) return claimedNames(registries, [])
+    try {
+        const manifest = await readManifest(projectRoot, registries)
+        if (!manifest) return claimedNames(registries, [])
+        const ctx = buildRunContext({ projectDir: projectRoot, manifest, debug: false, dryRun: true }, registries)
+        return claimedNames(registries, buildCommandMap(ctx, manifest, registries).ordered)
+    } catch {
+        // An unreadable manifest just means no feature commands to subtract.
+        return claimedNames(registries, [])
+    }
+}
+
 export async function projectCommand(
     args: ParsedArgs,
     loader: Ora,
     projectRoot: string,
     registries: BattlestackRegistries,
+    /** The unparsed argv, forwarded to plugin commands the same way scaffold mode does. */
+    rawArgv: string[],
 ): Promise<void> {
     const requested = args.projectName
     // preCheck runs before reserved-command dispatch.
@@ -161,16 +190,26 @@ export async function projectCommand(
     const { commands, ordered } = buildCommandMap(ctx, manifest, registries)
 
     if (!requested) {
-        printAvailable(commands, ordered, manifest)
+        printAvailable(commands, ordered, manifest, registries)
         return
     }
 
     const entry = commands.get(requested)
     if (!entry) {
+        // Plugin commands (addCommand) dispatch in project mode too, after built-ins
+        // and feature commands miss. `dispatchPluginCommand` runs its own --dry-run gate.
+        if (!isScaffoldOnly(registries, requested)
+            && await dispatchPluginCommand(requested, stripCommandToken(rawArgv), loader, registries, projectRoot)) {
+            return
+        }
         ui.fail(`Unknown command: ${requested}`)
-        const suggestion = suggestCommand(requested, ordered)
+        const pluginIds = registries.commands.all()
+            .filter((c) => !SCAFFOLD_ONLY.has(c.id))
+            // Both spellings: `suggestCommand` matches an fqid by its `:`-suffix.
+            .flatMap((c) => [c.id, c.fqid])
+        const suggestion = suggestCommand(requested, [...ordered, ...pluginIds])
         if (suggestion) ui.hint(`did you mean: battlestack ${suggestion}?`)
-        printAvailable(commands, ordered, manifest)
+        printAvailable(commands, ordered, manifest, registries)
         throw new CLIError(ErrorCode.SCAFFOLD_FAILED, `Unknown project command: ${requested}`)
     }
 
@@ -221,6 +260,7 @@ function printAvailable(
     commands: Map<string, { feature: string, cmd: ProjectCommand }>,
     ordered: string[],
     manifest: ProjectManifest,
+    registries: BattlestackRegistries,
 ): void {
     ui.section('Battlestack project commands')
     ui.dim(`${manifest.framework} / ${manifest.template}`)
@@ -238,6 +278,15 @@ function printAvailable(
         ui.plain('  ' + pc.dim(featureId))
         ui.kv(
             list.map(({ name, cmd }) => [name, cmd.label] as [string, string]),
+            '    ',
+        )
+    }
+
+    for (const { plugin, commands: cmds } of pluginCommandGroups(registries, claimedNames(registries, ordered))) {
+        ui.blank()
+        ui.plain('  ' + pc.dim(plugin))
+        ui.kv(
+            cmds.map((cmd) => [cmd.usage ?? cmd.id, cmd.description] as [string, string]),
             '    ',
         )
     }

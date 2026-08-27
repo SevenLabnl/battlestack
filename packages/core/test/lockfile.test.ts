@@ -26,6 +26,26 @@ describe('acquireProjectLock', () => {
         await release()
     })
 
+    it('writes nothing under dryRun, not even the state dir', async () => {
+        const fresh = path.join(projectDir, 'not-created-yet')
+        const release = await acquireProjectLock(fresh, 'battlestack create', { dryRun: true })
+        const { exists } = await import('../src/utils/fs.js')
+        expect(await exists(fresh)).toBe(false)
+        // Release is a no-op, safe to call in the same `finally`.
+        await release()
+        expect(await exists(fresh)).toBe(false)
+    })
+
+    it('does not block a concurrent dryRun, in either order', async () => {
+        const release = await acquireProjectLock(projectDir, 'battlestack pull')
+        const dryRelease = await acquireProjectLock(projectDir, 'battlestack pull', { dryRun: true })
+        await dryRelease()
+        // The real lock survives the dry-run release.
+        const { exists } = await import('../src/utils/fs.js')
+        expect(await exists(path.join(projectDir, LOCK_REL))).toBe(true)
+        await release()
+    })
+
     it('removes the lock on release', async () => {
         const release = await acquireProjectLock(projectDir, 'battlestack test')
         await release()

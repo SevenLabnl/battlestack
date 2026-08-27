@@ -56,6 +56,8 @@ export interface CommandContext {
     loader: Ora
     /** Finalized registries: features/templates/… from every loaded plugin. */
     registries: BattlestackRegistries
+    /** Project root when dispatched from inside a project; absent in scaffold mode. */
+    projectRoot?: string
 }
 
 /** A CLI subcommand contributed by a plugin. Ids are namespaced. Built-ins always win. */
@@ -66,6 +68,11 @@ export interface BattlestackCommand {
     description: string
     /** Usage hint shown instead of the bare id, e.g. `deploy [env]`. */
     usage?: string
+    /**
+     * Set once `run` honors `parsed.dryRun`. Until then `--dry-run` refuses to
+     * dispatch, rather than silently writing under a flag that promises not to.
+     */
+    honorsDryRun?: boolean
     run(ctx: CommandContext): Promise<void> | void
 }
 

@@ -276,7 +276,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         )
     }
 
-    const releaseLock = await acquireProjectLock(projectDir, 'battlestack pull')
+    const releaseLock = await acquireProjectLock(projectDir, 'battlestack pull', { dryRun: args.dryRun })
     try {
         // Orphan features are dropped from ctx. Warnings are deferred to the end.
         const orphans = manifest.features.filter((f) => !registries.features.has(f.id))

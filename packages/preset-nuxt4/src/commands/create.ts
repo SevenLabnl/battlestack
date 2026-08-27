@@ -219,8 +219,10 @@ export async function createCommand(context: CommandContext): Promise<void> {
     }
 
     ui.section('Scaffolding')
-    ui.dim('  Generating files, applying features, and installing dependencies.')
-    const releaseLock = await acquireProjectLock(projectDir, 'battlestack create')
+    ui.dim(ctx.dryRun
+        ? '  Planning the file, feature and dependency work. Nothing is written.'
+        : '  Generating files, applying features, and installing dependencies.')
+    const releaseLock = await acquireProjectLock(projectDir, 'battlestack create', { dryRun: ctx.dryRun })
     try {
         await runFeatures(ctx, loader, { format: formatProject })
         await generateInitialMigration(ctx, enabled)
@@ -228,13 +230,19 @@ export async function createCommand(context: CommandContext): Promise<void> {
         await releaseLock()
     }
 
-    if (gatewayEnabled) {
+    if (gatewayEnabled && !ctx.dryRun) {
         await writeLocalState(projectDir, {
             gateway: { enabled: true, hostname: `${projectName}.battlestack.test` },
         })
     }
 
     ui.section('Done')
+    if (ctx.dryRun) {
+        ui.ok(`Would create ${ui.color.accent(projectName)} at ${ui.color.dim(projectDir)}`)
+        ui.dim('  Dry run: nothing was written. Re-run without --dry-run to scaffold.')
+        ui.blank()
+        return
+    }
     ui.dim('  Project ready. Next steps below.')
     ui.ok(`Created ${ui.color.accent(projectName)} at ${ui.color.dim(projectDir)}`)
     printNextSteps(projectDir, enabled, registries, {
