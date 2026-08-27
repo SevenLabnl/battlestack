@@ -46,6 +46,12 @@ jobs:
           BUMP_CHECK_BASE: ${{ github.base_ref && format('origin/{0}', github.base_ref) || '' }}
         run: pnpm bump:check
 
+      # Package versions, not feature versions. The five packages are published
+      # in lockstep and cross-depend with `workspace:*`, so a version that
+      # drifted on one of them is only discoverable at release time otherwise.
+      - name: Lockstep package version check
+        run: pnpm version:check
+
   verify:
     name: Type-check and test (Node ${{ matrix.node }})
     runs-on: ubuntu-latest

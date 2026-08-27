@@ -57,6 +57,14 @@ and deps, none of which resolve here, so it's deliberately excluded from
 the copy path never translates line endings, so whatever's committed is
 exactly what a scaffolded project gets.
 
+## Package versions are separate from feature versions
+
+The five publishable packages share one lockstep version, checked in CI by
+`pnpm version:check`. A feature's `version` is unrelated to it and is not a
+release number. See [RELEASING.md](RELEASING.md) for how a release is cut:
+merging to `main` publishes nothing, a release is a manual dispatch plus an
+environment approval.
+
 ## Features carry a version — bump it when output changes
 
 Every `Feature` has a `version` (semver). `battlestack pull` uses it to

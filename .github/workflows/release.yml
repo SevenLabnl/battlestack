@@ -1,6 +1,11 @@
 name: Release
 
-# Publishes all five packages to npm when a `v*` tag is pushed.
+# Manual dispatch only. Merging to `main` publishes nothing; a release is always
+# a deliberate act by a human, gated a second time by the `release` environment.
+#
+# Order of operations: gate, then publish, then record. The npm registry is the
+# only irreversible step, so git is never marked as released until npm accepted
+# the packages. A `v*` tag in this repo therefore always means "published".
 #
 # `pnpm publish`, never `npm publish`: the packages depend on each other with
 # `workspace:*`, and only pnpm rewrites that to a real version at pack time. npm
@@ -10,39 +15,55 @@ name: Release
 # version is already on the registry, so a re-run after a partial failure
 # finishes the job instead of erroring on the ones that made it.
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
     inputs:
       dry_run:
         description: 'Run every gate and pack the tarballs, but publish nothing'
         type: boolean
         default: true
+      channel:
+        description: 'npm dist-tag. auto = latest for a stable version, the prerelease id otherwise'
+        type: choice
+        default: auto
+        options:
+          - auto
+          - latest
+          - next
 
-# `id-token: write` is what lets the job mint a GitHub OIDC token. Auth is npm
-# Trusted Publishing: every package on npmjs.com is configured (Settings →
-# Trusted Publisher) to accept publishes only from this repo + this workflow
-# file + the `release` environment. pnpm exchanges the OIDC token for a
-# short-lived registry credential at publish time — no NPM_TOKEN secret exists.
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  PRODUCTION_BRANCH: production
+  RELEASE_BRANCH: main
 
 jobs:
-  release:
-    name: Publish to npm
+  # No environment on this job: the gates must be green before a human is asked
+  # to approve anything.
+  verify:
+    name: Gate
     runs-on: ubuntu-latest
-    environment: release
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      dist_tag: ${{ steps.plan.outputs.dist_tag }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
+      promote: ${{ steps.plan.outputs.promote }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
 
       # No `registry-url` here on purpose: it would write an .npmrc line that
       # dereferences ${NODE_AUTH_TOKEN}, and with trusted publishing no such
-      # token is ever set — the publish would die on env replacement. OIDC
+      # token is ever set, so the publish would die on env replacement. OIDC
       # needs no .npmrc auth at all.
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -52,6 +73,101 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # A publish from a topic branch would put unreviewed code on the registry
+      # under a version `main` does not carry. Dry runs stay unrestricted.
+      - name: Verify the release branch
+        if: inputs.dry_run != true
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "${RELEASE_BRANCH}" ]; then
+            echo "::error::a real publish must be dispatched from ${RELEASE_BRANCH}, got ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
+      # Replaces the old tag-versus-package comparison. There is no hand-written
+      # tag to disagree with any more: the version comes from the workspace and
+      # this job is what proves all five packages state the same one.
+      - name: Verify lockstep versions
+        run: node scripts/release-version.mjs --check
+
+      - name: Plan the release
+        id: plan
+        run: |
+          set -euo pipefail
+          VERSION=$(node scripts/release-version.mjs --print)
+
+          if [ -n "$(git tag --list "v$VERSION")" ]; then
+            echo "::error::tag v$VERSION already exists, so v$VERSION is already released. Run Prepare release first."
+            exit 1
+          fi
+
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE=true
+            PREID="${VERSION#*-}"
+            DEFAULT_TAG="${PREID%%.*}"
+          else
+            PRERELEASE=false
+            DEFAULT_TAG=latest
+          fi
+
+          case "${{ inputs.channel }}" in
+            auto) DIST_TAG="$DEFAULT_TAG" ;;
+            *)    DIST_TAG="${{ inputs.channel }}" ;;
+          esac
+
+          if [ "$PRERELEASE" = true ] && [ "$DIST_TAG" = latest ]; then
+            echo "::error::$VERSION is a prerelease; publishing it as latest would serve it to every plain install"
+            exit 1
+          fi
+
+          # `production` tracks what a plain `npx battlestack` installs, so a
+          # prerelease or an off-channel publish leaves it where it is.
+          PROMOTE=false
+          if [ "$DIST_TAG" = latest ]; then PROMOTE=true; fi
+
+          {
+            echo "version=$VERSION"
+            echo "dist_tag=$DIST_TAG"
+            echo "prerelease=$PRERELEASE"
+            echo "promote=$PROMOTE"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "### Release plan" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "| | |"
+            echo "|---|---|"
+            echo "| version | \`$VERSION\` |"
+            echo "| npm dist-tag | \`$DIST_TAG\` |"
+            echo "| git tag | \`v$VERSION\` |"
+            echo "| promotes \`$PRODUCTION_BRANCH\` | $PROMOTE |"
+            echo "| dry run | ${{ inputs.dry_run }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # An already-published version makes `pnpm -r publish` a silent no-op that
+      # would still get tagged and promoted. The unscoped wrapper is published
+      # last, so it being present means the whole release already landed; a
+      # partial set is reported but still resumable.
+      - name: Verify the version is unpublished
+        run: |
+          set -uo pipefail
+          VERSION="${{ steps.plan.outputs.version }}"
+          PUBLISHED=0
+          while read -r NAME; do
+            if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+              echo "$NAME@$VERSION is already on npm"
+              PUBLISHED=$((PUBLISHED + 1))
+            else
+              echo "$NAME@$VERSION is not on the registry"
+            fi
+          done < <(node scripts/release-version.mjs --names)
+
+          if npm view "battlestack@$VERSION" version >/dev/null 2>&1; then
+            echo "::error::battlestack@$VERSION is already on npm, v$VERSION is spent. Run Prepare release."
+            exit 1
+          fi
+          if [ "$PUBLISHED" -gt 0 ]; then
+            echo "::warning::$PUBLISHED package(s) at $VERSION are already published; this run resumes the rest"
+          fi
 
       # The gates run before the publish, not after: an unpublish window is 72
       # hours and a bad version number is permanent, so it is far cheaper to
@@ -65,33 +181,64 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # Catches the mistake this workflow is most likely to make: tagging v0.2.0
-      # while package.json still says 0.1.0. npm would happily publish the
-      # package version, silently disagreeing with the tag forever.
-      - name: Verify the tag matches the package version
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          PKG=$(node -p "require('./packages/cli/package.json').version")
-          if [ "$TAG" != "$PKG" ]; then
-            echo "::error::tag v$TAG does not match packages/cli version $PKG"
-            exit 1
-          fi
-          echo "tag v$TAG matches package version $PKG"
-
       # Proves the tarballs install and the binary runs, from the packed
       # artifacts rather than the workspace. This is the check that would catch
       # a `workspace:*` that failed to rewrite.
       - name: Smoke-test the packed tarballs
         run: node scripts/pack-smoke.mjs
 
+  # `environment: release` is the approval gate: configure it with required
+  # reviewers, and restrict its deployment branches to `main`. That setting is
+  # also what npm Trusted Publishing binds to.
+  #
+  # `id-token: write` is what lets the job mint a GitHub OIDC token. Auth is npm
+  # Trusted Publishing: every package on npmjs.com is configured (Settings ->
+  # Trusted Publisher) to accept publishes only from this repo + this workflow
+  # file + the `release` environment. pnpm exchanges the OIDC token for a
+  # short-lived registry credential at publish time, so no NPM_TOKEN exists.
+  #
+  # `contents: write` is for the tag and the production branch, nothing else.
+  publish:
+    name: Publish to npm
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      DIST_TAG: ${{ needs.verify.outputs.dist_tag }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+      PROMOTE: ${{ needs.verify.outputs.promote }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
       - name: Publish
-        if: github.event.inputs.dry_run != 'true'
-        run: pnpm -r publish --access public --no-git-checks --report-summary
+        if: inputs.dry_run != true
+        run: pnpm -r publish --access public --tag "$DIST_TAG" --no-git-checks --report-summary
 
       - name: Dry run (no publish)
-        if: github.event.inputs.dry_run == 'true'
-        run: pnpm -r publish --access public --no-git-checks --dry-run
+        if: inputs.dry_run == true
+        run: pnpm -r publish --access public --tag "$DIST_TAG" --no-git-checks --dry-run
 
       - name: Upload the publish summary
         if: always() && hashFiles('pnpm-publish-summary.json') != ''
@@ -99,3 +246,60 @@ jobs:
         with:
           name: publish-summary
           path: pnpm-publish-summary.json
+
+      # Written only now, so the tag is evidence of a completed publish rather
+      # than an intention to publish. The message records every package version
+      # in the release, which is what makes a checkout of the tag readable
+      # without consulting the registry.
+      - name: Tag the release
+        if: inputs.dry_run != true
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          {
+            echo "battlestack v$VERSION"
+            echo
+            echo "npm dist-tag: $DIST_TAG"
+            echo
+            node scripts/release-version.mjs --check | tail -n +2
+          } > /tmp/tag-message
+          git tag -a "v$VERSION" -F /tmp/tag-message
+          git push origin "refs/tags/v$VERSION"
+
+      # Fast-forwards for as long as releases are cut from `main`. A rejected
+      # push means the branches diverged and wants a human, not a force.
+      - name: Promote the production branch
+        if: inputs.dry_run != true && needs.verify.outputs.promote == 'true'
+        run: |
+          set -euo pipefail
+          git push origin "HEAD:refs/heads/$PRODUCTION_BRANCH"
+          echo "$PRODUCTION_BRANCH now points at $(git rev-parse --short HEAD) (v$VERSION)"
+
+      - name: Create the GitHub release
+        if: inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          FLAGS=(--generate-notes --target "$GITHUB_SHA" --title "v$VERSION")
+          if [ "$PRERELEASE" = true ]; then
+            FLAGS+=(--prerelease --latest=false)
+          else
+            FLAGS+=(--latest)
+          fi
+          gh release create "v$VERSION" "${FLAGS[@]}"
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "### Released"
+            echo "| | |"
+            echo "|---|---|"
+            echo "| version | \`$VERSION\` |"
+            echo "| install | \`npx battlestack@$DIST_TAG\` |"
+            echo "| git tag | \`v$VERSION\` |"
+            echo "| $PRODUCTION_BRANCH promoted | $PROMOTE |"
+            echo "| dry run | ${{ inputs.dry_run }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

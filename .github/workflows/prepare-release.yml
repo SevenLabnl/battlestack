@@ -1,0 +1,101 @@
+name: Prepare release
+
+# Opens a pull request that bumps every publishable package to one new version
+# and prepends a CHANGELOG stanza. Merging that PR is the human approval of the
+# version number; `Release` then publishes it on a separate manual dispatch.
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: 'Version step'
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+          - prepatch
+          - preminor
+          - premajor
+          - prerelease
+      preid:
+        description: 'Prerelease identifier for the pre* levels'
+        type: string
+        default: next
+
+# `pull-requests: write` also needs Settings -> Actions -> "Allow GitHub Actions
+# to create and approve pull requests".
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Open the version bump PR
+    runs-on: ubuntu-latest
+    steps:
+      # Full history so the CHANGELOG stanza can diff against the previous tag.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bump the workspace version
+        id: bump
+        run: |
+          FROM=$(node scripts/release-version.mjs --print)
+          TO=$(node scripts/release-version.mjs --bump '${{ inputs.level }}' --preid '${{ inputs.preid }}' | tail -1)
+          node scripts/release-version.mjs --changelog
+          node scripts/release-version.mjs --check
+          echo "from=$FROM" >> "$GITHUB_OUTPUT"
+          echo "to=$TO" >> "$GITHUB_OUTPUT"
+
+      - name: Open the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.ref_name }}
+          FROM: ${{ steps.bump.outputs.from }}
+          TO: ${{ steps.bump.outputs.to }}
+        run: |
+          set -euo pipefail
+          BRANCH="release/v$TO"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$BRANCH"
+          git add packages/*/package.json CHANGELOG.md
+          git commit -m "release: v$TO"
+          git fetch origin "$BRANCH" || true
+          git push --force-with-lease origin "$BRANCH"
+
+          cat > /tmp/pr-body.md <<BODY
+          Bumps every publishable package from \`$FROM\` to \`$TO\` and prepends the changelog stanza.
+
+          ## Next steps
+
+          1. Review the version and the changelog, then merge into \`$BASE\`.
+          2. Run the **Release** workflow from \`$BASE\` with \`dry_run: false\`.
+          3. Approve the \`release\` environment when prompted.
+
+          The \`v$TO\` tag and the \`production\` branch move only after npm has accepted the packages.
+          BODY
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            gh pr edit "$BRANCH" --title "release: v$TO" --body-file /tmp/pr-body.md
+          else
+            gh pr create --base "$BASE" --head "$BRANCH" --title "release: v$TO" --body-file /tmp/pr-body.md
+          fi
