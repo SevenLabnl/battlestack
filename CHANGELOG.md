@@ -1,23 +1,7 @@
 # Changelog
 
-## v0.1.0 (2026-08-27)
+## v0.1.0 (2026-08-13)
 
-- fix: make --dry-run write nothing during create (12ce8fa)
-- fix: resolve plugin command dispatch by token, fqid and dry-run intent (0aa5316)
-- fix: dispatch plugin commands through one shared code path in both modes (23fa619)
-- cli: plugin-contributed commands work inside project mode (54a0172)
-- fix: apply review findings and gate feature version bumps in CI (da02c6b)
-- fix: resolve the database feature via enabledHas in generateInitialMigration (01225a8)
-- feat: generate the initial drizzle migration at scaffold time (92cb764)
-- fix: apply server/database/extensions in every migrate path, not just dev db:push (3667067)
-- chore: drop every openai/gpt-4o-mini reference (a9ca404)
-- fix: point the chat fallback at an id the catalogue actually serves (49dda58)
-- fix: reach for the sluis alias only when the gateway is sluis (0d7ae06)
-- refactor: preset-driven gateway defaults, not a provider-named constant (e44cf8e)
-- fix: satisfy generated-project typecheck in icon-ssr-fetch plugin (2f49a6e)
-- fix: restore SSR icon loading and make test-runner 503-aware (5cd0ea8)
-- feat: default chat model to sluis/chat alias, prompt custom gateways (5949b0b)
-- ci: publish via npm Trusted Publishing (OIDC) instead of a token (c6a4cb2)
 - feat: split the CLI into @battlestack/cli plus an unscoped npx wrapper (fcfb034)
 - test: reword doctor test fixture flagged by leak-guard (92d3761)
 - fix: satisfy generated-project lint in gateway template (2fefd41)
@@ -26,4 +10,3 @@
 - docs: add installing and updating section to README (1a3aef4)
 - docs: fill README content gaps — why, capabilities, components, authorship (cb49ea6)
 - Initial commit (c5c3486)
-
