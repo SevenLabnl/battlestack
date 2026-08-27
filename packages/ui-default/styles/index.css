@@ -1,0 +1,5 @@
+/* Entry point for the default theme. Order is documentation, not cascade:
+   custom properties resolve at use time, so these are order-independent.
+   Both files are deliberately unlayered — see tokens/index.css and bridge.css. */
+@import "../tokens/index.css";
+@import "./bridge.css";

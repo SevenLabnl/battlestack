@@ -1,29 +1,33 @@
 {
-    "name": "battlestack-split-prototype",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "battlestack": "tsx packages/cli/src/index.ts",
-        "demo": "tsx scripts/demo.ts",
-        "tsc": "tsc --noEmit",
-        "bump": "tsx scripts/bump-check.ts",
-        "bump:check": "tsx scripts/bump-check.ts --check",
-        "test": "vitest run",
-        "test:watch": "vitest",
-        "build": "tsc -b tsconfig.build.json && node scripts/build-post.mjs",
-        "build:clean": "tsc -b tsconfig.build.json --clean",
-        "pack:smoke": "pnpm build && node scripts/pack-smoke.mjs",
-        "pack:smoke:matrix": "pnpm build && node scripts/pack-smoke-matrix.mjs",
-        "race:migrate-lock": "node scripts/migrate-lock-race.mjs"
-    },
-    "devDependencies": {
-        "tsx": "^4.22.4",
-        "typescript": "^5.9.3",
-        "vitest": "^4.1.8",
-        "@types/node": "^22.19.21"
-    },
-    "engines": {
-        "node": ">=24"
-    },
-    "packageManager": "pnpm@11.8.0"
+  "name": "battlestack-split-prototype",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "battlestack": "tsx packages/cli/src/index.ts",
+    "demo": "tsx scripts/demo.ts",
+    "tsc": "tsc --noEmit",
+    "bump": "tsx scripts/bump-check.ts",
+    "bump:check": "tsx scripts/bump-check.ts --check",
+    "check:contrast": "pnpm --filter @sevenlab/ui-default check:contrast",
+    "check:contract": "pnpm --filter @sevenlab/ui-default check:contract",
+    "check:layers": "pnpm --filter @sevenlab/ui check:layers",
+    "check:ds": "pnpm check:contrast && pnpm check:contract && pnpm check:layers",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc -b tsconfig.build.json && node scripts/build-post.mjs",
+    "build:clean": "tsc -b tsconfig.build.json --clean",
+    "pack:smoke": "pnpm build && node scripts/pack-smoke.mjs",
+    "pack:smoke:matrix": "pnpm build && node scripts/pack-smoke-matrix.mjs",
+    "race:migrate-lock": "node scripts/migrate-lock-race.mjs"
+  },
+  "devDependencies": {
+    "tsx": "^4.22.4",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.8",
+    "@types/node": "^22.19.21"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.8.0"
 }

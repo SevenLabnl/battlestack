@@ -1,0 +1,53 @@
+/* Additive CSS for the navigation group.
+
+   Owned by whoever ports the navigation components. One file per group so parallel work
+   never collides on a shared stylesheet.
+
+   Rules:
+   - Additive only. Never edit ../vendor/*.css — that is the design system's own
+     CSS and has to stay diffable against the next export.
+   - Semantic tokens only: var(--fg-muted), var(--space-4). Never a primitive
+     (--gray-200, --blue-500), never a raw hex or px where a token exists.
+   - Most rules here replace an inline style the React reference used. If the
+     vendored CSS already has a class for it, use that instead of adding one.
+   - Keep the bs- prefix.
+*/
+
+/* Accordion -------------------------------------------------------------- */
+
+/* React: style={{margin:0}} on the <h3> that wraps each trigger. The heading is
+   there for structure, not for the heading's own vertical rhythm. */
+.bs-accordion__header { margin: 0; }
+
+/* DropdownMenu ----------------------------------------------------------- */
+
+/* Reka's popper owns the panel's position: it renders a fixed-positioned wrapper
+   around the panel and copies the panel's own z-index onto it. The reference put
+   `position:fixed` plus an inline top/left on the panel itself, which is what
+   .bs-menu--fixed encodes — left in place here it would tear the panel out of the
+   wrapper that is positioning it, and .bs-menu's `top:calc(100% + 4px)` would then
+   resolve against the viewport. So inside the wrapper the panel sits in normal
+   flow. The --z-menu that .bs-menu--fixed declares is still the value the wrapper
+   reads, and the class stays on the element the reference put it on. */
+[data-reka-popper-content-wrapper] > .bs-menu {
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+}
+
+/* Reka marks the item under the roving focus with data-highlighted; the vendored
+   menu expresses that same state as [data-active]. Disabled items never receive
+   it, so the :disabled rule above it in the cascade is not at risk. */
+.bs-menu__item[data-highlighted] { background: var(--hover); }
+
+/* Breadcrumbs ------------------------------------------------------------ */
+
+/* React: style={{listStyle:"none",margin:0,padding:0}} on the <ol>. The vendored
+   .bs-breadcrumbs only lays the row out; the list reset was inline. */
+.bs-breadcrumbs { list-style: none; margin: 0; padding: 0; }
+
+/* React: style={{display:"inline-flex",alignItems:"center",gap:"6px"}} on each
+   <li>. 6px is off the 4px spacing grid and has no token; the design system
+   writes it literally here too. */
+.bs-breadcrumbs__item { display: inline-flex; align-items: center; gap: 6px; }

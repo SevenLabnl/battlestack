@@ -1,0 +1,128 @@
+/* Additive CSS for the feedback group.
+
+   Owned by whoever ports the feedback components. One file per group so parallel work
+   never collides on a shared stylesheet.
+
+   Rules:
+   - Additive only. Never edit ../vendor/*.css — that is the design system's own
+     CSS and has to stay diffable against the next export.
+   - Semantic tokens only: var(--fg-muted), var(--space-4). Never a primitive
+     (--gray-200, --blue-500), never a raw hex or px where a token exists.
+   - Most rules here replace an inline style the React reference used. If the
+     vendored CSS already has a class for it, use that instead of adding one.
+   - Keep the bs- prefix.
+*/
+
+/* Alert ------------------------------------------------------------------ */
+
+/* React: style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:"2px"}}
+   minWidth:0 is what lets a long line wrap instead of pushing the dismiss button
+   out of the alert. 2px is below the 4px spacing grid, so it stays literal. */
+.bs-alert__content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* React: style={{marginTop:"6px"}} on the action wrapper. 6px is off the grid. */
+.bs-alert__action { margin-top: 6px; }
+
+/* React: style={{margin:"-4px -6px 0 0",color:"inherit"}}. The negative margin is an
+   optical nudge that pulls the ghost button's own padding back to the alert's edge,
+   so the icon lines up with the text above it rather than the box. -4px is --space-1;
+   -6px is off the grid and stays literal. color:inherit keeps the × in the tone's
+   text colour instead of the button's. */
+.bs-alert__dismiss {
+    margin: calc(var(--space-1) * -1) -6px 0 0;
+    color: inherit;
+}
+
+/* Dialog ----------------------------------------------------------------- */
+
+/* React: style={{margin:"-6px -8px 0 0"}} — same optical nudge as the alert's
+   dismiss. -8px is --space-2; -6px is off the grid. */
+.bs-dialog__close { margin: -6px calc(var(--space-2) * -1) 0 0; }
+
+/* Dialog and Drawer descriptions. The reference has no description element at all;
+   this port adds one because Reka wires aria-describedby to it, and a described
+   dialog is the difference between "Invite member" and "Invite member, they will
+   get an email and can join your workspace" when it is announced. */
+.bs-dialog__desc,
+.bs-drawer__desc { margin-bottom: var(--space-3); }
+
+/* Popover ---------------------------------------------------------------- */
+
+/* React: style={{marginBottom:"8px"}} on the popover title. */
+.bs-popover__title { margin-bottom: var(--space-2); }
+
+/* Toast ------------------------------------------------------------------ */
+
+/* React: style={{flex:"none",marginTop:"1px"}} on the icon. The vendored CSS has the
+   same rule for the alert (.bs-alert>svg) but not for the toast. 1px is a hairline
+   nudge, not a spacing step. */
+.bs-toast__icon {
+    flex: none;
+    margin-top: 1px;
+}
+
+/* React put the tone colour inline from a COLORS map. All four are token-backed, so
+   they are classes; this is also what keeps the toast's status from being carried by
+   the icon's shape alone. */
+.bs-toast__icon--info { color: var(--info); }
+.bs-toast__icon--success { color: var(--success); }
+.bs-toast__icon--warning { color: var(--warning); }
+.bs-toast__icon--danger { color: var(--danger); }
+
+/* React: style={{flex:1,minWidth:0}} — lets a long title wrap instead of pushing the
+   dismiss button past the toast's fixed 360px. */
+.bs-toast__content {
+    flex: 1;
+    min-width: 0;
+}
+
+/* React: style={{fontWeight:"var(--weight-semibold)",fontSize:"var(--text-md)"}}.
+   Not .bs-h4: that is a heading style, and a toast title is not a heading. */
+.bs-toast__title {
+    font-weight: var(--weight-semibold);
+    font-size: var(--text-md);
+}
+
+/* React: style={{marginTop:"1px"}} next to className="bs-small bs-muted". */
+.bs-toast__desc { margin-top: 1px; }
+
+/* React: style={{marginTop:"8px"}} on the action wrapper. */
+.bs-toast__action { margin-top: var(--space-2); }
+
+/* React: style={{margin:"-4px -6px"}} — the same optical nudge as the alert's. */
+.bs-toast__dismiss { margin: calc(var(--space-1) * -1) -6px; }
+
+/* Popover and Tooltip, once Reka positions them ---------------------------- */
+
+/* The vendored .bs-popover and .bs-tooltip__bubble position themselves against
+   their anchor with `position:absolute` and an offset — which only works while they
+   are children of .bs-anchor / .bs-tooltip. This port portals both out (so a picker
+   opened inside a scroll container is not clipped) and lets Reka's Floating UI
+   placement decide where they go, collisions included. Reka wraps them in a
+   positioned [data-reka-popper-content-wrapper] and places that; the vendored
+   offsets would then be applied a second time, on top of Reka's, so inside the
+   wrapper the positioning is dropped and only the appearance is kept.
+
+   z-index deliberately stays on our element rather than moving to the wrapper:
+   Reka copies the content's computed z-index onto the wrapper, so --z-dropdown and
+   --z-tooltip still decide the stacking order and nothing here needs to name a
+   number. The `top`/`bottom` offsets both components lose are passed back to Reka
+   as :side-offset="6", so the gap to the trigger is unchanged. */
+[data-reka-popper-content-wrapper] > .bs-popover,
+[data-reka-popper-content-wrapper] > .bs-tooltip__bubble {
+    position: static;
+    inset: auto;
+    translate: none;
+}
+
+/* The vendored bubble is a pure-CSS affordance: opacity 0 until .bs-tooltip is
+   hovered or holds focus. Reka mounts the bubble only while the tooltip is open and
+   portals it away from .bs-tooltip, so that selector can never match again — inside
+   the wrapper the bubble is visible by virtue of existing. */
+[data-reka-popper-content-wrapper] > .bs-tooltip__bubble { opacity: 1; }

@@ -1,0 +1,63 @@
+/* Semantic tokens — the only layer components may reference. Light on :root, dark on [data-theme="dark"]. */
+:root{
+color-scheme:light;
+/* background & surfaces */
+--bg:var(--gray-50);--bg-sunken:var(--gray-100);--surface:var(--gray-0);--surface-raised:var(--gray-0);--surface-overlay:var(--gray-0);
+/* foreground */
+--fg:var(--gray-950);--fg-muted:var(--gray-600);--fg-subtle:var(--gray-500);--fg-disabled:var(--gray-400);--fg-inverse:#ffffff;
+/* borders — decorative vs control (control borders meet 3:1 non-text contrast) */
+--border-subtle:var(--gray-100);--border:var(--gray-200);--border-strong:#8a837b;--border-hover:#6f6961;
+/* interaction */
+--hover:rgba(18,17,16,.045);--active:rgba(18,17,16,.08);--row-selected:var(--blue-50);--selection:var(--blue-200);
+/* primary — signal blue, white text */
+--primary:var(--blue-500);--primary-hover:var(--blue-600);--primary-active:var(--blue-700);--primary-fg:#ffffff;--primary-tint:var(--blue-50);--primary-tint-fg:var(--blue-700);--primary-border:var(--blue-200);
+/* secondary (neutral outline) */
+--secondary-bg:var(--gray-0);--secondary-fg:var(--gray-950);--secondary-border:#c3bcb2;
+/* checked controls & structural indicators */
+--control-checked:var(--blue-500);--control-checked-fg:#ffffff;
+/* status */
+--success:var(--green-600);--success-bg:var(--green-100);--success-border:var(--green-200);
+--warning:var(--amber-600);--warning-bg:var(--amber-100);--warning-border:var(--amber-200);
+--danger:var(--red-600);--danger-hover:var(--red-700);--danger-fg:#ffffff;--danger-bg:var(--red-100);--danger-border:var(--red-200);
+--info:var(--blue-600);--info-bg:var(--blue-100);--info-border:var(--blue-200);
+/* focus & links */
+--focus:var(--blue-500);--link:var(--blue-600);--link-hover:var(--blue-700);
+/* overlays */
+--backdrop:rgba(18,17,16,.5);--tooltip-bg:var(--gray-900);--tooltip-fg:#ffffff;
+/* elevation aliases */
+--shadow-card:var(--shadow-1);--shadow-raised:var(--shadow-2);--shadow-overlay:var(--shadow-3);
+/* skeleton */
+--skeleton:var(--gray-200);
+/* glow (subtle flair) */
+--glow:rgba(47,102,245,.1);--glow-btn:0 2px 8px -3px rgba(17,73,221,.4);
+}
+[data-theme="dark"]{
+color-scheme:dark;
+--bg:#141311;--bg-sunken:#0e0d0c;--surface:#1c1a18;--surface-raised:#24211e;--surface-overlay:#2a2724;
+--fg:#f5f2ee;--fg-muted:#a8a29a;--fg-subtle:#8b857d;--fg-disabled:#5c5751;--fg-inverse:var(--gray-950);
+--border-subtle:#26231f;--border:#33302b;--border-strong:#605a53;--border-hover:#7a736b;
+--hover:rgba(245,242,238,.06);--active:rgba(245,242,238,.11);--row-selected:#16213c;--selection:#1f3a75;
+--primary:#7ba4ff;--primary-hover:#9bbaff;--primary-active:#b6ccff;--primary-fg:#0f1729;--primary-tint:#182a4d;--primary-tint-fg:#a9c4ff;--primary-border:#2c4784;
+--secondary-bg:transparent;--secondary-fg:#f5f2ee;--secondary-border:#56504a;
+--control-checked:#7ba4ff;--control-checked-fg:#0f1729;
+--success:var(--green-400);--success-bg:var(--green-900);--success-border:#1f5b3f;
+--warning:var(--amber-400);--warning-bg:var(--amber-900);--warning-border:#6b4f14;
+--danger:var(--red-400);--danger-hover:#f6ada1;--danger-fg:#ffffff;--danger-bg:var(--red-900);--danger-border:#78302a;
+--info:#7ba4ff;--info-bg:#14203c;--info-border:#26407e;
+--focus:#7ba4ff;--link:#a9c4ff;--link-hover:#cddcff;
+--backdrop:rgba(10,9,8,.7);--tooltip-bg:#2a2724;--tooltip-fg:#f5f2ee;
+--shadow-card:0 1px 2px rgba(0,0,0,.5);
+--shadow-raised:0 4px 16px -6px rgba(0,0,0,.6),0 1px 2px rgba(0,0,0,.4);
+--shadow-overlay:0 24px 56px -16px rgba(0,0,0,.7),0 4px 12px -6px rgba(0,0,0,.5);
+--skeleton:#262320;
+--glow:rgba(123,164,255,.09);--glow-btn:0 2px 12px -4px rgba(123,164,255,.35);
+}
+/* Solid action colors that differ per theme */
+:root{--danger-solid:var(--red-600);--danger-solid-hover:var(--red-700);}
+[data-theme="dark"]{--danger-solid:var(--red-500);--danger-solid-hover:#e0604f;}
+/* Chart palette (categorical) */
+:root{--chart-1:var(--blue-500);--chart-2:var(--mint-600);--chart-3:var(--amber-400);--chart-4:var(--lilac-600);--chart-5:var(--peach-600);--chart-grid:var(--border);}
+[data-theme="dark"]{--chart-1:#7ba4ff;--chart-2:var(--mint-400);--chart-3:var(--amber-400);--chart-4:var(--lilac-400);--chart-5:var(--peach-400);--chart-grid:var(--border);}
+/* Sidebar nav — ink in both themes; blue-lit active state. Override this group alone for a light-chrome client. */
+:root{--nav-bg:#121110;--nav-fg:#f5f2ee;--nav-fg-muted:#a8a29a;--nav-border:rgba(245,242,238,.09);--nav-hover:rgba(245,242,238,.06);--nav-active-bg:rgba(123,164,255,.15);--nav-active-fg:#a9c4ff;--nav-edge:transparent;--nav-logo-bg:var(--blue-500);--nav-logo-fg:#ffffff;}
+[data-theme="dark"]{--nav-bg:#0e0d0c;--nav-edge:#33302b;}

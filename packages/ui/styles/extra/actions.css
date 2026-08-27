@@ -1,0 +1,24 @@
+/* Additive CSS for the actions group.
+
+   Owned by whoever ports the actions components. One file per group so parallel work
+   never collides on a shared stylesheet.
+
+   Rules:
+   - Additive only. Never edit ../vendor/*.css — that is the design system's own
+     CSS and has to stay diffable against the next export.
+   - Semantic tokens only: var(--fg-muted), var(--space-4). Never a primitive
+     (--gray-200, --blue-500), never a raw hex or px where a token exists.
+   - Most rules here replace an inline style the React reference used. If the
+     vendored CSS already has a class for it, use that instead of adding one.
+   - Keep the bs- prefix.
+*/
+
+/* Link — replaces the inline style on the external variant in Link.jsx
+   (display:inline-flex; align-items:center; gap:3px). Only the external variant
+   needs it: it is the only case where the anchor has an icon to line up with its
+   text. The reference's 3px gap has no token; --space-1 (4px) is the nearest. */
+.bs-link--external {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}

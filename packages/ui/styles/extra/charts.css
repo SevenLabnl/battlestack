@@ -1,0 +1,217 @@
+/* Additive CSS for the charts group.
+
+   Owned by whoever ports the charts components. One file per group so parallel work
+   never collides on a shared stylesheet.
+
+   Rules:
+   - Additive only. Never edit ../vendor/*.css — that is the design system's own
+     CSS and has to stay diffable against the next export.
+   - Semantic tokens only: var(--fg-muted), var(--space-4). Never a primitive
+     (--gray-200, --blue-500), never a raw hex or px where a token exists.
+   - Most rules here replace an inline style the React reference used. If the
+     vendored CSS already has a class for it, use that instead of adding one.
+   - Keep the bs- prefix.
+*/
+
+/* Chart micro-labels sit below --text-xs (12px) on purpose: an axis tick is not body
+   copy and the reference sets 9.5–10.5px inline. There is no token at that size, so
+   these are the one place in the group where a raw px length is intentional. */
+
+/* BarChart --------------------------------------------------------------- */
+
+/* React: style={{display:"flex",gap:"10px"}} on the chart root. The plot carries
+   role="img"; the wrapper stays a plain block so the hidden data table beside it is
+   still reachable. --bs-barchart-h is the `height` prop. */
+.bs-barchart__plot { display: flex; gap: 10px; }
+
+/* React: style={{display:"flex",flexDirection:"column",justifyContent:"space-between",height,textAlign:"right",flex:"none"}} */
+.bs-barchart__axis {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: var(--bs-barchart-h);
+    text-align: right;
+    flex: none;
+}
+
+/* React: style={{fontSize:"10px",lineHeight:1}} */
+.bs-barchart__tick { font-size: 10px; line-height: 1; }
+
+/* React: style={{flex:1,minWidth:0,position:"relative"}} — the gridlines are absolute
+   inside it, so it must establish the containing block. */
+.bs-barchart__area { flex: 1; min-width: 0; position: relative; }
+
+/* React: style={{position:"absolute",left:0,right:0,top:height*(1-t),borderTop:...}}.
+   The three stops are fixed, so they are modifiers rather than an inline top. */
+.bs-barchart__grid {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1px dashed var(--chart-grid);
+    z-index: 0;
+}
+
+.bs-barchart__grid--0 { top: var(--bs-barchart-h); border-top-style: solid; }
+.bs-barchart__grid--50 { top: calc(var(--bs-barchart-h) / 2); }
+.bs-barchart__grid--100 { top: 0; }
+
+/* React: style={{position:"relative",display:"flex",alignItems:"stretch",gap:"8px",zIndex:1}} */
+.bs-barchart__bars {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-2);
+    z-index: 1;
+}
+
+/* React: style={{flex:1,minWidth:0,display:"flex",flexDirection:"column"}} */
+.bs-barchart__col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* React: style={{height,display:"flex",flexDirection:"column",justifyContent:"flex-end",gap:"4px",padding:"0 12%"}}
+   The 12% side padding is what sets the bar-to-gap ratio, so it stays a percentage. */
+.bs-barchart__track {
+    height: var(--bs-barchart-h);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: var(--space-1);
+    padding: 0 12%;
+}
+
+/* React: style={{fontSize:"10px",textAlign:"center",whiteSpace:"nowrap"}} */
+.bs-barchart__value { font-size: 10px; text-align: center; white-space: nowrap; }
+
+/* React: style={{height:<pct>,background:<color>,borderRadius:"3px 3px 0 0",transition:...}}.
+   Height and colour vary per bar, so they arrive as custom properties. The 3px cap is
+   smaller than --radius-sm on purpose — a bar reads as a column, not as a card. */
+.bs-barchart__bar {
+    height: var(--bs-bar-h);
+    background: var(--bs-bar-color);
+    border-radius: 3px 3px 0 0;
+    transition: height var(--dur-slow) var(--ease-standard);
+}
+
+/* React: style={{fontSize:"10.5px",textAlign:"center",paddingTop:"6px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}} */
+.bs-barchart__label {
+    font-size: 10.5px;
+    text-align: center;
+    padding-top: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* LineChart -------------------------------------------------------------- */
+
+/* React: style={{display:"block"}} + width="100%". height:auto lets the viewBox drive
+   the aspect ratio, so the chart scales in a resizing card instead of only stretching. */
+.bs-linechart__svg { display: block; width: 100%; height: auto; }
+
+/* React: stroke="var(--chart-grid)" strokeWidth="1" as SVG attributes. */
+.bs-linechart__grid { stroke: var(--chart-grid); stroke-width: 1; }
+
+/* React: fontSize="9.5" fill="var(--fg-subtle)" fontFamily="var(--font-sans)". */
+.bs-linechart__tick { font-size: 9.5px; fill: var(--fg-subtle); font-family: var(--font-sans); }
+
+/* React: fill={color} opacity="0.08" — the series colour arrives as --bs-line-color
+   on the series group. */
+.bs-linechart__area { fill: var(--bs-line-color); opacity: 0.08; }
+
+/* React: fill="none" stroke={color} strokeWidth="2" strokeLinejoin/Linecap="round". */
+.bs-linechart__line {
+    fill: none;
+    stroke: var(--bs-line-color);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+/* React: fill="var(--surface)" stroke={color} strokeWidth="1.6". */
+.bs-linechart__dot { fill: var(--surface); stroke: var(--bs-line-color); stroke-width: 1.6; }
+
+/* React: style={{display:"flex",gap:"16px",marginTop:"8px",flexWrap:"wrap"}} — a <ul>
+   here because a legend is a list of series. */
+.bs-linechart__legend {
+    display: flex;
+    gap: var(--space-4);
+    margin: var(--space-2) 0 0;
+    padding: 0;
+    list-style: none;
+    flex-wrap: wrap;
+}
+
+/* React: style={{display:"inline-flex",alignItems:"center",gap:"6px"}} */
+.bs-linechart__legend-item { display: inline-flex; align-items: center; gap: 6px; }
+
+/* React: style={{width:"14px",height:0,borderTop:"2px solid|dashed <color>"}} — the
+   swatch mirrors the stroke, so a dashed series reads as forecast in the legend too. */
+.bs-linechart__swatch { width: 14px; height: 0; border-top: 2px solid var(--bs-line-color); }
+.bs-linechart__swatch--dashed { border-top-style: dashed; }
+
+/* DonutChart ------------------------------------------------------------- */
+
+/* React: style={{display:"flex",gap:"22px",alignItems:"center",flexWrap:"wrap"}} */
+.bs-donut { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+
+/* React: style={{position:"relative",width:size,height:size,flex:"none"}}. Here `size`
+   is a max, not a fixed width: the ring shrinks with a narrow card and the square is
+   held by aspect-ratio instead of a pinned height. */
+.bs-donut__ring {
+    position: relative;
+    width: var(--bs-donut-size);
+    max-width: 100%;
+    min-width: 0;
+    aspect-ratio: 1;
+    flex: 0 1 auto;
+}
+
+/* React pinned width/height in px; the viewBox plus these rules make it responsive. */
+.bs-donut__svg { display: block; width: 100%; height: auto; }
+
+/* React: fill="none" stroke="var(--bg-sunken)" on the backing circle. */
+.bs-donut__track { fill: none; stroke: var(--bg-sunken); }
+
+/* React: fill="none" stroke={color} strokeLinecap="butt" per segment. */
+.bs-donut__segment { fill: none; stroke: var(--bs-donut-color); stroke-linecap: butt; }
+
+/* React: style={{position:"absolute",inset:thickness,display:"grid",placeContent:"center",textAlign:"center"}}.
+   --bs-donut-inset is thickness expressed as a percentage of size, so the centre keeps
+   clearing the ring at any rendered width. */
+.bs-donut__center {
+    position: absolute;
+    inset: var(--bs-donut-inset);
+    display: grid;
+    place-content: center;
+    text-align: center;
+}
+
+/* React: style={{fontSize:"var(--text-3xl)",fontWeight:"var(--weight-semibold)",letterSpacing:"-.01em",fontVariantNumeric:"tabular-nums"}} */
+.bs-donut__value {
+    font-size: var(--text-3xl);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+}
+
+/* React: style={{display:"flex",flexDirection:"column",gap:"8px",minWidth:"140px"}} */
+.bs-donut__legend {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 140px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* React: style={{display:"flex",alignItems:"center",gap:"8px",fontSize:"var(--text-sm)"}} */
+.bs-donut__legend-item { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+
+/* React: style={{width:"9px",height:"9px",borderRadius:"2px",background:<color>,flex:"none"}} */
+.bs-donut__swatch { width: 9px; height: 9px; border-radius: 2px; background: var(--bs-donut-color); flex: none; }
+
+/* React: style={{flex:1}} */
+.bs-donut__legend-label { flex: 1; }
+
+/* React: className="bs-mono" style={{fontSize:"12px",color:"var(--fg-muted)"}} */
+.bs-donut__legend-value { font-size: var(--text-xs); color: var(--fg-muted); }

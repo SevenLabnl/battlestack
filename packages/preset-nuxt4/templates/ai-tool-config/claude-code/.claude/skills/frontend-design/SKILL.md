@@ -1,11 +1,19 @@
 ---
 name: frontend-design
-description: Design thinking for distinctive, production-grade UI. Uses Nuxt UI v4, Tailwind CSS v4, and the project's design system.
+description: Design thinking for distinctive, production-grade UI. Uses Nuxt UI v4 and Tailwind CSS v4. When the project extends a SevenLab UI theme layer, the battlestack-ui skill takes precedence over the component guidance here.
 ---
 
 # Frontend Design
 
 Use this skill when building new pages, redesigning existing UI, or making significant visual changes. The goal is distinctive, polished UI, not cookie-cutter defaults.
+
+## Precedence: check for the design system first
+
+If `nuxt.config.ts` extends `@sevenlab/ui-default` or a `@sevenlab/ui-<client>` theme, **use the `battlestack-ui` skill instead of the component guidance below.** That project has its own component library (`Bs*`), its own token contract and CI gates that fail on hardcoded values, and `@nuxt/ui` is only kept there as a compatibility layer for older feature UI.
+
+The design-thinking sections of this skill — intent, hierarchy, spacing rhythm, restraint — still apply. The "use Nuxt UI components first" sections do not: reaching for `U*` in such a project adds markup the design system does not own.
+
+Everything below assumes a project **without** a SevenLab UI theme layer.
 
 ## Before Writing Code
 

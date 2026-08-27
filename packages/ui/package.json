@@ -1,0 +1,29 @@
+{
+    "name": "@sevenlab/ui",
+    "version": "0.0.0",
+    "description": "Battlestack design system \u2014 Vue components. Structure and behaviour only; every value comes from a theme layer.",
+    "license": "MIT",
+    "type": "module",
+    "main": "./nuxt.config.ts",
+    "files": [
+        "PORTING.md",
+        "components",
+        "composables",
+        "nuxt.config.ts",
+        "scripts",
+        "styles"
+    ],
+    "scripts": {
+        "check:layers": "node scripts/check-layers.mjs"
+    },
+    "sideEffects": [
+        "*.css"
+    ],
+    "dependencies": {
+        "@nuxt/kit": "^4.5.2",
+        "reka-ui": "^2.10.3"
+    },
+    "peerDependencies": {
+        "vue": "^3.5.0"
+    }
+}

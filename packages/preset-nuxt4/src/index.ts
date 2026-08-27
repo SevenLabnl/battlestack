@@ -25,6 +25,7 @@ import { oauthFeature } from './features/oauth.js'
 import { userAdminFeature } from './features/user-admin.js'
 import { auditLogFeature } from './features/audit-log.js'
 import { nuxtUiFeature } from './features/nuxt-ui.js'
+import { sevenlabUiFeature } from './features/sevenlab-ui.js'
 import { piniaFeature } from './features/pinia.js'
 import { landingShellFeature } from './features/landing-shell.js'
 import { dashboardShellFeature } from './features/dashboard-shell.js'
@@ -64,6 +65,7 @@ export default defineBattlestackPlugin({
                 'nuxt4:naming',
                 'nuxt4:essentials',
                 'nuxt4:nuxt-ui',
+                'nuxt4:sevenlab-ui',
                 'nuxt4:landing-shell',
                 'nuxt4:vitest',
                 'nuxt4:i18n',
@@ -127,6 +129,7 @@ export default defineBattlestackPlugin({
         battlestack.addFeature(userAdminFeature)
         battlestack.addFeature(auditLogFeature)
         battlestack.addFeature(nuxtUiFeature)
+        battlestack.addFeature(sevenlabUiFeature)
         battlestack.addFeature(piniaFeature)
         battlestack.addFeature(landingShellFeature)
         battlestack.addFeature(dashboardShellFeature)

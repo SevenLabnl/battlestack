@@ -1,0 +1,155 @@
+/* Additive CSS for the patterns-page components.
+
+   Owned by whoever ports that half of the patterns group. Split from patterns.css
+   so the two halves can be worked in parallel without colliding.
+
+   Rules:
+   - Additive only. Never edit ../vendor/*.css.
+   - Semantic tokens only. Never a primitive, never a raw hex or px where a token exists.
+   - Most rules here replace an inline style the React reference used.
+   - Keep the bs- prefix.
+*/
+
+/* PageHeader ------------------------------------------------------------- */
+
+/* React: style={{marginTop:"4px"}} on the meta row. The vendored
+   .bs-pagehead__meta lays the row out; only the offset from the description
+   above it was inline. */
+.bs-pagehead__meta { margin-top: var(--space-1); }
+
+/* Toolbar ---------------------------------------------------------------- */
+
+/* React: style={{cursor:"pointer"}} on the × of an active FilterChip. The chip
+   around it is already a button, so this is only about the pointer reading as
+   "this glyph does its own thing". */
+.bs-toolbar__chip-clear { cursor: pointer; }
+
+/* Stepper ---------------------------------------------------------------- */
+
+/* The reference writes the whole component inline, per-state colours included.
+   Same three states, same tokens, expressed as [data-state] rules so the DOM
+   carries no style attribute and a theme can reach them.
+
+   The off-grid values are the reference's own and have no token to point at: a
+   26px circle, the 10px gap inside a step, the 3px that drops the label onto the
+   circle's cap height, and the 13px that centres the connector on it. */
+
+.bs-stepper {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.bs-stepper__step {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    flex: 1;
+    min-width: 0;
+}
+
+/* The last step has no connector to stretch, so it takes only its own width. */
+.bs-stepper__step[data-last] { flex: none; }
+
+.bs-stepper__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+}
+
+.bs-stepper__marker {
+    width: 26px;
+    height: 26px;
+    flex: none;
+    border-radius: var(--radius-full);
+    display: grid;
+    place-content: center;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    background: var(--surface);
+    color: var(--fg-subtle);
+    border: 1px solid var(--border-strong);
+}
+
+.bs-stepper__step[data-state="done"] .bs-stepper__marker {
+    background: var(--primary);
+    color: var(--primary-fg);
+    border-color: var(--primary);
+}
+
+.bs-stepper__step[data-state="current"] .bs-stepper__marker {
+    background: var(--primary-tint);
+    color: var(--primary-tint-fg);
+    border-color: var(--primary-border);
+}
+
+.bs-stepper__text {
+    min-width: 0;
+    padding-top: 3px;
+}
+
+.bs-stepper__label {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--fg);
+    white-space: nowrap;
+}
+
+.bs-stepper__step[data-state="todo"] .bs-stepper__label { color: var(--fg-muted); }
+
+.bs-stepper__desc { display: block; }
+
+.bs-stepper__line {
+    flex: 1;
+    height: 1px;
+    min-width: var(--space-5);
+    margin-top: 13px;
+    background: var(--border);
+}
+
+/* Filled up to the current step: the connector is how far the flow has come. */
+.bs-stepper__line[data-filled] { background: var(--primary); }
+
+/* DataTable -------------------------------------------------------------- */
+
+/* The bulk bar sits above the table and the pagination footer inside it, so the
+   component's root is a plain block around .bs-tablewrap rather than the wrap
+   itself. No layout of its own — .bs-bulkbar already carries its own margin. */
+.bs-datatable { min-width: 0; }
+
+/* Kit: style={{flex:1}} on the span that pushes "Clear selection" to the end of
+   the bulk bar. */
+.bs-bulkbar__spacer { flex: 1; }
+
+/* React: style={{width:"36px",paddingRight:0}} on the select-all header cell and
+   style={{paddingRight:0}} on each row's checkbox cell. One class for both: the
+   column is exactly as wide as the control and owns no gutter of its own. */
+.bs-table__select {
+    width: 36px;
+    padding-right: 0;
+}
+
+/* React: style={{height:"auto"}} on the cell the empty state lives in — it spans
+   every column and must not be held to a row's height. */
+.bs-table__empty { height: auto; }
+
+/* React: style={{cursor:"pointer"}} on a row when onRowClick is passed. */
+.bs-table__row--clickable { cursor: pointer; }
+
+/* React: the inline style object on the pagination footer. The count summary
+   goes left, the pager right, and they stack on a narrow table. 10px has no
+   token — the vendored table cells use the same off-grid vertical rhythm. */
+.bs-tablefoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    padding: 10px var(--space-3);
+    border-top: 1px solid var(--border);
+}

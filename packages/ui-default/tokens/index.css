@@ -1,0 +1,19 @@
+/* Battlestack default theme — token values only.
+   Layer order: primitive -> semantic -> component. Components may only reference
+   the semantic layer; primitives exist to define it.
+
+   Deliberately UNLAYERED. Nuxt UI and Tailwind define their theme inside
+   `@layer theme`, and several custom-property names overlap with ours
+   (--radius-*, --text-*, --leading-*, --font-sans, --font-mono). Unlayered
+   declarations beat layered ones regardless of source order, so ours win
+   deterministically instead of depending on which stylesheet loaded first.
+   The effect is intended: Tailwind's scale is re-based on the design system,
+   so `rounded-md` is 10px and `text-sm` is 13px everywhere — one scale, not two.
+   See styles/bridge.css for the full story. */
+@import "./vendor/primitives.css";
+@import "./typography.css";
+@import "./vendor/semantic.css";
+@import "./vendor/components.css";
+
+/* Default-theme decisions that differ from the export — see the file header. */
+@import "./theme-decisions.css";

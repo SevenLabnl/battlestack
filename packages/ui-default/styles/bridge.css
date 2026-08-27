@@ -1,0 +1,131 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Nuxt UI bridge
+
+   Battlestack features emit Nuxt UI markup (UHeader, UCard, UButton, …). This
+   file maps our semantic tokens onto Nuxt UI's, so that markup is on-brand
+   without being touched. It is a compatibility layer with an end date: once
+   battlestack's own shell runs on Bs* components, @nuxt/ui leaves the template
+   and only existing projects keep this file.
+
+   How Nuxt UI's theme works (verified in
+   node_modules/@nuxt/ui/dist/runtime/plugins/colors.js):
+
+     - A runtime plugin injects, inside `@layer theme`:
+         :root,:host        --ui-color-<alias>-<50..950>
+         :root,:host,.light --ui-<alias>: var(--ui-color-<alias>-500)
+         .dark              --ui-<alias>: var(--ui-color-<alias>-400)
+     - `.nuxt/ui.css` then maps Tailwind theme vars onto those:
+         --color-primary: var(--ui-primary)
+         --radius-md: calc(var(--ui-radius) * 1.5)
+         --text-color-muted: var(--ui-text-muted)   … and so on.
+
+   Everything below is UNLAYERED on purpose: unlayered declarations outrank
+   anything in `@layer theme`, so we win over both the injected plugin styles
+   and Tailwind's own theme, no matter the load order.
+
+   Note the light/dark split is handled for free. Nuxt UI flips its aliases per
+   theme; we point them at semantic tokens that already flip on
+   [data-theme="dark"], so one declaration covers both themes.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+    /* ── Accent ramp ────────────────────────────────────────────────────────
+       Full ramp, because Nuxt UI components reach for individual shades
+       (bg-primary-50, text-primary-600) as well as the alias. Primitives are
+       the correct source here: this is a theme package defining another
+       system's ramp, not a component reaching past the semantic layer.
+       We have no --blue-950; 900 is the darkest step in the scale. */
+    --ui-color-primary-50: var(--blue-50);
+    --ui-color-primary-100: var(--blue-100);
+    --ui-color-primary-200: var(--blue-200);
+    --ui-color-primary-300: var(--blue-300);
+    --ui-color-primary-400: var(--blue-400);
+    --ui-color-primary-500: var(--blue-500);
+    --ui-color-primary-600: var(--blue-600);
+    --ui-color-primary-700: var(--blue-700);
+    --ui-color-primary-800: var(--blue-800);
+    --ui-color-primary-900: var(--blue-900);
+    --ui-color-primary-950: var(--blue-900);
+
+    /* ── Neutral ramp ───────────────────────────────────────────────────────
+       Warm stone instead of zinc. Our scale maps 1:1 onto Nuxt UI's shades. */
+    --ui-color-neutral-50: var(--gray-50);
+    --ui-color-neutral-100: var(--gray-100);
+    --ui-color-neutral-200: var(--gray-200);
+    --ui-color-neutral-300: var(--gray-300);
+    --ui-color-neutral-400: var(--gray-400);
+    --ui-color-neutral-500: var(--gray-500);
+    --ui-color-neutral-600: var(--gray-600);
+    --ui-color-neutral-700: var(--gray-700);
+    --ui-color-neutral-800: var(--gray-800);
+    --ui-color-neutral-900: var(--gray-900);
+    --ui-color-neutral-950: var(--gray-950);
+
+    /* ── Aliases ────────────────────────────────────────────────────────────
+       Pointed at semantic tokens, which already carry the light/dark split and
+       the design system's "accent as fill vs accent as text" rule.
+
+       Status ramps (success/info/warning/error shades) deliberately keep
+       Tailwind's defaults: our status scales are sparse (100/200/400/600/700/900)
+       and interpolating the missing steps would invent colours the design system
+       never specified. Only the aliases — which is what Nuxt UI components
+       actually render — are ours. */
+    --ui-primary: var(--primary);
+    --ui-secondary: var(--primary);
+    --ui-success: var(--success);
+    --ui-info: var(--info);
+    --ui-warning: var(--warning);
+    --ui-error: var(--danger);
+
+    /* ── Surfaces ───────────────────────────────────────────────────────────
+       Nuxt UI's --ui-bg is the card ground, not the page ground, so it maps to
+       --surface; the stone canvas is its "muted" step. */
+    --ui-bg: var(--surface);
+    --ui-bg-muted: var(--bg);
+    --ui-bg-elevated: var(--bg-sunken);
+    --ui-bg-accented: var(--border-subtle);
+    --ui-bg-inverted: var(--fg);
+
+    /* ── Text ───────────────────────────────────────────────────────────────
+       Nuxt UI has one more step than we do (dimmed/muted/toned/default/
+       highlighted). --fg carries both "default" and "highlighted"; the design
+       system uses weight, not colour, for that emphasis. */
+    --ui-text-dimmed: var(--fg-disabled);
+    --ui-text-muted: var(--fg-subtle);
+    --ui-text-toned: var(--fg-muted);
+    --ui-text: var(--fg);
+    --ui-text-highlighted: var(--fg);
+    --ui-text-inverted: var(--fg-inverse);
+
+    /* ── Borders ────────────────────────────────────────────────────────────
+       Borders do the edge work in this design system, so the mapping keeps the
+       three-tier split: subtle hairlines, default edges, control borders. */
+    --ui-border-muted: var(--border-subtle);
+    --ui-border: var(--border);
+    --ui-border-accented: var(--border-strong);
+    --ui-border-inverted: var(--fg);
+
+    /* ── Geometry ───────────────────────────────────────────────────────────
+       --ui-radius is a base that Tailwind multiplies (sm = 1x, md = 1.5x,
+       lg = 2x). We do not use it to set the scale — our unlayered --radius-*
+       tokens already win over Tailwind's calc()s, so `rounded-md` is 10px and
+       `rounded-lg` is 16px straight from the design system. --ui-radius is set
+       anyway for the few places Nuxt UI reads it directly. */
+    --ui-radius: var(--radius-sm);
+    --ui-container: var(--content-max);
+    --ui-header-height: var(--topbar-h);
+}
+
+/* ── Page ground ────────────────────────────────────────────────────────────
+   Nuxt UI puts its own ground on <body> via
+   `@layer base { body { @apply bg-default text-default } }`, which resolves to
+   --ui-bg — and --ui-bg has to stay --surface so UCard renders white.
+
+   The design system splits those two: the page ground is the stone canvas
+   (--bg), and --surface is reserved for cards sitting on it. That split is the
+   whole look, so the design system wins here. Unlayered, so it beats Nuxt UI's
+   base layer regardless of load order. */
+body {
+    background: var(--bg);
+    color: var(--fg);
+}

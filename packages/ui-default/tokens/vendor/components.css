@@ -1,0 +1,12 @@
+/* Component tokens — knobs a theme may retune without touching component CSS. */
+:root{
+--control-h-sm:32px;--control-h-md:38px;--control-h-lg:44px;
+--control-px-sm:12px;--control-px-md:14px;--control-px-lg:18px;
+--control-radius:var(--radius-md);--control-font:var(--text-md);--check-radius:5px;
+--card-radius:var(--radius-lg);--card-p:var(--space-6);
+--field-gap:6px;--form-gap:var(--space-5);
+--table-row-h:46px;--table-head-h:40px;
+--sidebar-w:248px;--sidebar-w-collapsed:64px;--topbar-h:60px;--content-max:100%;
+--dialog-w-sm:400px;--dialog-w-md:520px;--dialog-w-lg:680px;--drawer-w:440px;
+--focus-w:2px;--focus-offset:2px;
+}

@@ -25,6 +25,17 @@ export class NuxtConfig {
         return defaultObject(this.mod)
     }
 
+    /**
+     * Adds a Nuxt layer to `extends`. The project's own `nuxt.config.ts` always outranks
+     * every layer, and among layers the earliest entry wins — so appending is the safe
+     * order: a layer added later never shadows one an earlier feature already relied on.
+     */
+    addExtends(layer: string): this {
+        this.config.extends ||= []
+        pushUnique(this.config.extends, layer)
+        return this
+    }
+
     addModule(name: string): this {
         this.config.modules ||= []
         pushUnique(this.config.modules, name)

@@ -1,0 +1,23 @@
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);font-size:var(--text-md);line-height:var(--leading-normal);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+:focus-visible{outline:var(--focus-w) solid var(--focus);outline-offset:var(--focus-offset)}
+::selection{background:var(--selection)}
+a{color:var(--link)}
+a:hover{color:var(--link-hover)}
+h1,h2,h3,h4,h5,h6,p{margin:0}
+code,pre,kbd{font-family:var(--font-mono);font-size:.92em}
+/* Text styles */
+.bs-h1{font-size:var(--text-3xl);font-weight:var(--weight-semibold);line-height:var(--leading-tight);letter-spacing:-.02em}
+.bs-h2{font-size:var(--text-2xl);font-weight:var(--weight-semibold);line-height:var(--leading-tight);letter-spacing:-.015em}
+.bs-h3{font-size:var(--text-lg);font-weight:var(--weight-semibold);line-height:var(--leading-tight)}
+.bs-h4{font-size:var(--text-md);font-weight:var(--weight-semibold);line-height:var(--leading-normal)}
+.bs-body{font-size:var(--text-md);line-height:var(--leading-normal)}
+.bs-small{font-size:var(--text-sm);line-height:var(--leading-normal)}
+.bs-caption{font-size:var(--text-xs);line-height:var(--leading-normal);color:var(--fg-muted)}
+.bs-overline{font-size:11px;font-weight:var(--weight-semibold);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--fg-subtle)}
+.bs-mono{font-family:var(--font-mono);font-size:var(--text-sm)}
+.bs-muted{color:var(--fg-muted)}
+.bs-visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.bs-hero-glow{background-image:radial-gradient(640px 360px at 50% -8%,var(--glow),transparent 70%)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+.bs-spinner{animation-duration:1.6s!important;animation-iteration-count:infinite!important}}

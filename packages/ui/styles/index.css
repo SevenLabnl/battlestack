@@ -1,0 +1,28 @@
+/* Cascade order, declared before anything else imports Tailwind so the order is ours.
+   Matches Tailwind v4's canonical layer order: utilities must stay last so a utility
+   class on a Bs* component still wins over the component's own rules. */
+@layer theme, base, components, utilities;
+
+/* Vendored verbatim from the Claude Design export — see styles/vendor/VENDOR.md.
+   Layering happens here, at the import site, so the vendored files stay byte-identical
+   and a re-export stays a diff instead of a merge. */
+@import "./vendor/base.css" layer(base);
+@import "./vendor/controls.css" layer(components);
+@import "./vendor/surfaces.css" layer(components);
+@import "./vendor/patterns.css" layer(components);
+
+/* Ours: additive only, one file per component group so parallel work does not
+   collide. Never edit the vendored files. */
+@import "./extra/shared.css" layer(components);
+@import "./extra/layout.css" layer(components);
+@import "./extra/actions.css" layer(components);
+@import "./extra/icons.css" layer(components);
+@import "./extra/display.css" layer(components);
+@import "./extra/forms.css" layer(components);
+@import "./extra/feedback.css" layer(components);
+@import "./extra/navigation.css" layer(components);
+@import "./extra/patterns.css" layer(components);
+@import "./extra/patterns-shell.css" layer(components);
+@import "./extra/patterns-page.css" layer(components);
+@import "./extra/charts.css" layer(components);
+@import "./extra/chat.css" layer(components);
