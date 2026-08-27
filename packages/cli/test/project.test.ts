@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { collectFeatureCommandHelp, projectCommand } from '../src/commands/project.js'
+import { claimedProjectCommands, collectFeatureCommandHelp, projectCommand } from '../src/commands/project.js'
 import { parseArgs } from '../src/cli/args.js'
 import {
     BattlestackRegistries,
@@ -81,6 +81,22 @@ function ensureRegistered(): void {
                 executed.push('plugin-create')
             },
         }, origin)
+        registries.commands.register({
+            id: 'greet-dry',
+            description: 'plugin command that honors --dry-run',
+            honorsDryRun: true,
+            run: (ctx) => {
+                pluginContexts.push(ctx)
+            },
+        }, origin)
+        // Shadows a reserved subcommand: must never reach dispatch, nor be listed.
+        registries.commands.register({
+            id: 'doctor',
+            description: 'plugin command shadowing a reserved command',
+            run: () => {
+                executed.push('plugin-doctor')
+            },
+        }, origin)
     }
 }
 
@@ -132,6 +148,23 @@ describe('collectFeatureCommandHelp', () => {
 
     it('returns [] when no manifest exists', async () => {
         expect(await collectFeatureCommandHelp(path.join(projectDir, 'nowhere'), registries)).toEqual([])
+    })
+})
+
+describe('claimedProjectCommands', () => {
+    it('covers reserved subcommands, feature commands and the scaffold-only ids', async () => {
+        const claimed = await claimedProjectCommands(registries, projectDir)
+        expect(claimed.has('doctor')).toBe(true)
+        expect(claimed.has('gateway:up')).toBe(true)
+        expect(claimed.has('hello')).toBe(true)
+        expect(claimed.has('create')).toBe(true)
+        expect(claimed.has('greet')).toBe(false)
+    })
+
+    it('still covers reserved subcommands with no project root', async () => {
+        const claimed = await claimedProjectCommands(registries)
+        expect(claimed.has('doctor')).toBe(true)
+        expect(claimed.has('hello')).toBe(false)
     })
 })
 
@@ -203,6 +236,63 @@ describe('projectCommand', () => {
         await expect(projectCommand(args('greeet'), loader, projectDir, registries, ['greeet']))
             .rejects.toThrow(/Unknown project command/)
         expect(lines.join('\n')).toContain('did you mean: battlestack greet?')
+    })
+
+    it('forwards the argv past the command token when a global flag comes first', async () => {
+        const argv = ['--debug', 'greet', 'staging', '--wait']
+        await projectCommand(parseArgs(argv), loader, projectDir, registries, argv)
+        expect(pluginContexts).toHaveLength(1)
+        const ctx = pluginContexts[0]!
+        // `--debug` stays, `greet` goes: `staging` is the plugin's own first positional.
+        expect(ctx.args).toEqual(['--debug', 'staging', '--wait'])
+        expect(ctx.parsed.projectName).toBe('staging')
+        expect(ctx.parsed.secondPositional).toBeUndefined()
+        expect(ctx.parsed.debug).toBe(true)
+    })
+
+    it('forwards the argv past the command token when a value flag precedes it', async () => {
+        const argv = ['--pm', 'bun', 'greet', 'staging']
+        await projectCommand(parseArgs(argv), loader, projectDir, registries, argv)
+        const ctx = pluginContexts[0]!
+        expect(ctx.args).toEqual(['--pm', 'bun', 'staging'])
+        expect(ctx.parsed.projectName).toBe('staging')
+        expect(ctx.parsed.packageManager).toBe('bun')
+    })
+
+    it('keeps create scaffold-only under its fully-qualified id too', async () => {
+        const argv = ['projecttest:create', 'my-app']
+        await expect(projectCommand(parseArgs(argv), loader, projectDir, registries, argv))
+            .rejects.toThrow(/Unknown project command: projecttest:create/)
+        expect(executed).toEqual([])
+    })
+
+    it('refuses --dry-run for a plugin command that does not declare support', async () => {
+        const argv = ['greet', '--dry-run']
+        await expect(projectCommand(parseArgs(argv), loader, projectDir, registries, argv))
+            .rejects.toThrow(/does not declare --dry-run support/)
+        expect(pluginContexts).toEqual([])
+    })
+
+    it('dispatches --dry-run to a plugin command that declares support', async () => {
+        const argv = ['greet-dry', '--dry-run']
+        await projectCommand(parseArgs(argv), loader, projectDir, registries, argv)
+        expect(pluginContexts).toHaveLength(1)
+        expect(pluginContexts[0]!.parsed.dryRun).toBe(true)
+    })
+
+    it('omits plugin commands that lose dispatch from the listing', async () => {
+        const lines: string[] = []
+        vi.mocked(console.log).mockImplementation((...a: unknown[]) => {
+            lines.push(a.join(' '))
+        })
+        await projectCommand(args(undefined), loader, projectDir, registries, [])
+        const out = lines.join('\n')
+        // Reachable, so listed under its plugin.
+        expect(out).toContain('plugin-contributed top-level command')
+        // Shadowed by a feature command, a reserved command, and the scaffold router.
+        expect(out).not.toContain('plugin command shadowing a feature command')
+        expect(out).not.toContain('plugin command shadowing a reserved command')
+        expect(out).not.toContain('scaffold-only command')
     })
 
     it('stamps projectName into the manifest on first run (rename reconciliation)', async () => {

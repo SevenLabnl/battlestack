@@ -68,6 +68,11 @@ export interface BattlestackCommand {
     description: string
     /** Usage hint shown instead of the bare id, e.g. `deploy [env]`. */
     usage?: string
+    /**
+     * Set once `run` honors `parsed.dryRun`. Until then `--dry-run` refuses to
+     * dispatch, rather than silently writing under a flag that promises not to.
+     */
+    honorsDryRun?: boolean
     run(ctx: CommandContext): Promise<void> | void
 }
 

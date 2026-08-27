@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseArgs } from '../src/cli/args.js'
+import { parseArgs, stripCommandToken } from '../src/cli/args.js'
 
 describe('parseArgs', () => {
     it('maps positionals to projectName / secondPositional / positionals', () => {
@@ -83,5 +83,47 @@ describe('parseArgs', () => {
     it('cwd only set when non-empty string', () => {
         expect(parseArgs(['--cwd', '/tmp/x']).cwd).toBe('/tmp/x')
         expect(parseArgs([]).cwd).toBeUndefined()
+    })
+})
+
+describe('stripCommandToken', () => {
+    it('drops a leading command token', () => {
+        expect(stripCommandToken(['deploy', 'staging'])).toEqual(['staging'])
+    })
+
+    it('drops the command token, not argv[0], when a global flag comes first', () => {
+        expect(stripCommandToken(['--debug', 'deploy', 'staging'])).toEqual(['--debug', 'staging'])
+        expect(stripCommandToken(['-d', 'deploy', 'staging'])).toEqual(['-d', 'staging'])
+    })
+
+    it('skips past a value-taking flag and its value', () => {
+        expect(stripCommandToken(['--pm', 'bun', 'deploy'])).toEqual(['--pm', 'bun'])
+        expect(stripCommandToken(['-t', 'nuxt4-ai', 'deploy', 'x'])).toEqual(['-t', 'nuxt4-ai', 'x'])
+        // Only a cluster's last letter takes a value.
+        expect(stripCommandToken(['-dt', 'nuxt4-ai', 'deploy'])).toEqual(['-dt', 'nuxt4-ai'])
+    })
+
+    it('treats an inline flag value as self-contained', () => {
+        expect(stripCommandToken(['--pm=bun', 'deploy'])).toEqual(['--pm=bun'])
+        expect(stripCommandToken(['-tnuxt4-ai', 'deploy'])).toEqual(['-tnuxt4-ai'])
+    })
+
+    it('leaves argv untouched when it holds no positional', () => {
+        expect(stripCommandToken(['--debug', '--pm', 'bun'])).toEqual(['--debug', '--pm', 'bun'])
+        expect(stripCommandToken([])).toEqual([])
+        // Everything past `--` is passthrough, never the command token.
+        expect(stripCommandToken(['--', 'deploy'])).toEqual(['--', 'deploy'])
+    })
+
+    it('agrees with parseArgs on which token the command is', () => {
+        for (const argv of [
+            ['deploy', 'staging'],
+            ['--debug', 'deploy', 'staging'],
+            ['--pm', 'bun', 'deploy', 'staging'],
+            ['-dt', 'nuxt4-ai', 'deploy', 'staging'],
+        ]) {
+            expect(parseArgs(argv).projectName).toBe('deploy')
+            expect(parseArgs(stripCommandToken(argv)).projectName).toBe('staging')
+        }
     })
 })

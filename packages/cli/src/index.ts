@@ -16,7 +16,7 @@ import {
     type RunContext,
 } from '@battlestack/core'
 import { installUiPort, ui } from '@battlestack/tui'
-import { parseArgs } from './cli/args.js'
+import { parseArgs, stripCommandToken } from './cli/args.js'
 import { dispatchPluginCommand } from './cli/plugin-commands.js'
 import { printHelp } from './cli/help.js'
 import { bootstrapProject } from './commands/install.js'
@@ -177,7 +177,7 @@ async function main(): Promise<void> {
     try {
         // Intercepted before mode detection, and routed via the plugin registry.
         if (args.projectName === 'init' && !args.help) {
-            const dispatched = await dispatchPluginCommand('init', rawArgv.slice(1), loader, registries)
+            const dispatched = await dispatchPluginCommand('init', stripCommandToken(rawArgv), loader, registries)
             if (!dispatched) {
                 ui.printError('No "init" command available. Is @battlestack/preset-nuxt4 installed?')
                 process.exitCode = 1
@@ -210,10 +210,11 @@ async function main(): Promise<void> {
         } else {
             ui.banner(VERSION)
             // A recognized plugin command beats treating the positional as a project name.
-            const asCommand = args.projectName && registries.commands.has(args.projectName)
-                ? await dispatchPluginCommand(args.projectName, rawArgv.slice(1), loader, registries)
+            const asCommand = args.projectName
+                ? await dispatchPluginCommand(args.projectName, stripCommandToken(rawArgv), loader, registries)
                 : false
             if (!asCommand) {
+                // Implicit `create`: the positional is the project name, so nothing is stripped.
                 const dispatched = await dispatchPluginCommand('create', rawArgv, loader, registries)
                 if (!dispatched) {
                     throw new CLIError(

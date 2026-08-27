@@ -150,12 +150,14 @@ export default defineBattlestackPlugin({
             id: 'create',
             usage: 'create [name] [template]',
             description: 'Scaffold a new project from a template',
+            honorsDryRun: true,
             run: createCommand,
         })
         battlestack.addCommand({
             id: 'init',
             usage: 'init [template]',
             description: 'Adopt the current directory into project mode',
+            honorsDryRun: true,
             run: initCommand,
         })
 

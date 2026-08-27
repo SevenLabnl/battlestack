@@ -16,7 +16,8 @@ import {
     type ReservedCommand,
     type RunContext,
 } from '@battlestack/core'
-import { dispatchPluginCommand, pluginCommandGroups, SCAFFOLD_ONLY } from '../cli/plugin-commands.js'
+import { stripCommandToken } from '../cli/args.js'
+import { dispatchPluginCommand, isScaffoldOnly, pluginCommandGroups, SCAFFOLD_ONLY } from '../cli/plugin-commands.js'
 import { addCommand, addReservedMeta, removeCommand, removeReservedMeta } from './add-remove.js'
 import { describeCommand, describeReservedMeta } from './describe.js'
 import { doctorCommand, doctorReservedMeta } from './doctor.js'
@@ -123,6 +124,31 @@ export async function collectFeatureCommandHelp(
     return [...grouped].map(([feature, cmds]) => ({ feature, commands: cmds }))
 }
 
+/**
+ * Names that beat a plugin command of the same name in project-mode dispatch:
+ * the scaffold-only ids, the reserved subcommands, then `featureCommands`.
+ */
+function claimedNames(registries: BattlestackRegistries, featureCommands: Iterable<string>): Set<string> {
+    return new Set([...SCAFFOLD_ONLY, ...Object.keys(buildReservedRunners(registries)), ...featureCommands])
+}
+
+/** `claimedNames` for the project at `projectRoot`, reading its manifest. Never throws. */
+export async function claimedProjectCommands(
+    registries: BattlestackRegistries,
+    projectRoot?: string,
+): Promise<Set<string>> {
+    if (!projectRoot) return claimedNames(registries, [])
+    try {
+        const manifest = await readManifest(projectRoot, registries)
+        if (!manifest) return claimedNames(registries, [])
+        const ctx = buildRunContext({ projectDir: projectRoot, manifest, debug: false, dryRun: true }, registries)
+        return claimedNames(registries, buildCommandMap(ctx, manifest, registries).ordered)
+    } catch {
+        // An unreadable manifest just means no feature commands to subtract.
+        return claimedNames(registries, [])
+    }
+}
+
 export async function projectCommand(
     args: ParsedArgs,
     loader: Ora,
@@ -171,14 +197,16 @@ export async function projectCommand(
     const entry = commands.get(requested)
     if (!entry) {
         // Plugin commands (addCommand) dispatch in project mode too, after built-ins
-        // and feature commands miss. Scaffold-only ids are excluded, and the dry-run
-        // gate below does not cover this path: `parsed.dryRun` is the plugin's job.
-        if (!SCAFFOLD_ONLY.has(requested)
-            && await dispatchPluginCommand(requested, rawArgv.slice(1), loader, registries, projectRoot)) {
+        // and feature commands miss. `dispatchPluginCommand` runs its own --dry-run gate.
+        if (!isScaffoldOnly(registries, requested)
+            && await dispatchPluginCommand(requested, stripCommandToken(rawArgv), loader, registries, projectRoot)) {
             return
         }
         ui.fail(`Unknown command: ${requested}`)
-        const pluginIds = registries.commands.all().map((c) => c.id).filter((id) => !SCAFFOLD_ONLY.has(id))
+        const pluginIds = registries.commands.all()
+            .filter((c) => !SCAFFOLD_ONLY.has(c.id))
+            // Both spellings: `suggestCommand` matches an fqid by its `:`-suffix.
+            .flatMap((c) => [c.id, c.fqid])
         const suggestion = suggestCommand(requested, [...ordered, ...pluginIds])
         if (suggestion) ui.hint(`did you mean: battlestack ${suggestion}?`)
         printAvailable(commands, ordered, manifest, registries)
@@ -254,7 +282,7 @@ function printAvailable(
         )
     }
 
-    for (const { plugin, commands: cmds } of pluginCommandGroups(registries)) {
+    for (const { plugin, commands: cmds } of pluginCommandGroups(registries, claimedNames(registries, ordered))) {
         ui.blank()
         ui.plain('  ' + pc.dim(plugin))
         ui.kv(

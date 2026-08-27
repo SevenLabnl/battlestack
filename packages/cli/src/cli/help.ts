@@ -1,6 +1,6 @@
 import pc from 'picocolors'
 import { ui } from '@battlestack/tui'
-import { collectFeatureCommandHelp, RESERVED_COMMANDS } from '../commands/project.js'
+import { claimedProjectCommands, collectFeatureCommandHelp, RESERVED_COMMANDS } from '../commands/project.js'
 import { pluginCommandGroups } from './plugin-commands.js'
 import type { BattlestackRegistries, HelpMode } from '@battlestack/core'
 
@@ -17,9 +17,12 @@ export async function printHelp(
     }
 }
 
-/** Plugin-contributed commands, one block per owning plugin. Scaffold-only ids excluded. */
-function printPluginCommandHelp(registries: BattlestackRegistries): void {
-    for (const { plugin, commands } of pluginCommandGroups(registries)) {
+/**
+ * Plugin-contributed commands, one block per owning plugin. Scaffold-only ids
+ * are excluded, plus anything in `claimed` that would lose dispatch anyway.
+ */
+function printPluginCommandHelp(registries: BattlestackRegistries, claimed?: ReadonlySet<string>): void {
+    for (const { plugin, commands } of pluginCommandGroups(registries, claimed)) {
         ui.blank()
         ui.plain(pc.bold(plugin))
         ui.kv(
@@ -140,6 +143,6 @@ async function printProjectHelp(registries: BattlestackRegistries, projectRoot?:
         ui.dim('Per-feature commands (`battlestack dev`, `battlestack db:push`, …): see `battlestack` with no args.')
     }
 
-    printPluginCommandHelp(registries)
+    printPluginCommandHelp(registries, await claimedProjectCommands(registries, projectRoot))
     ui.blank()
 }
