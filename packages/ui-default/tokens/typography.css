@@ -1,0 +1,18 @@
+/* The one file we do NOT ship verbatim from the export.
+   The export's version opens with `@import url("https://fonts.googleapis.com/...")`,
+   which the boilerplate's CSP blocks (`style-src 'self'`, `font-src 'self' data:`) —
+   the fonts would silently fall back to system faces. The families are declared to
+   @nuxt/fonts in nuxt.config.ts instead, which self-hosts them at build time.
+   The token values below are unchanged; --font-sans / --font-mono stay the contract.
+   Baseline for diffing: tokens/vendor/typography.css. */
+:root{
+--font-sans:"Plus Jakarta Sans",-apple-system,"Segoe UI",system-ui,sans-serif;
+--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+/* Type scale */
+--text-xs:12px;--text-sm:13px;--text-md:14px;--text-lg:16px;--text-xl:18px;--text-2xl:20px;--text-3xl:24px;--text-4xl:30px;
+/* Line heights */
+--leading-tight:1.22;--leading-normal:1.5;--leading-relaxed:1.65;
+/* Weights */
+--weight-regular:400;--weight-medium:500;--weight-semibold:600;--weight-bold:700;
+--tracking-caps:.06em;
+}

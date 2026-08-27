@@ -1,0 +1,73 @@
+/* Additive CSS for the layout group.
+
+   Owned by whoever ports the layout components. One file per group so parallel work
+   never collides on a shared stylesheet.
+
+   Rules:
+   - Additive only. Never edit ../vendor/*.css — that is the design system's own
+     CSS and has to stay diffable against the next export.
+   - Semantic tokens only: var(--fg-muted), var(--space-4). Never a primitive
+     (--gray-200, --blue-500), never a raw hex or px where a token exists.
+   - Most rules here replace an inline style the React reference used. If the
+     vendored CSS already has a class for it, use that instead of adding one.
+   - Keep the bs- prefix.
+*/
+
+/* --------------------------------------------------------------------------
+   The layout primitives are the one group the vendored CSS does not style: the
+   React reference expressed all of them as inline `style={{...}}` objects. The
+   split used here is the same everywhere — a rule that is the same for every
+   instance (display, direction, wrapping, alignment of a fixed sub-part) is a
+   class; a value the caller picks (gap step, column template, max width) stays
+   an inline custom property that the class reads.
+   -------------------------------------------------------------------------- */
+
+/* Container (React: maxWidth + width + marginInline + paddingInline inline).
+   The named sizes are the design system's own container scale, straight out of
+   Container.jsx. There is no token for them — the spacing scale tops out at
+   80px and --bp-* are primitives components may not touch — so the four raw
+   widths are pinned here, in one place, instead of being repeated in the SFC.
+   A caller passing an arbitrary CSS width sets --bs-container-max inline, which
+   beats the modifier class. */
+.bs-container { width: 100%; max-width: var(--bs-container-max, 1080px); margin-inline: auto; padding-inline: var(--space-6) }
+.bs-container--sm { --bs-container-max: 640px }
+.bs-container--md { --bs-container-max: 820px }
+.bs-container--lg { --bs-container-max: 1080px }
+.bs-container--xl { --bs-container-max: 1280px }
+.bs-container--full { --bs-container-max: 100% }
+
+/* Stack — vertical flex group. align/justify accept any CSS value, so they stay
+   inline; only the gap gets a custom property because the class has to read it. */
+.bs-stack { display: flex; flex-direction: column; gap: var(--bs-stack-gap, var(--space-4)) }
+
+/* Inline — horizontal flex row. `wrap` is a boolean, so it is a modifier class
+   rather than an inline style. */
+.bs-inline { display: flex; flex-wrap: wrap; gap: var(--bs-inline-gap, var(--space-2)) }
+.bs-inline--nowrap { flex-wrap: nowrap }
+
+/* Grid — the column template is per instance (fixed count, auto-fill min width
+   or a raw grid-template-columns string), so it is a custom property. */
+.bs-grid { display: grid; grid-template-columns: var(--bs-grid-cols, repeat(2, minmax(0, 1fr))); gap: var(--bs-grid-gap, var(--space-4)) }
+
+/* Section — every rule here is structural, so nothing needs a custom property. */
+.bs-section { display: flex; flex-direction: column; gap: var(--space-4) }
+.bs-section__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4) }
+/* Reference used a raw 2px here; the scale starts at 4px and the layer gate
+   rejects off-grid values, so the title/description pair sits on --space-1. */
+.bs-section__heading { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0 }
+.bs-section__actions { display: flex; gap: var(--space-2); flex: none }
+
+/* Divider — 1px is the hairline the vendored CSS uses for every border; there is
+   no token for a border width, so it stays literal. */
+.bs-divider { margin: 0; border: 0; border-top: 1px solid var(--border) }
+.bs-divider--vertical { align-self: stretch; width: 1px; border-top: 0; background: var(--border) }
+.bs-divider--labelled { display: flex; align-items: center; gap: var(--space-3); border-top: 0 }
+.bs-divider__rule { flex: 1; height: 1px; background: var(--border) }
+/* .bs-caption already sets --fg-muted; the reference dials the label back one
+   step further so the rule and the word read as one quiet unit. */
+.bs-divider__label { color: var(--fg-subtle) }
+
+/* PageLayout — standalone page main region. dvh keeps the page a full viewport
+   tall on mobile browsers whose toolbars shrink the visual viewport; the vh
+   declaration above it is the fallback for engines without dvh. */
+.bs-pagelayout { width: 100%; max-width: var(--bs-pagelayout-max, var(--content-max)); margin-inline: auto; padding: var(--bs-pagelayout-pad, var(--space-6)); min-height: 100vh; min-height: 100dvh }

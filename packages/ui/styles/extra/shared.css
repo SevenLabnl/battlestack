@@ -1,0 +1,7 @@
+/* Additive component CSS owned by @sevenlab/ui.
+   Everything here replaces an inline style that the React reference used, so the DOM
+   stays clean and the rule is themeable like the rest. Nothing here may introduce a
+   raw value where a token exists. */
+
+/* Spinner wrapper (React: style={{display:'inline-flex'}}) */
+.bs-spinner-wrap { display: inline-flex; }

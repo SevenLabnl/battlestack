@@ -1,0 +1,150 @@
+/* Additive CSS for the forms group.
+
+   Owned by whoever ports the forms components. One file per group so parallel work
+   never collides on a shared stylesheet.
+
+   Rules:
+   - Additive only. Never edit ../vendor/*.css — that is the design system's own
+     CSS and has to stay diffable against the next export.
+   - Semantic tokens only: var(--fg-muted), var(--space-4). Never a primitive
+     (--gray-200, --blue-500), never a raw hex or px where a token exists.
+   - Most rules here replace an inline style the React reference used. If the
+     vendored CSS already has a class for it, use that instead of adding one.
+   - Keep the bs- prefix.
+*/
+
+/* Checkbox / Radio label stack — replaces the inline
+   style={{display:'flex',flexDirection:'column',gap:'1px'}} in Checkbox.jsx and
+   Radio.jsx. The 1px gap is a hairline between a label and its description;
+   there is no token that small, and --space-1 (4px) would break the pairing. */
+.bs-check__text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+/* The description under a checkbox/radio label. The reference picks the colour
+   inline from its own `disabled` flag; here the disabled modifier already on the
+   root does the same job in CSS. */
+.bs-check__desc {
+    color: var(--fg-muted);
+}
+
+.bs-check--disabled .bs-check__desc {
+    color: var(--fg-disabled);
+}
+
+/* RadioGroup fieldset — replaces the inline reset + flex column in Radio.jsx.
+   The reference's 10px gap sits between --space-2 and --space-3; --space-3 (12px)
+   keeps the rows apart once they carry descriptions. */
+.bs-radiogroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+/* legend gets browser padding by default; --field-gap is the same 6px the
+   reference used, and it is the label-to-control distance everywhere else. */
+.bs-radiogroup__legend {
+    margin-bottom: var(--field-gap);
+    padding: 0;
+}
+
+/* ── Combobox ─────────────────────────────────────────────────────────────── */
+
+/* Replaces the inline style={{listStyle:'none',margin:0}} the reference puts on
+   the same element as .bs-listbox. */
+.bs-listbox {
+    margin: 0;
+    list-style: none;
+}
+
+/* The portalled panel. DESIGN_SYSTEM.md: an overlay that can sit inside a scroll
+   container renders in a document.body portal at --z-menu — the same move
+   .bs-menu--fixed makes for DropdownMenu, hence the same modifier name.
+
+   Once the panel is no longer a descendant of .bs-inputwrap, the vendored
+   `position:absolute; top:calc(100% + 4px); left:0; right:0` has nothing to
+   resolve against, so the offsets go back to auto and the headless layer's
+   positioner owns placement (it repositions on scroll and resize). Only the
+   width is kept: --reka-combobox-trigger-width is the measured width of the
+   anchor (the full-width .bs-input), which is what left:0/right:0 gave the panel
+   in the reference. */
+.bs-listbox--fixed {
+    position: relative;
+    inset: auto;
+    width: var(--reka-combobox-trigger-width);
+    z-index: var(--z-menu);
+}
+
+/* The reference flags the active option with its own data-active; the headless
+   layer flags it with data-highlighted. Same declaration as the vendored
+   .bs-listbox__opt[data-active] rule — a second selector for it, not new styling. */
+.bs-listbox__opt[data-highlighted] {
+    background: var(--hover);
+}
+
+/* The chevron doubles as the open/close toggle, so it takes pointer events back
+   from `.bs-inputwrap > svg { pointer-events: none }`. Appearance is untouched. */
+.bs-inputwrap > .bs-combobox__toggle {
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+/* ── Radio: undo the checkbox's indeterminate treatment ─────────────────────
+   Per the CSS spec a radio matches :indeterminate for as long as no radio in its
+   group is checked. The vendored rule
+
+       .bs-check > input:checked, .bs-check > input:indeterminate { … }
+
+   therefore fills *every* option of an unselected radio group with the accent
+   colour and draws the checkbox's dash across it — so a fresh form looks like all
+   options are picked at once. Scope that treatment back to checkboxes.
+
+   The :not() chain is deliberate rather than defensive: without :not(:disabled) a
+   disabled unselected radio would lose its sunken background, and without
+   :not(:hover) this would outrank the vendored hover rule and kill the border
+   feedback. Belongs in the vendored selector as input[type="checkbox"]:indeterminate
+   in a future export — see design-system finding 24. */
+.bs-radio > input:indeterminate:not(:checked):not(:disabled) {
+    background: var(--surface);
+}
+
+.bs-radio > input:indeterminate:not(:checked):not(:disabled):not(:hover) {
+    border-color: var(--border-strong);
+}
+
+.bs-radio > input:indeterminate:not(:checked)::before {
+    content: none;
+}
+
+/* ── Focus: one accent edge instead of three bands ──────────────────────────
+   The vendored rules give a focused field a grey 1px border, then 1px of gap,
+   then a 2px ring outside that — three concentric bands. On an invalid field it
+   is worse: a red border fighting a blue ring.
+
+   Pull the ring inside the border box and colour the border to match, so focus
+   reads as a single 2px accent edge, flush with the control and with no layout
+   shift. The indicator is still 2px of --focus, which the contrast gate already
+   holds at >=3:1 against both grounds, so this is a calmer treatment and not a
+   weaker one.
+
+   The invalid pair is restated because the border must stay --danger: an error
+   that turns blue the moment you focus it loses the signal exactly when the user
+   is fixing it. Vendor already switches the ring colour; this switches the border
+   with it.
+
+   Belongs in vendor/controls.css in a future export — see design-system finding 25. */
+.bs-input:focus-visible {
+    border-color: var(--focus);
+    /* Negated --focus-offset rather than a literal -2px, so a theme that retunes
+       the focus scale moves this with it. */
+    outline-offset: calc(var(--focus-offset) * -1);
+}
+
+.bs-input[aria-invalid="true"]:focus-visible {
+    border-color: var(--danger);
+}

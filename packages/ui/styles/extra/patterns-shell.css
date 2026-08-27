@@ -1,0 +1,92 @@
+/* Additive CSS for the patterns-shell components.
+
+   Owned by whoever ports that half of the patterns group. Split from patterns.css
+   so the two halves can be worked in parallel without colliding.
+
+   Rules:
+   - Additive only. Never edit ../vendor/*.css.
+   - Semantic tokens only. Never a primitive, never a raw hex or px where a token exists.
+   - Most rules here replace an inline style the React reference used.
+   - Keep the bs- prefix.
+
+   One extra rule this file lives under: the sidebar is ink chrome in both themes and
+   a client relights it by overriding the `--nav-*` group alone. So nothing here may
+   paint inside `.bs-sidenav` — not with `--bg`/`--fg`, not with `--nav-*` either.
+   ../vendor/patterns.css already resolves every sidebar colour, border and hover
+   state through `--nav-*`; every rule below is layout only (flex, padding,
+   alignment, overflow), which is why the token group stays the single place a theme
+   has to touch.
+*/
+
+/* AppShell ---------------------------------------------------------------- */
+
+/* Nothing. `.bs-shell`, `.bs-shell--collapsed`, `.bs-shell--topnav`,
+   `.bs-shell__main` and `.bs-shell__content` are complete in ../vendor/patterns.css;
+   the component only picks which classes to render. */
+
+/* SidebarNav -------------------------------------------------------------- */
+
+/* React: style={{display:"flex",flexDirection:"column",gap:"1px"}} on the div that
+   wraps a group's items. It is a <ul> here — a navigation region announces how many
+   destinations it holds — so the list reset joins the same rule. 1px is a hairline
+   gap; no token names it, and the export writes it literally too. */
+.bs-sidenav__items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+/* React: style={{flex:1,textAlign:"left",overflow:"hidden",textOverflow:"ellipsis"}}
+   on the item's label span. `text-align` matters because the item is a <button>,
+   which centres its text by default. */
+.bs-sidenav__label {
+    flex: 1;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* React: style={collapsed?{justifyContent:"center",padding:0}:undefined}, repeated
+   on the brand row and on every item. One modifier on the nav expresses it once and
+   gives a client theme a handle on the collapsed rail. Layout only — the collapsed
+   sidebar's colours are the same `--nav-*` ones as the expanded sidebar's. */
+.bs-sidenav--collapsed .bs-sidenav__brand,
+.bs-sidenav--collapsed .bs-sidenav__item {
+    justify-content: center;
+    padding: 0;
+}
+
+/* TopNav ------------------------------------------------------------------ */
+
+/* React: style={{display:"flex",alignItems:"center",gap:"8px"}} on the div wrapping
+   `actions`. */
+.bs-topnav__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* HorizontalNav ----------------------------------------------------------- */
+
+/* React: style={{display:"flex",alignItems:"center",gap:"14px",minWidth:0,...style}}
+   directly on the <nav> — the one element in this group the export left without a
+   class of its own. The caller's own `style` still falls through onto the element
+   and still wins, which is what the trailing spread did. 14px sits off the 4px
+   spacing grid and has no token; the export writes it literally. */
+.bs-hnav {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+/* The item row is a <ul> for the same reason the sidebar's is. ../vendor/patterns.css
+   already lays `.bs-topnav__nav` out as the flex row; only the list reset is new. */
+.bs-topnav__nav {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}

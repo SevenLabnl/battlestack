@@ -1,0 +1,55 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   This project's brand.
+
+   The one place a project is allowed to differ visually from the design system.
+   Everything here is a token re-value: the names come from
+   @sevenlab/ui-default, and every component is written against them. A name
+   this file invents is a name no component reads.
+
+   Loaded after @sevenlab/ui-default's own tokens and after Tailwind, and left
+   deliberately unlayered — unlayered declarations outrank anything inside an
+   @layer, so these values win regardless of load order.
+
+   The full token set, generated from the theme:
+     node_modules/@sevenlab/ui-default/tokens/tokens.json   (values, both themes)
+     node_modules/@sevenlab/ui-default/tokens/tokens.d.ts   (names, as a type)
+
+   Both themes need the same treatment: a value set only here applies to light
+   *and* dark, so anything that has to differ per theme is set twice.
+   Re-verify contrast after any colour change — text >= 4.5:1, control borders
+   and the focus ring >= 3:1, in both themes.
+
+   `battlestack pull` never touches this file. See DESIGN_SYSTEM.md in the repo
+   root for the rules this file operates under.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+    /* Accent. The most common brand change by a wide margin, and the one with
+       the most reach: buttons, links, focus ring, charts, selection. */
+    /* --primary: #2f66f5; */
+    /* --primary-hover: #2452cc; */
+    /* --primary-active: #1d43a8; */
+    /* --primary-fg: #ffffff; */
+    /* --link: var(--primary); */
+    /* --focus: var(--primary); */
+
+    /* Typography. `@nuxt/fonts` self-hosts whatever is named here. */
+    /* --font-sans: "Plus Jakarta Sans", system-ui, sans-serif; */
+
+    /* Shape. */
+    /* --radius-md: 10px; */
+    /* --card-radius: var(--radius-lg); */
+    /* --control-radius: var(--radius-md); */
+
+    /* Nav chrome. Ink in both themes by default; override this group alone for
+       a light sidebar. */
+    /* --nav-bg: #101418; */
+    /* --nav-fg: #e6e9ee; */
+}
+
+[data-theme="dark"] {
+    /* Dark is not a filter over light. Anything above that reads wrong on a
+       dark canvas gets its own value here. */
+    /* --primary: #6f95ff; */
+    /* --primary-fg: #0b1020; */
+}

@@ -1,0 +1,28 @@
+{
+    "name": "@sevenlab/ui-default",
+    "version": "0.0.0",
+    "description": "Battlestack default theme \u2014 token values for light and dark, plus the Nuxt UI bridge. Extends @sevenlab/ui.",
+    "license": "MIT",
+    "type": "module",
+    "main": "./nuxt.config.ts",
+    "files": [
+        "assets",
+        "components",
+        "nuxt.config.ts",
+        "plugins",
+        "scripts",
+        "styles",
+        "tokens"
+    ],
+    "sideEffects": [
+        "*.css"
+    ],
+    "dependencies": {
+        "@nuxt/kit": "^4.5.2",
+        "@sevenlab/ui": "workspace:*"
+    },
+    "scripts": {
+        "check:contrast": "node scripts/check-contrast.mjs",
+        "check:contract": "node scripts/check-contract.mjs"
+    }
+}

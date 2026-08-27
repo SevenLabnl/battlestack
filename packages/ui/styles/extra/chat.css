@@ -1,0 +1,43 @@
+/* Additive CSS for the chat group.
+
+   Owned by whoever ports the chat components. One file per group so parallel work
+   never collides on a shared stylesheet.
+
+   Rules:
+   - Additive only. Never edit ../vendor/*.css — that is the design system's own
+     CSS and has to stay diffable against the next export.
+   - Semantic tokens only: var(--fg-muted), var(--space-4). Never a primitive
+     (--gray-200, --blue-500), never a raw hex or px where a token exists.
+   - Most rules here replace an inline style the React reference used. If the
+     vendored CSS already has a class for it, use that instead of adding one.
+   - Keep the bs- prefix.
+*/
+
+/* ChatMessage ------------------------------------------------------------ */
+
+/* React: style={{minWidth:0,maxWidth:"84%"}} on the wrapper around an assistant
+   message. min-width:0 lets a wide embed (a Table, a long invoice number) shrink
+   instead of pushing the bubble past the thread. */
+.bs-chatmsg__body { min-width: 0; max-width: 84%; }
+
+/* React: style={{maxWidth:"100%"}} on the content, overriding the vendored
+   max-width:84%. The 84% cap now sits on the wrapper above, so capping again here
+   would compound to 70% of the thread. */
+.bs-chatmsg__body .bs-chatmsg__content { max-width: 100%; }
+
+/* ChatComposer ----------------------------------------------------------- */
+
+/* BsTextarea brings .bs-textarea's min-height (a 84px form field). The vendored
+   .bs-chatcomposer textarea rule has no min-height to override it with, and the
+   composer has to start one row tall and grow to its own max-height instead. */
+.bs-chatcomposer .bs-textarea { min-height: 0; }
+
+/* React: style={{margin:"6px 2px 0"}} on the hint under the composer. Neither length
+   has a token: 6px is a hairline gap and the 2px inset lines the hint up with the
+   textarea's text rather than with the composer's border. */
+.bs-chatcomposer__hint { margin: 6px 2px 0; }
+
+/* ChatSuggestions -------------------------------------------------------- */
+
+/* React: style={{display:"flex",gap:"8px",flexWrap:"wrap"}} */
+.bs-chatsuggestions { display: flex; gap: var(--space-2); flex-wrap: wrap; }

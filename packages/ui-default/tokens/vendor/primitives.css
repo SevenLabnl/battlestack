@@ -1,0 +1,41 @@
+/* Battlestack primitives — raw values only. Components never reference these directly; use semantic tokens. */
+:root{
+/* Neutral scale (warm stone — 50 is the canvas, 950 the ink) */
+--gray-0:#ffffff;--gray-50:#f4f1ec;--gray-100:#eae6df;--gray-200:#e0dbd3;--gray-300:#d0cac1;--gray-400:#a8a29a;--gray-500:#7c766e;--gray-600:#5c5751;--gray-700:#423e39;--gray-800:#2c2926;--gray-900:#1c1a18;--gray-950:#121110;
+/* Accent scale (signal blue — 500 is --primary, 600 carries links and focus) */
+--blue-50:#eff4ff;--blue-100:#dde8ff;--blue-200:#bcd2ff;--blue-300:#8fb2ff;--blue-400:#5b8cff;--blue-500:#2f66f5;--blue-600:#1149dd;--blue-700:#0d38ad;--blue-800:#102f89;--blue-900:#11255f;
+/* Soft tints — pastel blocks for decorative panels and charts */
+--mint-100:#dff2e8;--mint-200:#b8e0cb;--mint-400:#55c48d;--mint-600:#0d7a4c;
+--lilac-100:#eae6fb;--lilac-200:#cfc9f7;--lilac-400:#a596f0;--lilac-600:#5946c8;
+--peach-100:#fdeade;--peach-200:#f8d2b7;--peach-400:#e0955f;--peach-600:#b2551f;
+/* Status scales */
+--green-100:#dff2e8;--green-200:#b8e0cb;--green-400:#55c48d;--green-600:#0d7a4c;--green-700:#0a5f3b;--green-900:#0e2a1e;
+--amber-100:#fbeeda;--amber-200:#f2d8a6;--amber-400:#e8a935;--amber-600:#92580a;--amber-700:#74450a;--amber-900:#33260c;
+--red-100:#fceae7;--red-200:#f6c8c0;--red-400:#ef8878;--red-500:#d94a3c;--red-600:#c2352a;--red-700:#9a281f;--red-900:#3a1512;
+/* Spacing — 4px base grid */
+--space-0:0;--space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;--space-10:40px;--space-12:48px;--space-16:64px;--space-20:80px;
+/* Radius — soft and generous */
+--radius-sm:8px;--radius-md:10px;--radius-lg:16px;--radius-xl:24px;--radius-full:999px;
+/* Elevation (raw) — near-flat, warm */
+--shadow-1:0 1px 2px rgba(18,17,16,.05);
+--shadow-2:0 4px 16px -6px rgba(18,17,16,.1),0 1px 2px rgba(18,17,16,.04);
+--shadow-3:0 24px 56px -16px rgba(18,17,16,.18),0 4px 12px -6px rgba(18,17,16,.07);
+/* Icon sizes */
+--icon-sm:16px;--icon-md:20px;--icon-lg:24px;
+/* Motion */
+--dur-fast:120ms;/* @kind other */
+--dur-base:200ms;/* @kind other */
+--dur-slow:300ms;/* @kind other */
+--ease-standard:cubic-bezier(.2,0,0,1);/* @kind other */
+--ease-out:cubic-bezier(0,0,.2,1);/* @kind other */
+/* Z-index ladder */
+--z-dropdown:100;/* @kind other */
+--z-sticky:200;/* @kind other */
+--z-drawer:300;/* @kind other */
+--z-dialog:400;/* @kind other */
+--z-menu:450;/* @kind other */
+--z-toast:500;/* @kind other */
+--z-tooltip:600;/* @kind other */
+/* Breakpoints — reference values; media queries cannot read custom props. sm 640, md 768, lg 1024, xl 1280, 2xl 1536 */
+--bp-sm:640px;--bp-md:768px;--bp-lg:1024px;--bp-xl:1280px;--bp-2xl:1536px;
+}

@@ -1,0 +1,12 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+:root{
+--font-sans:"Plus Jakarta Sans",-apple-system,"Segoe UI",system-ui,sans-serif;
+--font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+/* Type scale */
+--text-xs:12px;--text-sm:13px;--text-md:14px;--text-lg:16px;--text-xl:18px;--text-2xl:20px;--text-3xl:24px;--text-4xl:30px;
+/* Line heights */
+--leading-tight:1.22;--leading-normal:1.5;--leading-relaxed:1.65;
+/* Weights */
+--weight-regular:400;--weight-medium:500;--weight-semibold:600;--weight-bold:700;
+--tracking-caps:.06em;
+}

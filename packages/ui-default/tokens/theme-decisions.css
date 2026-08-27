@@ -1,0 +1,39 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Default-theme decisions that differ from the 2026-08-20 export.
+
+   A theme package's job is to set token values, so this is the right layer for
+   all of it. Each entry records what the export does, what we chose, and why —
+   and each should land in a future export so this file can shrink.
+
+   See the internal design-system findings log for the full context per item.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+    /* Finding 2 — page width.
+       guidelines/ux-patterns.md is described as binding and says "Content
+       max-width 1280px". The export's own token ships 100%, and
+       .bs-shell__content reads it, so every app is full-bleed and the two
+       documents cannot both be followed.
+
+       Decision: the binding UX rule wins. An app that genuinely wants full
+       bleed overrides this one token, which is a smaller ask than every app
+       silently violating the convention. */
+    --content-max: 1280px;
+}
+
+[data-theme="dark"] {
+    /* Findings 1 — dark contrast. The export's readme requires "control borders
+       and focus ring >= 3:1" and 4.5:1 for text in both themes; dark misses on
+       three pairs. The contrast gate fails without these.
+
+       Was #605a53 (2.55:1 on --surface, 2.73:1 on --bg). Lifted just past 3:1
+       on both grounds (3.11:1 and 3.33:1) while staying clearly darker than
+       --border-hover (#7a736b), so the hover step still reads. */
+    --border-strong: #6e675f;
+
+    /* Was --red-500 (#d94a3c), which carries white text at 4.20:1. --red-600
+       restores 5.47:1. Keeping the lighter red and switching to ink text — the
+       way dark --primary works — lands at 4.49:1 and misses by a hair, so it is
+       not a way out. */
+    --danger-solid: var(--red-600);
+}

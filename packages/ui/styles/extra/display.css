@@ -1,0 +1,66 @@
+/* Additive CSS for the display group.
+
+   Owned by whoever ports the display components. One file per group so parallel work
+   never collides on a shared stylesheet.
+
+   Rules:
+   - Additive only. Never edit ../vendor/*.css — that is the design system's own
+     CSS and has to stay diffable against the next export.
+   - Semantic tokens only: var(--fg-muted), var(--space-4). Never a primitive
+     (--gray-200, --blue-500), never a raw hex or px where a token exists.
+   - Most rules here replace an inline style the React reference used. If the
+     vendored CSS already has a class for it, use that instead of adding one.
+   - Keep the bs- prefix.
+*/
+
+/* Card ------------------------------------------------------------------- */
+
+/* React: style={{minWidth:0}} — lets a long title ellipsize instead of pushing
+   the actions out of the header. */
+.bs-card__titles { min-width: 0; }
+
+/* React: style={{display:"flex",gap:"8px",flex:"none"}} */
+.bs-card__actions { display: flex; gap: var(--space-2); flex: none; }
+
+/* Table ------------------------------------------------------------------ */
+
+/* Not a ported inline style: this implements a binding rule the vendored CSS stops
+   short of — findings #23. guidelines/ux-patterns.md requires amounts right-aligned
+   *in mono*, but vendor/surfaces.css gives .bs-table__num only tabular-nums, so every
+   caller had to remember bs-mono per cell. Right-aligned is the system's marker for a
+   number, and a number is set in mono; the two are one decision, not two.
+
+   Font family only — .bs-mono also drops to --text-sm, which is a size choice a table
+   cell should not inherit from its alignment. Belongs in the vendored .bs-table__num
+   rule in a future export; it lives here because vendor/*.css stays byte-identical. */
+.bs-table__num { font-family: var(--font-mono); }
+
+/* Avatar ----------------------------------------------------------------- */
+
+/* React put the status colour inline from a STATUS map. The three documented
+   statuses are token-backed, so they are classes; any other string stays inline
+   because it is a per-instance colour. */
+.bs-avatar__status--online { background: var(--success); }
+.bs-avatar__status--away { background: var(--warning); }
+.bs-avatar__status--offline { background: var(--fg-disabled); }
+
+/* React: style={{background:"var(--bg-sunken)",color:"var(--fg-muted)"}} on the
+   "+N" overflow chip of an AvatarGroup. */
+.bs-avatar--more { background: var(--bg-sunken); color: var(--fg-muted); }
+
+/* Skeleton --------------------------------------------------------------- */
+
+/* React: style={{display:"block"}} on every skeleton span. */
+.bs-skel { display: block; }
+
+/* React: style={{display:"flex",flexDirection:"column",gap:"8px"}} on the
+   multi-line text skeleton. */
+.bs-skel-lines { display: flex; flex-direction: column; gap: var(--space-2); }
+
+/* EmptyState ------------------------------------------------------------- */
+
+/* React: style={{maxWidth:"40ch"}} — a measure, not a length; no token for it. */
+.bs-empty__desc { max-width: 40ch; }
+
+/* React: style={{marginTop:"12px",display:"flex",gap:"8px"}} */
+.bs-empty__actions { margin-top: var(--space-3); display: flex; gap: var(--space-2); }
