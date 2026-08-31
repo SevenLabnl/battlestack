@@ -8,6 +8,13 @@ const VALID_PASSWORD = 'a'.repeat(MIN_SESSION_PASSWORD_LENGTH)
 const SHORT_PASSWORD = 'a'.repeat(MIN_SESSION_PASSWORD_LENGTH - 1)
 
 describe('health.get checkEnvVars (env-only)', () => {
+    // `nuxt4:auth` requires `nuxt4:database` and this variant ships without the database,
+    // so auth — and its session password — can never be installed here. Treating absence
+    // as missing would make readiness unsatisfiable in every env-only scaffold.
+    it('treats an absent session config (auth not installed) as not-applicable', () => {
+        expect(checkEnvVars(undefined)).toEqual([])
+    })
+
     it('reports NUXT_SESSION_PASSWORD missing when the password is empty', () => {
         expect(checkEnvVars('')).toEqual(['NUXT_SESSION_PASSWORD'])
     })

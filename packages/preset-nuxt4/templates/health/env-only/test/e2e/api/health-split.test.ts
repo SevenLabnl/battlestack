@@ -33,6 +33,7 @@ describe('e2e: /api/health/ready (env-only)', () => {
         // 503 is a valid answer — the test asserts shape, not that this environment
         // happens to be fully configured.
         expect([200, 503]).toContain(status)
+        expect(data).toBeTruthy()
         expect(['ok', 'degraded']).toContain(data!.status)
         expect(typeof data!.env.ok).toBe('boolean')
         expect(data!.status === 'ok').toBe(data!.env.ok)

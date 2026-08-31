@@ -7,7 +7,9 @@ export const healthFeature: Feature = {
     id: 'nuxt4:health',
     // 1.2.0: the env check names NUXT_SESSION_PASSWORD and checks its length.
     // 1.3.0: probe split — dependency-free `/api/health/live` for liveness,
-    // `/api/health/ready` for readiness (DB ping with-db, env check env-only).
+    // `/api/health/ready` for readiness. Both variants gate readiness on env config
+    // (with-db also pings Postgres), and only on APPLICABLE config: an absent
+    // `session` runtimeConfig means auth is not installed, not misconfigured.
     version: '1.3.0',
     label: 'Health endpoints (/api/health, /live, /ready)',
     frameworks: ['nuxt4'],
@@ -21,7 +23,7 @@ export const healthFeature: Feature = {
                     'Three endpoints, because liveness and readiness answer different questions. The rule: a liveness probe must not depend on anything a restart cannot fix.',
                     '',
                     '- `GET /api/health/live` — liveness + startup probes. Checks nothing but the process; failing means the pod is restarted. Never add a dependency check here (a test guards this).',
-                    '- `GET /api/health/ready` — readiness probe. Checks Postgres (with `nuxt4:database`) or env config (without); failing takes the pod out of the Service and reverses on its own.',
+                    '- `GET /api/health/ready` — readiness probe. Checks env config, plus a Postgres ping with `nuxt4:database`; failing takes the pod out of the Service and reverses on its own. Only applicable config gates: the session password is checked only when `nuxt4:auth` is installed.',
                     '- `GET /api/health` — humans and monitoring. Returns `{ status, version, checks }`; wired to no probe.',
                     '',
                     '- `/api/health` answers 200 when ok; 503 when degraded AND `runtimeConfig.health.failOnDegraded` is true (default).',
