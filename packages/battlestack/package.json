@@ -1,6 +1,6 @@
 {
     "name": "battlestack",
-    "version": "0.1.0",
+    "version": "0.9.0",
     "description": "Battlestack — plugin-based scaffolding CLI for Nuxt 4. This unscoped package is the `npx battlestack` entry point; the implementation lives in @battlestack/cli.",
     "license": "MIT",
     "author": "SevenLab",
