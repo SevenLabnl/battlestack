@@ -1,0 +1,150 @@
+name: Prepare release
+
+# Opens a pull request that bumps every publishable package to one new version
+# and prepends a CHANGELOG stanza. Merging that PR is the human approval of the
+# version number; `Release` then publishes it on a separate manual dispatch.
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: 'Version step'
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+          - prepatch
+          - preminor
+          - premajor
+          - prerelease
+      preid:
+        description: 'Prerelease identifier for the pre* levels'
+        type: string
+        default: next
+
+# The push and the PR are authored with `RELEASE_PR_TOKEN`, not GITHUB_TOKEN,
+# because GitHub runs no workflows for events a GITHUB_TOKEN triggered: the
+# release PR would carry zero checks, and a `main` with required status checks
+# could never merge it. These permissions cover the fallback paths only.
+#
+# `pull-requests: write` also needs Settings -> Actions -> "Allow GitHub Actions
+# to create and approve pull requests".
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Open the version bump PR
+    runs-on: ubuntu-latest
+    steps:
+      # First, before any work: a run that cannot open a mergeable PR should not
+      # bump anything. The `secrets` context is unavailable in `if:`, so the
+      # check has to be a step.
+      - name: Require the release PR token
+        env:
+          RELEASE_PR_TOKEN: ${{ secrets.RELEASE_PR_TOKEN }}
+        run: |
+          if [ -z "${RELEASE_PR_TOKEN:-}" ]; then
+            echo "::error::RELEASE_PR_TOKEN is not set. GitHub runs no workflows on a GITHUB_TOKEN-authored push or PR, so the release PR would get no CI and a protected main could not merge it. See the one-time setup in RELEASING.md."
+            exit 1
+          fi
+
+      # Same rule as Release: versions are cut from main. The `release/vX`
+      # branch name carries no base, so a run dispatched from a topic branch
+      # would bump that branch's files, build the changelog from its history,
+      # and open release/vX against it — and a later run from main computing
+      # the same version would force-push over that PR without an error.
+      - name: Verify the release branch
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "::error::Prepare release must be dispatched from main, got ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
+      # Full history so the CHANGELOG stanza can diff against the previous tag.
+      # `token:` is persisted into .git config, so the later `git push` is
+      # authored by that identity too, which is what makes CI fire.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PR_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Both inputs go through `env:` rather than `${{ }}` inside the script.
+      # `preid` is a free-text input, and interpolation happens before bash
+      # parses the line, so a value containing a quote would run as code in a
+      # job holding `contents: write` and `pull-requests: write`.
+      - name: Bump the workspace version
+        id: bump
+        env:
+          LEVEL: ${{ inputs.level }}
+          PREID: ${{ inputs.preid }}
+        run: |
+          set -euo pipefail
+          FROM=$(node scripts/release-version.mjs --print)
+          node scripts/release-version.mjs --bump "$LEVEL" --preid "$PREID"
+          # Re-read rather than parsing the bump output: `TO=$(... | tail -1)`
+          # reported the exit status of `tail`, so a failed bump yielded an
+          # empty version and the run went on to commit `release: v` and a
+          # duplicate changelog stanza.
+          TO=$(node scripts/release-version.mjs --print)
+          if [ -z "$TO" ] || [ "$TO" = "$FROM" ]; then
+            echo "::error::the bump did not change the version ($FROM -> '$TO')"
+            exit 1
+          fi
+          node scripts/release-version.mjs --changelog
+          node scripts/release-version.mjs --check
+          echo "from=$FROM" >> "$GITHUB_OUTPUT"
+          echo "to=$TO" >> "$GITHUB_OUTPUT"
+
+      - name: Open the pull request
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN }}
+          BASE: ${{ github.ref_name }}
+          FROM: ${{ steps.bump.outputs.from }}
+          TO: ${{ steps.bump.outputs.to }}
+        run: |
+          set -euo pipefail
+          BRANCH="release/v$TO"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$BRANCH"
+          git add packages/*/package.json CHANGELOG.md
+          git commit -m "release: v$TO"
+          git fetch origin "$BRANCH" || true
+          git push --force-with-lease origin "$BRANCH"
+
+          cat > /tmp/pr-body.md <<BODY
+          Bumps every publishable package from \`$FROM\` to \`$TO\` and prepends the changelog stanza.
+
+          ## Next steps
+
+          1. Review the version and the changelog, then merge into \`$BASE\`.
+          2. Run the **Release** workflow from \`$BASE\` with \`dry_run: false\`.
+          3. Approve the \`release\` environment when prompted.
+
+          The \`v$TO\` tag and the \`production\` branch move only after npm has accepted the packages.
+          BODY
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            gh pr edit "$BRANCH" --title "release: v$TO" --body-file /tmp/pr-body.md
+          else
+            gh pr create --base "$BASE" --head "$BRANCH" --title "release: v$TO" --body-file /tmp/pr-body.md
+          fi

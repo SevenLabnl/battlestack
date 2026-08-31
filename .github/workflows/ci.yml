@@ -8,10 +8,16 @@ name: CI
 # repo, and a stranger's fork must be able to run this workflow unmodified.
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
+
+# One in-flight run per branch or PR.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Gates every other job: a feature whose output changed without a version bump
@@ -45,6 +51,12 @@ jobs:
         env:
           BUMP_CHECK_BASE: ${{ github.base_ref && format('origin/{0}', github.base_ref) || '' }}
         run: pnpm bump:check
+
+      # Package versions, not feature versions. The five packages are published
+      # in lockstep and cross-depend with `workspace:*`, so a version that
+      # drifted on one of them is only discoverable at release time otherwise.
+      - name: Lockstep package version check
+        run: pnpm version:check
 
   verify:
     name: Type-check and test (Node ${{ matrix.node }})

@@ -166,6 +166,13 @@ on your PATH inside projects:
 pnpm add -g battlestack   # or: npm i -g battlestack · bun i -g battlestack
 ```
 
+**Trying the next release early.** Prereleases publish under the `next`
+dist-tag, so they never reach a plain install:
+
+```bash
+npx battlestack@next my-app
+```
+
 **Updating the CLI.** A global install updates itself:
 
 ```bash
