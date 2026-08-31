@@ -1,6 +1,6 @@
 {
     "name": "@battlestack/preset-nuxt4",
-    "version": "0.1.0",
+    "version": "0.9.0",
     "description": "Public Battlestack preset: Nuxt 4 framework + open-source features. (Versioned for Nuxt-major coexistence — a future preset-nuxt5 registers alongside.)",
     "license": "MIT",
     "author": "SevenLab",
