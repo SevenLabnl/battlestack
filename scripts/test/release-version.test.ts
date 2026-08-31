@@ -51,11 +51,15 @@ describe('bump prerelease identifiers', () => {
     // The Prepare release workflow passes `--preid` straight from an
     // operator-editable text input, so an unusable value has to fail loudly
     // rather than reach package.json.
-    it.each(['', 'my next', 'next.0', 'ünïcode', 'a b'])('rejects %o', (preid) => {
+    // `0`, `1-2` and `v1` are well-formed semver identifiers but invalid npm
+    // dist-tags ("Tag name must not be a valid SemVer range"), and the preid's
+    // first segment becomes the dist-tag under `channel: auto` — rejected here
+    // so the publish cannot fail after the human already approved it.
+    it.each(['', 'my next', 'next.0', 'ünïcode', 'a b', '0', '12', 'v1', '1-2'])('rejects %o', (preid) => {
         expect(() => bump('0.1.0', 'preminor', preid)).toThrow(/invalid prerelease identifier/)
     })
 
-    it.each(['next', 'rc', 'alpha-1', 'RC2', '0'])('accepts %o', (preid) => {
+    it.each(['next', 'rc', 'alpha-1', 'RC2', 'version9'])('accepts %o', (preid) => {
         expect(() => bump('0.1.0', 'preminor', preid)).not.toThrow()
     })
 

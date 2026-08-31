@@ -61,4 +61,17 @@ describe('run', () => {
         // directory must not be the one we asked for.
         expect(path.resolve(dir)).not.toBe(path.resolve(process.cwd()))
     })
+
+    // A timeout kill must reject, not take the "signal-terminated children are
+    // not failures" path — that path is for the user's own Ctrl-C.
+    it('rejects a child that outlives timeoutMs', async () => {
+        await expect(
+            run('node', ['-e', 'setTimeout(() => {}, 10_000)'], { timeoutMs: 200 }),
+        ).rejects.toThrow(/timed out after 200ms/)
+    })
+
+    it('leaves a child that finishes in time alone', async () => {
+        const result = await run('node', ['-e', 'console.log("quick")'], { timeoutMs: 5000 })
+        expect(result.stdout).toContain('quick')
+    })
 })

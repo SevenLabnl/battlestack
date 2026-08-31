@@ -26,7 +26,13 @@ const CHANGELOG = path.join(ROOT, 'CHANGELOG.md')
 // identifier through to package.json, where npm rejects it at publish time.
 const PRE_IDENT = String.raw`(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)`
 const SEMVER_RE = new RegExp(String.raw`^(\d+)\.(\d+)\.(\d+)(?:-(${PRE_IDENT}(?:\.${PRE_IDENT})*))?$`)
-const PREID_RE = /^[0-9A-Za-z-]+$/
+// Stricter than semver, on purpose: the preid's first dot-segment becomes the
+// npm dist-tag under `channel: auto`, and npm rejects any tag it can read as a
+// semver version or range ("Tag name must not be a valid SemVer range") — that
+// covers `0`, `1-2`, and `v1`. Requiring a letter first and refusing the
+// `v<digit>` shape keeps that failure out of the publish step, where it would
+// surface only after the human already approved the release.
+const PREID_RE = /^(?!v\d)[A-Za-z][0-9A-Za-z-]*$/
 const VERSION_FIELD_RE = /("version"\s*:\s*")([^"]+)(")/
 const LEVELS = ['major', 'minor', 'patch', 'premajor', 'preminor', 'prepatch', 'prerelease']
 const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
@@ -149,7 +155,7 @@ function setVersion(pkg, next) {
 export function bump(current, level, preid = 'next') {
     if (!LEVELS.includes(level)) fail(`invalid level "${level}", use ${LEVELS.join('|')}`)
     if (level.startsWith('pre') && !PREID_RE.test(preid)) {
-        fail(`invalid prerelease identifier "${preid}", use only [0-9A-Za-z-]`)
+        fail(`invalid prerelease identifier "${preid}": it becomes the npm dist-tag, so it must start with a letter and must not look like a version (e.g. "next", "beta", "rc")`)
     }
     const [, major, minor, patch, pre] = SEMVER_RE.exec(current)
     const n = [Number(major), Number(minor), Number(patch)]
@@ -223,9 +229,11 @@ function writeChangelog(version) {
     const range = previous ? `${previous}..HEAD` : 'HEAD'
     const log = git(['log', '--no-merges', '--pretty=format:- %s (%h)', range]) ?? ''
     const entries = log.trim() || '- no commits recorded'
-    const date = git(['log', '-1', '--pretty=format:%cs'])?.trim() ?? ''
+    // Today, not HEAD's committer date: --changelog runs before the release
+    // commit exists, so %cs of HEAD is whenever the previous merge landed.
+    const date = new Date().toISOString().slice(0, 10)
     const compare = previous ? `\n\n[Full changelog](https://github.com/SevenLabnl/battlestack/compare/${previous}...v${version})` : ''
-    const stanza = `## v${version}${date ? ` (${date})` : ''}\n\n${entries}${compare}\n`
+    const stanza = `## v${version} (${date})\n\n${entries}${compare}\n`
 
     const existing = existsSync(CHANGELOG) ? readFileSync(CHANGELOG, 'utf8') : '# Changelog\n'
     const [heading, ...rest] = existing.split('\n')

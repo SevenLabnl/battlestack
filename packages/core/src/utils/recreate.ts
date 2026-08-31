@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process'
 import { readdir, rm } from 'node:fs/promises'
 import { exists } from './fs.js'
 import { run } from './run.js'
+import { getUiPort } from '../ui-port.js'
 
 /**
  * An unreachable Docker daemon does not fail fast. On a host with Docker
@@ -11,32 +12,52 @@ import { run } from './run.js'
  * anything. Same bound the port probes in port-diagnosis.ts use.
  */
 const DOCKER_PROBE_TIMEOUT_MS = 5000
+// The teardown writes get longer ropes than the probes — a `compose down -v`
+// legitimately takes a while — but must not hang forever on the same dead socket.
+const DOCKER_DOWN_TIMEOUT_MS = 60_000
+const DOCKER_RM_TIMEOUT_MS = 15_000
 
-/** Non-empty stdout lines, or none when docker is absent, broken or too slow. */
-function dockerLines(args: string[]): Promise<string[]> {
+/** Non-empty stdout lines; empty when docker is absent, broken or too slow. */
+function dockerLines(args: string[]): Promise<{ lines: string[], timedOut: boolean }> {
     return new Promise((resolve) => {
         let settled = false
         let timer: NodeJS.Timeout | undefined
-        const finish = (lines: string[]): void => {
+        const finish = (result: { lines: string[], timedOut: boolean }): void => {
             if (settled) return
             settled = true
             if (timer) clearTimeout(timer)
-            resolve(lines)
+            resolve(result)
         }
 
         const child = spawn('docker', args, { stdio: ['ignore', 'pipe', 'ignore'] })
         timer = setTimeout(() => {
             child.kill()
-            finish([])
+            finish({ lines: [], timedOut: true })
         }, DOCKER_PROBE_TIMEOUT_MS)
 
         let out = ''
         child.stdout.on('data', (b: Buffer) => (out += b.toString()))
-        child.on('error', () => finish([]))
+        child.on('error', () => finish({ lines: [], timedOut: false }))
         // Trimmed per line: docker on Windows terminates with CRLF, and a
         // trailing \r rides along into the `docker rm <id>` that follows.
-        child.on('close', () => finish(out.split('\n').map((l) => l.trim()).filter(Boolean)))
+        child.on('close', () =>
+            finish({
+                lines: out.split('\n').map((l) => l.trim()).filter(Boolean),
+                timedOut: false,
+            }))
     })
+}
+
+/**
+ * A timed-out probe is not "no containers" — the daemon may just be slow, and
+ * silently reporting the project clean lets a recreate wipe the directory while
+ * the old containers and volumes survive to reattach to the fresh scaffold.
+ */
+function warnSlowDocker(projectName: string): void {
+    getUiPort().warn(
+        `docker did not answer within ${DOCKER_PROBE_TIMEOUT_MS / 1000}s — leftover containers or `
+        + `volumes labeled "${projectName}" may survive; check with \`docker ps -a\` once the daemon responds`,
+    )
 }
 
 /** Detects a previous scaffold by directory contents, manifest state, or docker compose label. */
@@ -75,14 +96,15 @@ async function detectIncompleteManifest(projectDir: string): Promise<boolean> {
 
 /** True when any container is labeled `com.docker.compose.project=<projectName>`. */
 export async function detectComposeProject(projectName: string): Promise<boolean> {
-    const ids = await dockerLines([
+    const { lines, timedOut } = await dockerLines([
         'ps',
         '-a',
         '--filter',
         `label=com.docker.compose.project=${projectName}`,
         '-q',
     ])
-    return ids.length > 0
+    if (timedOut) warnSlowDocker(projectName)
+    return lines.length > 0
 }
 
 /** Best-effort. */
@@ -95,6 +117,7 @@ export async function dockerTeardown(
             await run('docker', ['compose', 'down', '-v', '--remove-orphans'], {
                 cwd: projectDir,
                 inherit: false,
+                timeoutMs: DOCKER_DOWN_TIMEOUT_MS,
             })
             return
         } catch {
@@ -112,15 +135,19 @@ async function rmByLabel(
     rmCmd: string,
     rmArgs: string[],
 ): Promise<void> {
-    const ids = await dockerLines([
+    const { lines: ids, timedOut } = await dockerLines([
         listCmd,
         ...listArgs,
         '--filter',
         `label=com.docker.compose.project=${projectName}`,
     ])
+    if (timedOut) warnSlowDocker(projectName)
     for (const id of ids) {
         try {
-            await run('docker', [rmCmd, ...rmArgs, id], { inherit: false })
+            await run('docker', [rmCmd, ...rmArgs, id], {
+                inherit: false,
+                timeoutMs: DOCKER_RM_TIMEOUT_MS,
+            })
         } catch {
             /* best-effort */
         }

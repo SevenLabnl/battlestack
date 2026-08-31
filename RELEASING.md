@@ -32,15 +32,18 @@ Publishable packages:
 3. **Actions -> Release -> Run workflow** from `main` with `dry_run: false` and
    `channel: auto`.
 4. The `Gate` job runs the lockstep check, the unpublished check, the
-   moves-`latest`-forward check, typecheck, tests, build and the
+   moves-the-dist-tag-forward check, typecheck, tests, build and the
    packed-tarball smoke test.
 5. The `Publish` job waits for a `release` environment reviewer. Approve it.
 6. On success the workflow publishes to npm, pushes the annotated `v<version>`
    tag, fast-forwards `production` and creates the GitHub release.
 
 Leave `dry_run: true` (the default) to run every gate and pack the tarballs
-without publishing. A dry run may be dispatched from any branch; a real publish
-may only be dispatched from `main`.
+without publishing. A dry run may be dispatched from any branch and keeps
+working after a release ships: the tag-exists, already-published and
+moves-forward checks downgrade to warnings for it, so the steady state on
+`main` (current version tagged and on npm) rehearses green. A real publish may
+only be dispatched from `main`, and Prepare release only runs from `main`.
 
 A dry run runs entirely inside `Gate` and the `Publish` job is skipped, so it
 needs no reviewer approval and is not subject to the `release` environment's

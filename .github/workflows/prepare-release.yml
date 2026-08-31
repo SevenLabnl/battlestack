@@ -55,6 +55,18 @@ jobs:
             exit 1
           fi
 
+      # Same rule as Release: versions are cut from main. The `release/vX`
+      # branch name carries no base, so a run dispatched from a topic branch
+      # would bump that branch's files, build the changelog from its history,
+      # and open release/vX against it — and a later run from main computing
+      # the same version would force-push over that PR without an error.
+      - name: Verify the release branch
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "::error::Prepare release must be dispatched from main, got ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
       # Full history so the CHANGELOG stanza can diff against the previous tag.
       # `token:` is persisted into .git config, so the later `git push` is
       # authored by that identity too, which is what makes CI fire.

@@ -33,8 +33,12 @@ on:
 permissions:
   contents: read
 
+# Dry runs and publishes get separate groups: a publish parked on its
+# environment approval would otherwise hold the group for days and starve every
+# dry run queued behind it (GitHub also cancels all but the newest queued run
+# in a group). A dry run writes nothing, so running beside a publish is safe.
 concurrency:
-  group: release
+  group: ${{ inputs.dry_run && 'release-dry-run' || 'release' }}
   cancel-in-progress: false
 
 env:
@@ -92,13 +96,22 @@ jobs:
 
       - name: Plan the release
         id: plan
+        env:
+          DRY: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
           VERSION=$(node scripts/release-version.mjs --print)
 
+          # Fatal for a publish; informational for a dry run, which is a
+          # rehearsal of the gates and must keep working after the release
+          # ships (the steady state on main is "current version is tagged").
           if [ -n "$(git tag --list "v$VERSION")" ]; then
-            echo "::error::tag v$VERSION already exists, so v$VERSION is already released. Run Prepare release first."
-            exit 1
+            if [ "$DRY" = "true" ]; then
+              echo "::warning::tag v$VERSION already exists; a real publish would stop here. The dry run continues."
+            else
+              echo "::error::tag v$VERSION already exists, so v$VERSION is already released. Run Prepare release first."
+              exit 1
+            fi
           fi
 
           if [[ "$VERSION" == *-* ]]; then
@@ -114,6 +127,15 @@ jobs:
             auto) DIST_TAG="$DEFAULT_TAG" ;;
             *)    DIST_TAG="${{ inputs.channel }}" ;;
           esac
+
+          # npm refuses a dist-tag it can parse as a semver version or range
+          # ("Tag name must not be a valid SemVer range"), but only at publish
+          # time — after the human approved. A version like 0.2.0-0.0 (set by
+          # hand; --bump rejects numeric preids) would derive DIST_TAG=0 here.
+          if [[ "$DIST_TAG" =~ ^v?[0-9] ]]; then
+            echo "::error::\"$DIST_TAG\" is not a valid npm dist-tag (npm reads it as a version). Use a prerelease identifier that starts with a letter."
+            exit 1
+          fi
 
           if [ "$PRERELEASE" = true ] && [ "$DIST_TAG" = latest ]; then
             echo "::error::$VERSION is a prerelease; publishing it as latest would serve it to every plain install"
@@ -148,6 +170,8 @@ jobs:
       # last, so it being present means the whole release already landed; a
       # partial set is reported but still resumable.
       - name: Verify the version is unpublished
+        env:
+          DRY: ${{ inputs.dry_run }}
         run: |
           set -uo pipefail
           VERSION="${{ steps.plan.outputs.version }}"
@@ -162,31 +186,59 @@ jobs:
           done < <(node scripts/release-version.mjs --names)
 
           if npm view "battlestack@$VERSION" version >/dev/null 2>&1; then
-            echo "::error::battlestack@$VERSION is already on npm, v$VERSION is spent. Run Prepare release."
-            exit 1
+            if [ "$DRY" = "true" ]; then
+              echo "::warning::battlestack@$VERSION is already on npm; a real publish would stop here. The dry run continues."
+            elif [ -z "$(git tag --list "v$VERSION")" ]; then
+              # The wrapper publishes last, so it being on npm means the whole
+              # release landed — and the missing tag means only the bookkeeping
+              # failed. Re-preparing here would orphan v$VERSION forever.
+              echo "::error::battlestack@$VERSION is fully published but v$VERSION was never tagged: the publish succeeded and only the tag/promote failed. Do NOT run Prepare release — recover per RELEASING.md: push the v$VERSION tag from the release commit, then fast-forward production."
+              exit 1
+            else
+              echo "::error::battlestack@$VERSION is already on npm, v$VERSION is spent. Run Prepare release."
+              exit 1
+            fi
           fi
           if [ "$PUBLISHED" -gt 0 ]; then
             echo "::warning::$PUBLISHED package(s) at $VERSION are already published; this run resumes the rest"
           fi
 
-      # Being unpublished is not enough. `pnpm publish --tag latest` moves the
+      # Being unpublished is not enough. `pnpm publish --tag <t>` moves that
       # dist-tag to whatever it is handed, including a version older than the
       # one already there, and the only step that would notice is the
       # `production` fast-forward at the very end of the publish job, long after
-      # npm accepted it. Checked here, before anything irreversible.
-      - name: Verify the version moves latest forward
-        if: steps.plan.outputs.promote == 'true'
+      # npm accepted it. Checked here for whichever dist-tag this release
+      # targets — `next` can move backwards exactly like `latest`.
+      - name: Verify the version moves the dist-tag forward
         env:
           RELEASING: ${{ steps.plan.outputs.version }}
+          DIST_TAG: ${{ steps.plan.outputs.dist_tag }}
+          DRY: ${{ inputs.dry_run }}
         run: |
-          set -uo pipefail
-          LATEST=$(npm view battlestack version 2>/dev/null || true)
-          if [ -z "$LATEST" ]; then
-            echo "battlestack has no published version yet, nothing to move backwards"
+          set -euo pipefail
+          # Fail closed: battlestack is published, so an error from npm must
+          # not be mistaken for "first release" — only a clean E404 may be.
+          if OUT=$(npm view battlestack "dist-tags.$DIST_TAG" 2>&1); then
+            CURRENT=$(echo "$OUT" | tr -d '[:space:]')
+          elif echo "$OUT" | grep -q 'E404'; then
+            CURRENT=""
+          else
+            echo "::error::npm view failed while reading dist-tags.$DIST_TAG; refusing to assume this is the first release"
+            echo "$OUT"
+            exit 1
+          fi
+
+          if [ -z "$CURRENT" ]; then
+            echo "dist-tag $DIST_TAG has no published version yet, nothing to move backwards"
             exit 0
           fi
-          echo "npm latest is $LATEST, releasing $RELEASING"
-          node scripts/release-version.mjs --newer-than "$LATEST"
+          echo "npm $DIST_TAG is $CURRENT, releasing $RELEASING"
+          if [ "$DRY" = "true" ]; then
+            node scripts/release-version.mjs --newer-than "$CURRENT" \
+              || echo "::warning::a real publish would stop here. The dry run continues."
+          else
+            node scripts/release-version.mjs --newer-than "$CURRENT"
+          fi
 
       # The gates run before the publish, not after: an unpublish window is 72
       # hours and a bad version number is permanent, so it is far cheaper to
