@@ -185,23 +185,31 @@ async function scenario({ name, withMechanism, withoutMechanism, act }) {
     log(`scenario: ${name}`)
 
     const live = await race(withMechanism, act)
-    const stale = live.filter((r) => r !== 'DROPPED')
-    if (stale.length > 0) {
-        failures.push(`${name}: with the mechanism — ${stale.length}/${REPLICAS} replicas did not `
-            + `drop the entry (${live.join(', ')})`)
+    const notDropped = live.filter((r) => r !== 'DROPPED')
+    if (notDropped.length > 0) {
+        failures.push(`${name}: with the mechanism — ${notDropped.length}/${REPLICAS} replicas did `
+            + `not drop the entry (${live.join(', ')})`)
     } else {
         log(`  with mechanism: all ${REPLICAS} replicas dropped the entry`)
     }
 
+    // Every replica must report STALE, not merely "something other than DROPPED". A replica that
+    // dies before reporting resolves to EXITED, and counting that as a tripped control is the
+    // vacuous pass this file exists to prevent: four crashed replicas would certify the run.
     const control = await race(withoutMechanism, act)
-    const dropped = control.filter((r) => r === 'DROPPED')
-    if (dropped.length > 0) {
-        failures.push(`${name}: NEGATIVE CONTROL DID NOT TRIP — ${dropped.length}/${REPLICAS} `
-            + 'replicas dropped the entry with the mechanism stripped out, so a pass with it '
-            + 'proves nothing. Something other than the mechanism is clearing the cache; check '
-            + `that TTL_MS (${TTL_MS}) still far exceeds WINDOW_MS (${WINDOW_MS}).`)
+    const notStale = control.filter((r) => r !== 'STALE')
+    if (notStale.length > 0) {
+        const dropped = control.filter((r) => r === 'DROPPED').length
+        failures.push(dropped > 0
+            ? `${name}: NEGATIVE CONTROL DID NOT TRIP — ${dropped}/${REPLICAS} replicas dropped `
+                + 'the entry with the mechanism stripped out, so a pass with it proves nothing. '
+                + 'Something other than the mechanism is clearing the cache; check that TTL_MS '
+                + `(${TTL_MS}) still far exceeds WINDOW_MS (${WINDOW_MS}).`
+            : `${name}: NEGATIVE CONTROL INCONCLUSIVE — expected all ${REPLICAS} replicas to `
+                + `report STALE, got (${control.join(', ')}). A replica that never reported cannot `
+                + 'demonstrate anything, so this is a red result about the test, not a pass.')
     } else {
-        log('  without mechanism: entry stays stale, as expected')
+        log(`  without mechanism: all ${REPLICAS} replicas kept the entry, as expected`)
     }
 }
 
