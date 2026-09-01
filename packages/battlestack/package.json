@@ -32,7 +32,8 @@
     "type": "module",
     "bin": {
         "battlestack": "./bin.js",
-        "bstack": "./bin.js"
+        "bstack": "./bin.js",
+        "bs": "./bin.js"
     },
     "files": [
         "bin.js"

@@ -192,7 +192,7 @@ jobs:
               # The wrapper publishes last, so it being on npm means the whole
               # release landed — and the missing tag means only the bookkeeping
               # failed. Re-preparing here would orphan v$VERSION forever.
-              echo "::error::battlestack@$VERSION is fully published but v$VERSION was never tagged: the publish succeeded and only the tag/promote failed. Do NOT run Prepare release — recover per RELEASING.md: push the v$VERSION tag from the release commit, then fast-forward production."
+              echo "::error::battlestack@$VERSION is fully published but v$VERSION was never tagged: the publish succeeded and only the tag/promote failed. Do NOT run Prepare release — recover per docs/releasing.md: push the v$VERSION tag from the release commit, then fast-forward production."
               exit 1
             else
               echo "::error::battlestack@$VERSION is already on npm, v$VERSION is spent. Run Prepare release."
