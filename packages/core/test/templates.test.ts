@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -353,5 +354,116 @@ describe('updateFromTemplateDir', () => {
         // Notes mention both
         expect(report.notes.some((n) => n.includes('pristine.ts'))).toBe(true)
         expect(report.notes.some((n) => n.includes('modified.ts'))).toBe(true)
+    })
+})
+
+// Bytes that do not survive a utf8 round-trip: 0x89 opens every PNG, and 0x80/0xFF
+// are invalid UTF-8 continuation bytes. `Buffer.from(...).toString('utf8')` turns each
+// into U+FFFD, so a mangling write path is detectable rather than merely suspected.
+const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x80, 0xff, 0x00, 0x01])
+const PNG_BYTES_V2 = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xfe, 0x81, 0x02, 0x03])
+
+function sha256Of(buf: Buffer | string): string {
+    return createHash('sha256').update(buf).digest('hex')
+}
+
+describe('updateFromTemplateDir: binary assets', () => {
+    it('rewrites a pristine binary asset byte-for-byte, not as mangled utf8', async () => {
+        const rel = path.join('public', 'icon-192.png')
+        await mkdir(path.join(templateDir, 'public'), { recursive: true })
+        await mkdir(path.join(projectDir, 'public'), { recursive: true })
+        await writeFile(path.join(projectDir, rel), PNG_BYTES)
+        await writeFile(path.join(templateDir, rel), PNG_BYTES_V2)
+
+        const ctx = makeCtx()
+        const prev: InstalledFeatureRecord = {
+            id: 'test:tpl-bin-pristine',
+            version: '0.1.0',
+            files: { [rel]: sha256Of(PNG_BYTES) },
+        }
+
+        const report = await updateFromTemplateDir(ctx, 'test:tpl-bin-pristine', templateDir, prev)
+
+        expect(report.written).toContain(rel)
+        const onDisk = await readFile(path.join(projectDir, rel))
+        expect(onDisk.equals(PNG_BYTES_V2)).toBe(true)
+        // The recorded hash must be of the real bytes, or the next run reports false drift.
+        const recorded = ctx.state['files:test:tpl-bin-pristine'] as Record<string, string>
+        expect(recorded[rel]).toBe(sha256Of(PNG_BYTES_V2))
+    })
+
+    it('overwrites a binary asset byte-for-byte under --overwrite', async () => {
+        const rel = path.join('public', 'favicon.ico')
+        await mkdir(path.join(templateDir, 'public'), { recursive: true })
+        await mkdir(path.join(projectDir, 'public'), { recursive: true })
+        // User-drifted AND owned: `--overwrite` ignores both, so this is the one path
+        // that can still reach our icons.
+        await writeFile(path.join(projectDir, rel), Buffer.from([0x00, 0xc3, 0x28]))
+        await writeFile(path.join(templateDir, rel), PNG_BYTES)
+
+        const ctx = makeCtx()
+        ctx.state.overwrite = true
+        const prev: InstalledFeatureRecord = {
+            id: 'test:tpl-bin-overwrite',
+            version: '0.1.0',
+            files: { [rel]: 'stale-hash' },
+            ownedByUser: [rel],
+        }
+
+        await updateFromTemplateDir(ctx, 'test:tpl-bin-overwrite', templateDir, prev)
+
+        const onDisk = await readFile(path.join(projectDir, rel))
+        expect(onDisk.equals(PNG_BYTES)).toBe(true)
+    })
+
+    it('stages a drifted binary asset as .new only, with no textual .patch', async () => {
+        const rel = path.join('public', 'icon-512.png')
+        await mkdir(path.join(templateDir, 'public'), { recursive: true })
+        await mkdir(path.join(projectDir, 'public'), { recursive: true })
+        const userEdit = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xaa, 0xbb])
+        await writeFile(path.join(projectDir, rel), userEdit)
+        await writeFile(path.join(templateDir, rel), PNG_BYTES_V2)
+
+        const ctx = makeCtx()
+        const prev: InstalledFeatureRecord = {
+            id: 'test:tpl-bin-drift',
+            version: '0.1.0',
+            files: { [rel]: sha256Of(PNG_BYTES) },
+        }
+
+        const report = await updateFromTemplateDir(ctx, 'test:tpl-bin-drift', templateDir, prev)
+
+        expect(report.skipped).toContain(rel)
+        // User's asset untouched.
+        expect((await readFile(path.join(projectDir, rel))).equals(userEdit)).toBe(true)
+        // `.new` staged with real bytes...
+        const staged = await readFile(path.join(projectDir, '.battlestack', 'pull', rel + '.new'))
+        expect(staged.equals(PNG_BYTES_V2)).toBe(true)
+        // ...and no line diff of binary noise.
+        expect(await exists(path.join(projectDir, '.battlestack', 'pull', rel + '.patch'))).toBe(false)
+        expect(report.notes.join('\n')).toContain('binary asset')
+    })
+
+    it('still writes a text file as text (the binary branch must not swallow everything)', async () => {
+        const rel = path.join('public', 'robots.txt')
+        await mkdir(path.join(templateDir, 'public'), { recursive: true })
+        await mkdir(path.join(projectDir, 'public'), { recursive: true })
+        const original = 'User-Agent: *\nDisallow: /\n'
+        const updated = 'User-Agent: *\nAllow: /\n'
+        await writeFile(path.join(projectDir, rel), 'User-Agent: *\n# edited\n')
+        await writeFile(path.join(templateDir, rel), updated)
+
+        const ctx = makeCtx()
+        const prev: InstalledFeatureRecord = {
+            id: 'test:tpl-text-drift',
+            version: '0.1.0',
+            files: { [rel]: sha256Of(original) },
+        }
+
+        const report = await updateFromTemplateDir(ctx, 'test:tpl-text-drift', templateDir, prev)
+
+        const patch = await readFile(path.join(projectDir, '.battlestack', 'pull', rel + '.patch'), 'utf8')
+        expect(patch).toContain('+Allow: /')
+        expect(report.notes.join('\n')).not.toContain('binary asset')
     })
 })

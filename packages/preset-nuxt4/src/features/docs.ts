@@ -16,7 +16,9 @@ export const docsFeature: Feature = {
     id: 'nuxt4:docs',
     // 1.0.8: redis-gated bullet. 1.0.9: corrected rule globs from `shared:ai-tool-config` 1.1.6.
     // 1.0.11: extensions docs from `nuxt4:database` 1.6.0 and `nuxt4:rag`.
-    version: '1.0.13',
+    // 1.0.14: favicon/app-icon docs from `nuxt4:essentials` 1.1.0 and `nuxt4:pwa` 1.1.0.
+    // 1.0.15: clarified when `pull` first writes the user-owned icon paths.
+    version: '1.0.15',
     label: 'Generate AGENTS.md + CLAUDE.md + README.md',
     frameworks: ['nuxt4'],
     stage: STAGE.DOCS,

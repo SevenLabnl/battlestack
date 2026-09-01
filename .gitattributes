@@ -12,6 +12,8 @@
 * text=auto eol=lf
 
 # Binary assets — never touch these.
+# Mirrors `BINARY_EXTENSIONS` in packages/core/src/utils/templates.ts. Keep the two in step:
+# an extension the copy path treats as bytes but git treats as text is the drift that matters.
 *.png binary
 *.jpg binary
 *.jpeg binary
@@ -23,3 +25,5 @@
 *.otf binary
 *.pdf binary
 *.tgz binary
+*.webp binary
+*.zip binary

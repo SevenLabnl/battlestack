@@ -37,6 +37,37 @@ export class NuxtConfig {
         return this
     }
 
+    /**
+     * Append a `<link>` to `app.head.link`. Idempotent on rel+href.
+     *
+     * The `[...links]` spread is load-bearing: array methods called straight on a
+     * magicast proxy scan the AST node, not the elements, and `.some()` there returns
+     * false for entries that are plainly present. `pushUnique` in `ts-file.ts` spreads
+     * for the same reason.
+     */
+    addHeadLink(link: Record<string, string>): this {
+        this.config.app ||= {}
+        this.config.app.head ||= {}
+        this.config.app.head.link ||= []
+        const links = this.config.app.head.link
+        const already = [...links].some(
+            (l: Record<string, string>) => l.rel === link.rel && l.href === link.href,
+        )
+        if (!already) links.push(link)
+        return this
+    }
+
+    /** Append a `<meta>` to `app.head.meta`. Idempotent on name. See `addHeadLink` re: the spread. */
+    addHeadMeta(meta: Record<string, string>): this {
+        this.config.app ||= {}
+        this.config.app.head ||= {}
+        this.config.app.head.meta ||= []
+        const metas = this.config.app.head.meta
+        const already = [...metas].some((m: Record<string, string>) => m.name === meta.name)
+        if (!already) metas.push(meta)
+        return this
+    }
+
     addViteOptimizeIncludes(entries: string[]): this {
         this.config.vite ||= {}
         this.config.vite.optimizeDeps ||= {}
