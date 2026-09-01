@@ -1,0 +1,83 @@
+name: Feature request
+description: Propose a new feature, template, or CLI capability.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        battlestack is a plugin system, and a plugin can register features,
+        templates, commands and deploy targets through the same public API the
+        built-in preset uses. If your idea is specific to how your team works,
+        a plugin may get you there today without waiting on us. See
+        [docs/plugins.md](https://github.com/SevenLabnl/battlestack/blob/main/docs/plugins.md).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What are you trying to do, and what stops you? Describe the situation
+        rather than the solution.
+      placeholder: |
+        Every project I start needs X wired up, and I end up doing it by hand
+        because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: What should exist that does not. Be concrete where you can.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of addition is this
+      options:
+        - A new feature in the catalog (`battlestack add <id>`)
+        - A new template
+        - A new CLI command or flag
+        - A change to an existing feature
+        - A change to the plugin API
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you have tried or considered
+      description: >
+        Existing features that come close, a plugin you attempted, or the manual
+        workaround you use now. This tells us what the gap really is.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Who is this for
+      description: >
+        Honest answers help. Something useful to one team is a strong case for a
+        plugin rather than for the public catalog.
+      options:
+        - Most people scaffolding a Nuxt app
+        - People using a specific service or provider
+        - Mainly my own team or organisation
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues
+          required: true
+        - label: I checked `battlestack features` in case it already exists
+          required: false

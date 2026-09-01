@@ -5,7 +5,7 @@ export function registerNuxtTemplates(battlestack: BattlestackPluginContext): vo
     battlestack.addTemplate({
         id: 'nuxt4-ai',
         label: 'Nuxt (AI app)',
-        description: 'Full stack + Mastra agents + HTTP streaming chat + Docker. RAG opt-in.',
+        description: 'Full stack + Mastra agents + WebSocket streaming chat + Docker. RAG opt-in.',
         framework: 'nuxt4',
         requiredFeatures: [
             'nuxt4:scaffold',

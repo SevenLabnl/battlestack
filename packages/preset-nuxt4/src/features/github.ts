@@ -1,17 +1,19 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { Feature, PackageManager, RunContext } from '@battlestack/core'
+import { rm } from 'node:fs/promises'
+import type { Feature, PackageManager, RunContext, UpdateReport } from '@battlestack/core'
+import { dropRecordedFile, exists, hashFile } from '@battlestack/core'
 import { templatesDir, writeRecorded } from '@battlestack/core/utils/templates.js'
 import { STAGE } from '@battlestack/core/constants/stages.js'
 import { applyVars, renderPmVars } from '../utils/pm-template.js'
 
 const FEATURE_ID = 'shared:github'
 
-/** GitHub Actions gate: lint, typecheck, coverage, audit, SonarQube. `<pm> audit` is advisory. */
+/** GitHub Actions gate: lint, typecheck, coverage, dependency audit. `<pm> audit` is advisory. */
 export const githubFeature: Feature = {
     id: 'shared:github',
-    // 2.2.0: renders per package manager instead of copied pnpm-hardcoded.
-    version: '2.2.0',
+    // 3.0.0: SonarQube left this feature; `lint-test-sonarqube.yml` is now `lint-test.yml`.
+    version: '3.0.0',
     label: 'GitHub Actions workflows',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,
@@ -23,9 +25,9 @@ export const githubFeature: Feature = {
             {
                 heading: 'GitHub Actions',
                 body: [
-                    '`.github/workflows/lint-test-sonarqube.yml` runs lint, typecheck, test coverage, a dependency audit, and a SonarQube scan on pushes/PRs (plus a weekly scheduled run). Runs on `ubuntu-latest` by default, so it needs no self-hosted runner.',
+                    '`.github/workflows/lint-test.yml` runs lint, typecheck, test coverage and a dependency audit on pushes/PRs (plus a weekly scheduled run). Runs on `ubuntu-latest` by default, so it needs no self-hosted runner.',
                     '',
-                    'Lint, typecheck, test and the dependency audit need no configuration: they pass on a fresh clone or a fork. Only the SonarQube scan talks to a service this repo can\'t provide, so it is skipped unless `vars.SONAR_HOST_URL` is set. Set the variable and the step turns itself on (nothing to uncomment).',
+                    'Every step needs no configuration: they pass on a fresh clone or a fork. Nothing in this workflow talks to a service the repo cannot provide.',
                     '',
                     'Dependency scanning comes in two layers. `' + audit + '` runs on every push as an **advisory** step: it never fails the build, and its counts are written to the job summary so a non-blocking result is still visible without expanding a log. On pull requests, `dependency-review-action` is the **blocking** gate: it diffs the PR against its base and refuses anything the PR newly introduces at high severity or above.',
                     '',
@@ -35,7 +37,7 @@ export const githubFeature: Feature = {
                     '',
                     'To run it on a self-hosted runner instead, set the repo/org variable `CI_RUNNER` to your runner\'s label; no template edit needed. If that runner\'s image is missing packages `ubuntu-latest` already has, set `CI_RUNNER_APT_PACKAGES` (space-separated) to have the workflow `apt-get install` them first; leave it unset to skip that step entirely.',
                     '',
-                    'Variables: `SONAR_HOST_URL`; secrets: `SONAR_TOKEN`, plus any Docker build secrets declared by enabled features (see the Docker section for the exact env var names). The SonarQube static config lives in `sonar-project.properties` (sources, coverage exclusions, lcov report path).',
+                    'Secrets: any Docker build secrets declared by enabled features (see the Docker section for the exact env var names). This workflow itself needs none.',
                     '',
                     'This feature ships no deploy workflow. A plugin that contributes a deploy target adds its own `.github/workflows/*.yml` pipeline for it and documents its own deploy secrets.',
                 ].join('\n'),
@@ -48,9 +50,15 @@ export const githubFeature: Feature = {
         await emit(ctx)
     },
 
-    async update(ctx) {
+    async update(ctx): Promise<UpdateReport> {
         const written = await emit(ctx)
-        return { written, skipped: [], notes: [] }
+        const { removed, kept } = await dropObsolete(ctx)
+        const notes: string[] = []
+        if (removed.length > 0) notes.push(`removed (SonarQube left this feature): ${removed.join(', ')}`)
+        for (const rel of kept) {
+            notes.push(`${rel}: edited since install, so left in place and no longer managed; delete it by hand if unused`)
+        }
+        return { written, skipped: [], notes }
     },
 }
 
@@ -61,22 +69,46 @@ async function emit(ctx: RunContext): Promise<string[]> {
 
     // Rendered per package manager, not copied.
     const pm = String(ctx.state.packageManager ?? 'pnpm') as PackageManager
-    const workflowRel = '.github/workflows/lint-test-sonarqube.yml'
+    const workflowRel = '.github/workflows/lint-test.yml'
     await writeRecorded(
         ctx,
         FEATURE_ID,
         workflowRel,
         applyVars(
-            await readFile(path.join(workflowsDir, 'lint-test-sonarqube.yml'), 'utf8'),
+            await readFile(path.join(workflowsDir, 'lint-test.yml'), 'utf8'),
             renderPmVars(pm),
         ),
     )
     written.push(workflowRel)
 
-    // Static SonarQube config. host, token and projectKey stay as -D flags.
-    const sonarSrc = path.join(templatesDir(import.meta.url, '..', '..', 'templates', 'sonar'), 'sonar-project.properties')
-    await writeRecorded(ctx, FEATURE_ID, 'sonar-project.properties', await readFile(sonarSrc, 'utf8'))
-    written.push('sonar-project.properties')
-
     return written
+}
+
+/** Paths this feature emitted before 3.0.0 and no longer owns. */
+const OBSOLETE_PATHS = ['.github/workflows/lint-test-sonarqube.yml', 'sonar-project.properties']
+
+/**
+ * Drops the pre-3.0.0 SonarQube files. An untouched file is deleted; an edited
+ * one is left on disk and merely unrecorded, so a project that customised it
+ * keeps it and owns it.
+ */
+async function dropObsolete(ctx: RunContext): Promise<{ removed: string[], kept: string[] }> {
+    const recorded = (ctx.state[`files:${FEATURE_ID}`] as Record<string, string> | undefined) ?? {}
+    const removed: string[] = []
+    const kept: string[] = []
+    for (const rel of OBSOLETE_PATHS) {
+        const abs = path.join(ctx.projectDir, rel)
+        if (!(await exists(abs))) {
+            dropRecordedFile(ctx, FEATURE_ID, rel)
+            continue
+        }
+        if (recorded[rel] && recorded[rel] === (await hashFile(abs))) {
+            await rm(abs, { force: true })
+            removed.push(rel)
+        } else {
+            kept.push(rel)
+        }
+        dropRecordedFile(ctx, FEATURE_ID, rel)
+    }
+    return { removed, kept }
 }

@@ -85,7 +85,7 @@ Leave `battlestack dev` running in one terminal and use another for `login`.
 | --- | --- | --- |
 | `nuxt4-minimal` | Nuxt 4 + UI v4 + Tailwind v4, i18n, Pinia, a `/api/health` route, production Dockerfile + CI. No database, no auth. | no |
 | `nuxt4-fullstack` | The above plus Postgres, Drizzle, custom auth, Mastra and Docker Compose. | yes |
-| `nuxt4-ai` | Full stack plus Mastra agents and HTTP streaming chat behind an OpenAI-compatible AI gateway (sluis.ai preset). RAG opt-in. | yes |
+| `nuxt4-ai` | Full stack plus Mastra agents and WebSocket streaming chat behind an OpenAI-compatible AI gateway (sluis.ai preset). RAG opt-in. | yes |
 
 Start with `nuxt4-minimal` if you only want a well-configured Nuxt app. Pick
 `nuxt4-fullstack` if you know you need users and a database. Nothing is a dead
@@ -104,7 +104,7 @@ the same catalog. What is in it today:
   breaker that fails over to Postgres; object storage (RustFS locally, S3 in
   production).
 - **AI features.** Mastra agents behind an OpenAI-compatible AI gateway
-  (sluis.ai preset — see below), an HTTP-streaming chat UI, opt-in RAG on
+  (sluis.ai preset — see below), a WebSocket-streaming chat UI, opt-in RAG on
   pgvector (ingest, chunk, embed, query), and admin-editable agent prompts.
 - **App surface.** Landing shell, authenticated dashboard, admin-gated user
   management, an append-only security audit log, PWA, i18n (EN + NL), Nuxt UI
@@ -193,7 +193,7 @@ battlestack sync    # pull + bump + doctor in one go
 ```
 
 `pull` refuses to clobber files you have edited; `--force` overwrites them and
-saves each one as `<file>.battlestack.bak` first, and `battlestack own <path>`
+saves each one as `.battlestack/pull/<path>.bak` first, and `battlestack own <path>`
 tells `pull` to leave a file alone permanently.
 
 **Cloned an existing battlestack project?** `battlestack install` is the
@@ -293,14 +293,36 @@ files, dependencies, env vars, docs sections and its own CLI subcommands.
 Anyone can ship more of them: a plugin is an npm package built with
 `defineBattlestackPlugin()` that registers features, templates, commands or
 deploy targets — including private, unpublished plugins that extend a public
-install without the public code referencing them. `ARCHITECTURE.md` has the
+install without the public code referencing them. [`docs/architecture.md`](docs/architecture.md) has the
 full picture.
 
 ## More
 
-`ARCHITECTURE.md` covers how the plugin system and package split fit together.
+**[Full documentation is in `docs/`](docs/README.md).** Start with
+[Requirements](docs/requirements.md) for what to install, then
+[Getting started](docs/getting-started.md).
+
+| | |
+| --- | --- |
+| [Requirements](docs/requirements.md) | What software you need, per OS |
+| [Installation](docs/installation.md) | Running it, installing it, updating it |
+| [Getting started](docs/getting-started.md) | First project, start to logged in |
+| [Templates](docs/templates.md) | The three starting points |
+| [Features](docs/features.md) | The full catalog |
+| [Command reference](docs/commands.md) | Every command and flag |
+| [Configuration](docs/configuration.md) | `.env`, ports, environment variables |
+| [Local development](docs/local-development.md) | Gateway, HTTPS, mail, database tooling |
+| [Plugins](docs/plugins.md) | Extending battlestack |
+| [Keeping a project current](docs/keeping-projects-current.md) | `pull`, drift, ownership |
+| [Deployment](docs/deployment.md) | Image, compose, health checks |
+| [Troubleshooting](docs/troubleshooting.md) | Symptoms and fixes |
+
+[`docs/architecture.md`](docs/architecture.md) covers how the plugin system and package split fit
+together.
 
 `CONTRIBUTING.md` covers local dev setup and what CI checks.
+
+`SECURITY.md` covers how to report a vulnerability, and what is in scope.
 
 ## Who built this
 

@@ -1,0 +1,61 @@
+title: "[Q&A]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For "how do I" questions. If something is broken or behaves differently
+        than documented, open a [bug report](https://github.com/SevenLabnl/battlestack/issues/new?template=bug_report.yml)
+        instead.
+
+        Two commands answer a surprising share of questions on their own:
+
+        ```bash
+        battlestack doctor      # drift, stale features, missing config, environment
+        battlestack describe    # what is running, on which ports
+        ```
+
+        [docs/troubleshooting.md](https://github.com/SevenLabnl/battlestack/blob/main/docs/troubleshooting.md)
+        covers the common ones by symptom.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: What are you trying to do
+      description: >
+        The goal, not just the error. Knowing where you are headed usually
+        changes the answer.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you have tried
+      description: Commands you ran, docs you read, what happened.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: template
+    attributes:
+      label: Template
+      options:
+        - nuxt4-minimal
+        - nuxt4-fullstack
+        - nuxt4-ai
+        - Not template-specific
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: >
+        Output of `battlestack --version` and `node -v`, plus your OS. Skip if
+        the question is not environment-specific.
+      render: shell
+    validations:
+      required: false

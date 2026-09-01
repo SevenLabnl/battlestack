@@ -61,7 +61,7 @@ exactly what a scaffolded project gets.
 
 The five publishable packages share one lockstep version, checked in CI by
 `pnpm version:check`. A feature's `version` is unrelated to it and is not a
-release number. See [RELEASING.md](RELEASING.md) for how a release is cut:
+release number. See [docs/releasing.md](docs/releasing.md) for how a release is cut:
 merging to `main` publishes nothing, a release is a manual dispatch plus an
 environment approval.
 

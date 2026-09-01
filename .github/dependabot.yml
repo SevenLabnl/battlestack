@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # This repo's own dev tooling. Not the scaffold payload under
+  # packages/preset-nuxt4/templates/, which is copied verbatim into generated
+  # projects and is versioned by the features that emit it.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-tooling:
+        patterns:
+          - "typescript"
+          - "tsx"
+          - "vitest"
+          - "@types/*"
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"

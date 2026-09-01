@@ -70,7 +70,7 @@ jobs:
       # token is ever set, so the publish would die on env replacement. OIDC
       # needs no .npmrc auth at all.
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: pnpm
@@ -192,7 +192,7 @@ jobs:
               # The wrapper publishes last, so it being on npm means the whole
               # release landed — and the missing tag means only the bookkeeping
               # failed. Re-preparing here would orphan v$VERSION forever.
-              echo "::error::battlestack@$VERSION is fully published but v$VERSION was never tagged: the publish succeeded and only the tag/promote failed. Do NOT run Prepare release — recover per RELEASING.md: push the v$VERSION tag from the release commit, then fast-forward production."
+              echo "::error::battlestack@$VERSION is fully published but v$VERSION was never tagged: the publish succeeded and only the tag/promote failed. Do NOT run Prepare release — recover per docs/releasing.md: push the v$VERSION tag from the release commit, then fast-forward production."
               exit 1
             else
               echo "::error::battlestack@$VERSION is already on npm, v$VERSION is spent. Run Prepare release."
@@ -304,7 +304,7 @@ jobs:
         uses: pnpm/action-setup@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: pnpm
@@ -320,7 +320,7 @@ jobs:
 
       - name: Upload the publish summary
         if: always() && hashFiles('pnpm-publish-summary.json') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: publish-summary
           path: pnpm-publish-summary.json

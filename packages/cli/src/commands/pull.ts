@@ -27,7 +27,7 @@ export const pullReservedMeta: Omit<ReservedCommand, 'run'> = {
     label: 'pull template + config changes (drift-aware)',
     group: 'Sync with upstream',
     helpExtra: [
-        ['battlestack pull --force', 'overwrite drifted files (saves `<file>.battlestack.bak`)'],
+        ['battlestack pull --force', 'overwrite drifted files (saves `.battlestack/pull/<path>.bak`)'],
         ['battlestack pull --overwrite', 'overwrite EVERY shipped file, no artefacts (confirms first if any are `own`ed)'],
         ['battlestack pull --skills-only', 'refresh ONLY AI-agent skills (skip everything else)'],
         ['battlestack pull --no-skills', 'skip the AI-agent skill refresh'],
