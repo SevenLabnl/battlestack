@@ -22,10 +22,10 @@
         "race:migrate-lock": "node scripts/migrate-lock-race.mjs"
     },
     "devDependencies": {
-        "tsx": "^4.22.4",
-        "typescript": "^5.9.3",
-        "vitest": "^4.1.8",
-        "@types/node": "^22.19.21"
+        "tsx": "^4.23.12",
+        "typescript": "^7.0.2",
+        "vitest": "^4.1.11",
+        "@types/node": "^26.4.0"
     },
     "engines": {
         "node": ">=24"
