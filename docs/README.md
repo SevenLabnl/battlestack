@@ -44,6 +44,7 @@ New here? Read [Requirements](requirements.md), then
 | [Architecture](architecture.md) | Internals of the plugin system: the package split, how ids are resolved, feature stages and execution order. [Plugins](plugins.md) is the practical guide; this is the reference behind it. |
 | [Contributing](../CONTRIBUTING.md) | Local development of battlestack itself, and what CI verifies. |
 | [Releasing](releasing.md) | How a release is cut. |
+| [Repository settings](repository-settings.md) | The GitHub rulesets that gate `main`, what CI is required to pass, and how to apply them. |
 | [Code of conduct](../CODE_OF_CONDUCT.md) | What we expect of each other. |
 | [Security policy](../SECURITY.md) | Reporting a vulnerability, and what is in scope. |
 

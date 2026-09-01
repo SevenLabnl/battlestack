@@ -98,6 +98,8 @@ pnpm pack:smoke                 # build, pack, install the tarballs, run the bin
 - Settings -> Branches: protect `main` and `production`. `production` needs to
   accept a push from `github-actions[bot]`, so either leave it unprotected
   against that actor or add the bot to the bypass list.
+  [Repository settings](repository-settings.md) covers what gates `main`, including
+  the required CI checks.
 
 **npm**
 
