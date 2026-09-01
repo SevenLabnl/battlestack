@@ -28,7 +28,7 @@ contact_links:
   # Switch it to that URL once "Private vulnerability reporting" is enabled in
   # Settings > Code security.
   - name: Security vulnerability
-    url: mailto:security@sevenlab.nl
+    url: mailto:security@sevenlab.ai
     about: >
       Report privately by email, never in a public issue. See SECURITY.md for
       what is in scope.

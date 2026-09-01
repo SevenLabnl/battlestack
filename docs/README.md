@@ -52,5 +52,5 @@ Open an issue on the [repository](https://github.com/SevenLabnl/battlestack/issu
 or reach SevenLab at [hello@sevenlab.ai](mailto:hello@sevenlab.ai).
 
 Found a security problem? Email
-[security@sevenlab.nl](mailto:security@sevenlab.nl) rather than opening an issue.
+[security@sevenlab.ai](mailto:security@sevenlab.ai) rather than opening an issue.
 [SECURITY.md](../SECURITY.md) covers what is in scope.

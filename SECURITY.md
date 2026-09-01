@@ -4,7 +4,7 @@
 
 **Do not open a public issue.**
 
-Email [security@sevenlab.nl](mailto:security@sevenlab.nl). That address reaches
+Email [security@sevenlab.ai](mailto:security@sevenlab.ai). That address reaches
 the maintainers directly and is the right channel for anything security-related,
 including questions about whether something counts.
 
