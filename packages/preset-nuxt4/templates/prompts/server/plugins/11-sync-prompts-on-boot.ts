@@ -34,7 +34,7 @@ export default defineNitroPlugin(async () => {
                         description: p.description,
                         content: p.defaultContent,
                         defaultContent: p.defaultContent,
-                    })
+                    }).onConflictDoNothing()
                     console.log(`[sync-prompts-on-boot] prompt registered: ${p.key}`)
                     continue
                 }

@@ -29,7 +29,7 @@ const SEEDER = path.join(dbTemplate, 'tools/seed.mjs')
 async function readRegistry(): Promise<Map<string, string>> {
     const src = await readFile(REGISTRY, 'utf8')
     const entries = new Map<string, string>()
-    for (const m of src.matchAll(/^\s{4}([A-Z_]+):\s*([0-9_]+),/gm)) {
+    for (const m of src.matchAll(/^\s{4}([A-Z_]+):\s*([0-9_]+),?$/gm)) {
         entries.set(m[1]!, m[2]!.replaceAll('_', ''))
     }
     if (entries.size === 0) {
@@ -131,7 +131,7 @@ describe('cache-bus namespaces', () => {
         const claims = new Map<string, string[]>()
         for (const file of await walk(templates)) {
             const src = await readFile(file, 'utf8')
-            for (const m of src.matchAll(/createTtlCache<[^>]*>\(\s*([A-Z_]+|'[^']+')/g)) {
+            for (const m of src.matchAll(/createTtlCache(?:<[^>]*>)?\(\s*([A-Z_]+|'[^']+')/g)) {
                 let token = m[1]!
                 if (!token.startsWith("'")) {
                     const decl = new RegExp(`const ${token}\\s*=\\s*'([^']+)'`).exec(src)
