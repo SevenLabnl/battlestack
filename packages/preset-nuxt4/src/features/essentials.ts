@@ -56,19 +56,29 @@ export const essentialsFeature: Feature = {
                 body: [
                     'The scaffold ships SevenLab branding at `public/favicon.ico`, `public/favicon.svg` and `public/apple-touch-icon.png`, wired into `nuxt.config.ts#app.head.link`. They replace the Nuxt-logo favicon that `nuxi init` leaves behind.',
                     '',
-                    'These three paths are **user-owned**: `battlestack pull` never touches them. Replace them with the client\'s own branding and the update path will leave your version alone. Keep the filenames — the `<link>` tags in `nuxt.config.ts` point at them.',
+                    'These three paths are **user-owned**: once they exist, `battlestack pull` never touches them. Replace them with the client\'s own branding and the update path will leave your version alone. Keep the filenames — the `<link>` tags in `nuxt.config.ts` point at them. A project scaffolded before the icon pack shipped gets them written once, on the pull that introduces them, and they are user-owned from then on.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },
         ]
     },
 
-    // Branding: every project replaces these with the client's own icons.
-    structuralFiles() {
+    /**
+     * Branding: every project replaces these with the client's own icons.
+     *
+     * Only paths this feature has actually recorded are claimed. Claiming all of `ICON_FILES`
+     * unconditionally would also claim them on a project scaffolded before they shipped, where
+     * `classifyForUpdate` reaches `owned` before it ever tests `!exists(dest)`, so `pull` would
+     * skip writing an icon that is not there while `wireIcons` still adds the `<link>`.
+     */
+    structuralFiles(ctx) {
         // Manifest keys come from `path.join` in `walkTemplateFiles`, so they carry the
         // platform separator. Returning the posix literals verbatim would miss on
         // Windows and let `pull` overwrite a project's branding.
-        return ICON_FILES.map((rel) => rel.split('/').join(path.sep))
+        const recorded = (ctx.state[`files:${this.id}`] as Record<string, string> | undefined) ?? {}
+        return ICON_FILES
+            .map((rel) => rel.split('/').join(path.sep))
+            .filter((rel) => rel in recorded)
     },
 
     async execute(ctx) {

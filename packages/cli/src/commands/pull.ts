@@ -8,6 +8,7 @@ import {
     ErrorCode,
     findProjectRoot,
     readManifest,
+    recordOwned,
     writeManifest,
     type BattlestackRegistries,
     type EnvDiff,
@@ -150,6 +151,15 @@ async function pullOneFeature(
         const report = ctx.dryRun
             ? { written: [], skipped: [], notes: ['dry-run'] }
             : await feature.update(ctx, seedOwnedFromStructural(ctx, feature, record))
+        // Mirrors the scaffold orchestrator, which records ownership after `execute`. Without it a
+        // structural file that first arrives through an upgrade is tracked but never owned, so the
+        // client's own replacement of it is reported as drift needing a manual merge on every later
+        // bump, while the same file on a freshly scaffolded project is left alone silently.
+        if (!ctx.dryRun && feature.structuralFiles) {
+            for (const rel of feature.structuralFiles(ctx)) {
+                recordOwned(ctx, feature.id, rel)
+            }
+        }
         loader.succeed(`${feature.label} ${arrow}`)
         printReport(feature.id, report)
     } catch (error) {

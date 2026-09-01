@@ -120,9 +120,19 @@ describe('essentialsFeature: default favicon and app icons', () => {
 })
 
 describe('essentialsFeature: icon ownership', () => {
-    it('claims exactly the three icons', () => {
-        const owned = essentialsFeature.structuralFiles?.(ctx()) ?? []
-        expect(owned).toEqual([
+    it('claims nothing before the feature has recorded anything', () => {
+        // The bug this guards: claiming a path the feature has not written makes
+        // `classifyForUpdate` return `owned` before it ever tests `!exists(dest)`, so `pull`
+        // silently skips writing an icon that is not there while `wireIcons` still adds the
+        // `<link>`. A project scaffolded before the icons shipped is exactly that case.
+        expect(essentialsFeature.structuralFiles?.(ctx()) ?? []).toEqual([])
+    })
+
+    it('claims exactly the three icons once they are recorded', async () => {
+        const c = ctx()
+        await essentialsFeature.execute(c)
+
+        expect(essentialsFeature.structuralFiles?.(c) ?? []).toEqual([
             path.join('public', 'favicon.ico'),
             path.join('public', 'favicon.svg'),
             path.join('public', 'apple-touch-icon.png'),
@@ -142,15 +152,18 @@ describe('essentialsFeature: icon ownership', () => {
         }
     })
 
-    it('does NOT claim robots.txt: that one stays tracked and updatable', () => {
-        const owned = essentialsFeature.structuralFiles?.(ctx()) ?? []
-        expect(owned).not.toContain(path.join('public', 'robots.txt'))
+    it('does NOT claim robots.txt: that one stays tracked and updatable', async () => {
+        const c = ctx()
+        await essentialsFeature.execute(c)
+        expect(essentialsFeature.structuralFiles?.(c) ?? [])
+            .not.toContain(path.join('public', 'robots.txt'))
     })
 
     it('leaves a project-replaced icon alone on update', async () => {
-        await essentialsFeature.execute(ctx())
+        const c = ctx()
+        await essentialsFeature.execute(c)
 
-        const owned = essentialsFeature.structuralFiles?.(ctx()) ?? []
+        const owned = essentialsFeature.structuralFiles?.(c) ?? []
         const rel = owned.find((f) => f.endsWith('favicon.svg'))!
         const clientBranding = '<svg xmlns="http://www.w3.org/2000/svg"><!-- client logo --></svg>\n'
         await writeFile(path.join(projectDir, rel), clientBranding, 'utf8')
@@ -161,9 +174,37 @@ describe('essentialsFeature: icon ownership', () => {
             files: {},
             ownedByUser: [...owned],
         }
-        const report = await essentialsFeature.update!(ctx(), prev)
+        const report = await essentialsFeature.update!(c, prev)
 
         expect(await readFile(path.join(projectDir, rel), 'utf8')).toBe(clientBranding)
         expect(report.written).not.toContain(rel)
+    })
+
+    it('writes the icons on a pull into a project scaffolded before they shipped', async () => {
+        // The pre-1.1.0 shape: the feature ran, so `nuxt.config.ts` and `package.json` exist,
+        // but no icon was ever emitted or recorded. `pull` must write all three rather than
+        // treat them as branding the user chose.
+        const c = ctx()
+        const prev: InstalledFeatureRecord = {
+            id: 'nuxt4:essentials',
+            version: '1.0.4',
+            files: {},
+            // Seeded exactly as `seedOwnedFromStructural` in `commands/pull.ts` does it. Passing
+            // an empty list here instead would bypass the bug entirely and pass either way.
+            ownedByUser: essentialsFeature.structuralFiles?.(c) ?? [],
+        }
+        const report = await essentialsFeature.update!(c, prev)
+
+        for (const icon of ICONS) {
+            const dest = path.join(projectDir, 'public', icon)
+            const emitted = await readFile(dest)
+            const shipped = await readFile(path.join(TEMPLATE_PUBLIC, icon))
+            expect(sha256(emitted), `${icon} was not written`).toBe(sha256(shipped))
+            expect(report.written, `${icon} missing from the report`)
+                .toContain(path.join('public', icon))
+        }
+        // The `<link>` tags and the files must arrive together; the bug shipped the tags alone.
+        const cfg = await readNuxtConfig()
+        expect(cfg).toMatch(/href:\s*["']\/apple-touch-icon\.png["']/)
     })
 })

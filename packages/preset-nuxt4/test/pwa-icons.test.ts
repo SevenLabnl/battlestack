@@ -78,3 +78,97 @@ describe('pwaFeature: app icons', () => {
         expect(cfg).not.toContain('#3b82f6')
     })
 })
+
+/** Exactly what `nuxt4:pwa` 1.0.2 wrote, so the repair path is tested against the real shape. */
+const LEGACY_CONFIG = `export default defineNuxtConfig({
+    pwa: {
+        registerType: 'autoUpdate',
+        manifest: {
+            name: 'demo',
+            short_name: 'demo',
+            theme_color: '#3b82f6',
+            background_color: '#ffffff',
+            display: 'standalone',
+            icons: [
+                { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+                { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+                {
+                    src: '/icon-512.png',
+                    sizes: '512x512',
+                    type: 'image/png',
+                    purpose: 'maskable',
+                },
+            ],
+        },
+        workbox: {
+            navigateFallback: '/',
+            globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+        },
+        devOptions: { enabled: false },
+    },
+})
+`
+
+describe('pwaFeature: updating a manifest an earlier version wrote', () => {
+    const prev = { id: 'nuxt4:pwa', version: '1.0.2', files: {}, ownedByUser: [] }
+
+    beforeEach(async () => {
+        await writeFile(path.join(projectDir, 'nuxt.config.ts'), LEGACY_CONFIG, 'utf8')
+    })
+
+    it('repoints the maskable entry at the dedicated file', async () => {
+        // The bug this guards: a whole-object `cfg.pwa ??=` skips every corrected value when the
+        // key already exists, so the new maskable PNGs get written and nothing references them.
+        await pwaFeature.update!(ctx(), prev)
+        const cfg = await readFile(path.join(projectDir, 'nuxt.config.ts'), 'utf8')
+
+        expect(cfg).toMatch(/src:\s*["']\/icon-maskable-512\.png["']/)
+        expect(cfg).toMatch(/src:\s*["']\/icon-maskable-192\.png["']/)
+        // No maskable entry may still point at a plain icon.
+        const maskableBlocks = cfg.split('purpose').slice(0, -1)
+        for (const block of maskableBlocks) {
+            const lastSrc = block.lastIndexOf('src:')
+            expect(block.slice(lastSrc)).toMatch(/icon-maskable-/)
+        }
+    })
+
+    it('updates colours that still hold the pre-icon-pack defaults', async () => {
+        await pwaFeature.update!(ctx(), prev)
+        const cfg = await readFile(path.join(projectDir, 'nuxt.config.ts'), 'utf8')
+
+        expect(cfg).toMatch(/theme_color:\s*["']#0D1520["']/)
+        expect(cfg).toMatch(/background_color:\s*["']#0A121E["']/)
+        expect(cfg).not.toContain('#3b82f6')
+    })
+
+    it('leaves colours a project chose for itself alone', async () => {
+        await writeFile(
+            path.join(projectDir, 'nuxt.config.ts'),
+            LEGACY_CONFIG.replace("'#3b82f6'", "'#ff0000'").replace("'#ffffff'", "'#00ff00'"),
+            'utf8',
+        )
+        await pwaFeature.update!(ctx(), prev)
+        const cfg = await readFile(path.join(projectDir, 'nuxt.config.ts'), 'utf8')
+
+        expect(cfg).toContain('#ff0000')
+        expect(cfg).toContain('#00ff00')
+    })
+
+    it('tells the user what it changed', async () => {
+        const report = await pwaFeature.update!(ctx(), prev)
+        // Silence was the original failure: files written, manifest stale, notes empty.
+        expect(report.notes.join('\n')).toMatch(/maskable/)
+    })
+
+    it('is idempotent across repeated pulls', async () => {
+        await pwaFeature.update!(ctx(), prev)
+        const once = await readFile(path.join(projectDir, 'nuxt.config.ts'), 'utf8')
+        const report = await pwaFeature.update!(ctx(), prev)
+        const twice = await readFile(path.join(projectDir, 'nuxt.config.ts'), 'utf8')
+
+        expect(twice).toBe(once)
+        expect(report.notes).toEqual([])
+        expect(twice.match(/icon-maskable-192/g)).toHaveLength(1)
+    })
+})
+
