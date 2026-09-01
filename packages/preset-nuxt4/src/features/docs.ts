@@ -18,7 +18,8 @@ export const docsFeature: Feature = {
     // 1.0.11: extensions docs from `nuxt4:database` 1.6.0 and `nuxt4:rag`.
     // 1.0.14: favicon/app-icon docs from `nuxt4:essentials` 1.1.0 and `nuxt4:pwa` 1.1.0.
     // 1.0.15: clarified when `pull` first writes the user-owned icon paths.
-    version: '1.0.15',
+    // 1.0.16: request-affinity and cache-invalidation sections from `nuxt4:database` 1.7.0.
+    version: '1.0.16',
     label: 'Generate AGENTS.md + CLAUDE.md + README.md',
     frameworks: ['nuxt4'],
     stage: STAGE.DOCS,
