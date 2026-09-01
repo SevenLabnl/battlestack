@@ -17,7 +17,7 @@ export interface ParsedArgs {
     cwd?: string
     /** Bypass safety checks. On `battlestack pull`, overwrites drifted files, saving a `.bak`. */
     force: boolean
-    /** Overwrite every emitted file with no `.battlestack.bak`/`.battlestack.new`/`.battlestack.patch`. Implies `force`. */
+    /** Overwrite every emitted file, staging no `.bak`/`.new`/`.patch` merge artifacts. Implies `force`. */
     overwrite: boolean
     /** Accept defaults for any unanswered prompt (non-interactive). */
     yes: boolean

@@ -51,7 +51,7 @@ jobs:
           RELEASE_PR_TOKEN: ${{ secrets.RELEASE_PR_TOKEN }}
         run: |
           if [ -z "${RELEASE_PR_TOKEN:-}" ]; then
-            echo "::error::RELEASE_PR_TOKEN is not set. GitHub runs no workflows on a GITHUB_TOKEN-authored push or PR, so the release PR would get no CI and a protected main could not merge it. See the one-time setup in RELEASING.md."
+            echo "::error::RELEASE_PR_TOKEN is not set. GitHub runs no workflows on a GITHUB_TOKEN-authored push or PR, so the release PR would get no CI and a protected main could not merge it. See the one-time setup in docs/releasing.md."
             exit 1
           fi
 

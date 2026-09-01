@@ -1,0 +1,37 @@
+# GitHub Discussions is currently DISABLED for this repo, so no contact link
+# points at it: a link to /discussions on a repo without Discussions is a 404.
+#
+# To turn it on: enable Discussions in Settings > General > Features, create the
+# categories "Q&A", "Ideas" and "Show and tell" (the category forms in
+# .github/DISCUSSION_TEMPLATE/ are keyed to those slugs and stay inert until the
+# matching category exists), then uncomment the block below.
+#
+#  - name: Question about using battlestack
+#    url: https://github.com/SevenLabnl/battlestack/discussions/new?category=q-a
+#    about: >
+#      For how-do-I questions. Check docs/troubleshooting.md first, and run
+#      `battlestack doctor`, which answers a fair share on its own.
+
+blank_issues_enabled: true
+contact_links:
+  - name: Troubleshooting guide
+    url: https://github.com/SevenLabnl/battlestack/blob/main/docs/troubleshooting.md
+    about: >
+      Common problems by symptom. `battlestack doctor` and `battlestack describe`
+      answer a fair share on their own. If it is not covered there, open an issue.
+  - name: Documentation
+    url: https://github.com/SevenLabnl/battlestack/blob/main/docs/README.md
+    about: >
+      Requirements, installation, commands, configuration, deployment.
+  # GitHub private vulnerability reporting is disabled for this repo, so this is a
+  # mailto rather than https://github.com/SevenLabnl/battlestack/security/advisories/new.
+  # Switch it to that URL once "Private vulnerability reporting" is enabled in
+  # Settings > Code security.
+  - name: Security vulnerability
+    url: mailto:security@sevenlab.ai
+    about: >
+      Report privately by email, never in a public issue. See SECURITY.md for
+      what is in scope.
+  - name: Working with SevenLab
+    url: mailto:hello@sevenlab.ai
+    about: Commercial questions, or building something with us.
