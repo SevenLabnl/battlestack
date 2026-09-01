@@ -11,6 +11,9 @@ if (!url) {
 const client = postgres(url, { max: 10 })
 export const db = drizzle(client)
 
+/** Raw postgres-js client, for LISTEN/NOTIFY and other statements drizzle doesn't model. */
+export { client as sql }
+
 export async function closeDb(): Promise<void> {
     await client.end({ timeout: 5 })
 }
