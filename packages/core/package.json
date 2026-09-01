@@ -1,6 +1,6 @@
 {
     "name": "@battlestack/core",
-    "version": "0.9.0",
+    "version": "1.0.0",
     "description": "Battlestack plugin SDK: types, registries, plugin loader.",
     "license": "MIT",
     "author": "SevenLab",

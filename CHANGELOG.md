@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.0.0 (2026-09-01)
+
+- revert(icons): restore the original apple-touch-icon bytes (3a31a3f)
+- fix(icons): make the icon pack actually reach existing projects (12ab48c)
+- ci: make CI a required merge gate for main (20457d9)
+- chore(deps): bump the dev-tooling group across 1 directory with 4 updates (5ebe19d)
+- fix: drop baseUrl so the workspace type-check survives TypeScript 7 (31d2007)
+- chore(deps): bump ora from 8.2.0 to 9.4.1 (10d8aa8)
+- fix(icons): match the platform separator in structuralFiles() (1ec0a46)
+- chore(deps): bump magicast from 0.5.3 to 0.5.4 (a129a28)
+- ci: bump actions/setup-node from 6 to 7 (7842b38)
+- ci: bump actions/upload-artifact from 4 to 7 (70e8d34)
+- feat(icons): ship the battlestack icon pack as the scaffold default (27a5930)
+- fix(core): keep binary template assets intact on the pull path (cff4b38)
+- chore: take SonarQube out of the public preset (5e1f288)
+- docs: add a product requirements document (7460482)
+- docs: use security@sevenlab.ai so every contact address shares one domain (0a617d1)
+- docs: add a user-facing documentation set and GitHub community files (76b09f7)
+
+[Full changelog](https://github.com/SevenLabnl/battlestack/compare/v0.9.0...v1.0.0)
+
 ## v0.9.0 (2026-08-31)
 
 - fix(health): readiness gates only on applicable config, in both variants (22e6916)
