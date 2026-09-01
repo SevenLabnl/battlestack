@@ -25,6 +25,9 @@ function readFallback(key: string): string {
 export async function getActiveModelId(key: string): Promise<string> {
     const cached = cache.get(key)
     if (cached !== undefined) return cached
+    // Captured before the query so an invalidation arriving mid-flight wins over the row this
+    // read is about to return, which was fetched before that write committed.
+    const generation = cache.generation()
     try {
         const [row] = await db
             .select({ model: aiModelConfigs.model })
@@ -33,7 +36,7 @@ export async function getActiveModelId(key: string): Promise<string> {
             .limit(1)
         const raw = row?.model?.trim() || readFallback(key)
         const value = toRouterId(raw)
-        cache.set(key, value)
+        cache.set(key, value, generation)
         return value
     } catch {
         return toRouterId(readFallback(key))
@@ -51,6 +54,7 @@ const EMBEDDING_CACHE_KEY = 'embedding:raw'
 export async function getActiveEmbeddingModelId(fallback?: string): Promise<string> {
     const cached = cache.get(EMBEDDING_CACHE_KEY)
     if (cached !== undefined) return cached
+    const generation = cache.generation()
     try {
         const [row] = await db
             .select({ model: aiModelConfigs.model })
@@ -58,7 +62,7 @@ export async function getActiveEmbeddingModelId(fallback?: string): Promise<stri
             .where(eq(aiModelConfigs.key, 'embedding'))
             .limit(1)
         const value = row?.model?.trim() || fallback?.trim() || readFallback('embedding')
-        cache.set(EMBEDDING_CACHE_KEY, value)
+        cache.set(EMBEDDING_CACHE_KEY, value, generation)
         return value
     } catch {
         return fallback?.trim() || readFallback('embedding')

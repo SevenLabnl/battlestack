@@ -44,7 +44,7 @@ async function ensureModelConfigs(tx: Tx): Promise<void> {
             .where(eq(aiModelConfigs.key, cfg.key))
             .limit(1)
         if (existing) continue
-        await tx.insert(aiModelConfigs).values(cfg)
+        await tx.insert(aiModelConfigs).values(cfg).onConflictDoNothing()
         console.log(`[sync-ai-on-boot] ai_model_config registered: ${cfg.key}`)
     }
 }
@@ -65,7 +65,7 @@ async function registerAgents(tx: Tx): Promise<void> {
             modelConfigKey: def.modelConfigKey,
             // null → agent registered without a prompt; link one later in admin
             promptKey: def.promptKey,
-        })
+        }).onConflictDoNothing()
         console.log(`[sync-ai-on-boot] agent registered: ${def.key}`)
     }
 }

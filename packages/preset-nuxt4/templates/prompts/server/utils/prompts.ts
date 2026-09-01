@@ -14,6 +14,9 @@ export async function getPromptByKey(key: string): Promise<string> {
     const cached = cache.get(key)
     if (cached !== undefined) return cached
 
+    // Captured before the query so an edit committing mid-flight is not overwritten by the
+    // pre-edit content this read is about to return.
+    const generation = cache.generation()
     const [row] = await db
         .select({ content: prompts.content })
         .from(prompts)
@@ -21,7 +24,7 @@ export async function getPromptByKey(key: string): Promise<string> {
         .limit(1)
 
     if (row) {
-        cache.set(key, row.content)
+        cache.set(key, row.content, generation)
         return row.content
     }
 

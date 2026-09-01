@@ -12,7 +12,13 @@ interface Entry<T> {
 
 export interface TtlCache<T> {
     get: (key: string) => T | undefined
-    set: (key: string, value: T) => void
+    /**
+     * Invalidation counter. Capture it before loading a value and pass it to `set`, so a drop
+     * that lands while the load is in flight is not overwritten by the value it invalidated.
+     */
+    generation: () => number
+    /** Writes unless `atGeneration` is given and an invalidation has happened since. */
+    set: (key: string, value: T, atGeneration?: number) => void
     /** Drops entries on this replica only. Cross-replica drops go through `invalidate`. */
     dropLocal: (key?: string) => void
 }
@@ -28,9 +34,14 @@ const registry = new Map<string, TtlCache<unknown>>()
  * replica through `invalidate`. `namespace` must be unique per cache in the project.
  *
  * The TTL is the floor: it bounds staleness even when a notification is never delivered.
+ *
+ * Keys must come from a bounded set (config keys, not user or tenant ids). Entries are evicted
+ * only when that same key is read again after expiry, so an unbounded keyspace grows for the
+ * lifetime of the process.
  */
 export function createTtlCache<T>(namespace: string, ttlMs: number): TtlCache<T> {
     const entries = new Map<string, Entry<T>>()
+    let generation = 0
 
     const cache: TtlCache<T> = {
         get(key) {
@@ -42,10 +53,13 @@ export function createTtlCache<T>(namespace: string, ttlMs: number): TtlCache<T>
             }
             return hit.value
         },
-        set(key, value) {
+        generation: () => generation,
+        set(key, value, atGeneration) {
+            if (atGeneration !== undefined && atGeneration !== generation) return
             entries.set(key, { value, expires: Date.now() + ttlMs })
         },
         dropLocal(key) {
+            generation++
             if (key === undefined) entries.clear()
             else entries.delete(key)
         },
@@ -77,15 +91,20 @@ export async function invalidate(namespace: string, key?: string): Promise<void>
 
 /** Applies one notification payload. Called by `server/plugins/02-cache-invalidation.ts`. */
 export function applyRemoteInvalidation(payload: string): void {
-    let parsed: { ns?: unknown, key?: unknown }
+    let parsed: unknown
     try {
         parsed = JSON.parse(payload)
     } catch {
         return
     }
-    if (typeof parsed.ns !== 'string') return
-    const key = typeof parsed.key === 'string' ? parsed.key : undefined
-    registry.get(parsed.ns)?.dropLocal(key)
+    // `JSON.parse('null')` returns null, which the catch above never sees. Reading `.ns` off it
+    // throws, and postgres-js swallows a throw from this callback, so the invalidation would be
+    // dropped with nothing logged.
+    if (typeof parsed !== 'object' || parsed === null) return
+    const { ns, key: rawKey } = parsed as { ns?: unknown, key?: unknown }
+    if (typeof ns !== 'string') return
+    const key = typeof rawKey === 'string' ? rawKey : undefined
+    registry.get(ns)?.dropLocal(key)
 }
 
 /**

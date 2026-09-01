@@ -26,6 +26,8 @@ const cache = createTtlCache<AgentLink>(CACHE_NAMESPACE, TTL_MS)
 async function readAgentLink(agentKey: string): Promise<AgentLink | null> {
     const cached = cache.get(agentKey)
     if (cached !== undefined) return cached
+    // Captured before the query; see `ai-model.ts`.
+    const generation = cache.generation()
     try {
         const [row] = await db
             .select({ modelConfigKey: agents.modelConfigKey, promptKey: agents.promptKey })
@@ -34,7 +36,7 @@ async function readAgentLink(agentKey: string): Promise<AgentLink | null> {
             .limit(1)
         if (!row) return null
         const value: AgentLink = { modelConfigKey: row.modelConfigKey, promptKey: row.promptKey }
-        cache.set(agentKey, value)
+        cache.set(agentKey, value, generation)
         return value
     } catch {
         return null
