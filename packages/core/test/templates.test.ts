@@ -369,7 +369,7 @@ function sha256Of(buf: Buffer | string): string {
 
 describe('updateFromTemplateDir: binary assets', () => {
     it('rewrites a pristine binary asset byte-for-byte, not as mangled utf8', async () => {
-        const rel = 'public/icon-192.png'
+        const rel = path.join('public', 'icon-192.png')
         await mkdir(path.join(templateDir, 'public'), { recursive: true })
         await mkdir(path.join(projectDir, 'public'), { recursive: true })
         await writeFile(path.join(projectDir, rel), PNG_BYTES)
@@ -393,7 +393,7 @@ describe('updateFromTemplateDir: binary assets', () => {
     })
 
     it('overwrites a binary asset byte-for-byte under --overwrite', async () => {
-        const rel = 'public/favicon.ico'
+        const rel = path.join('public', 'favicon.ico')
         await mkdir(path.join(templateDir, 'public'), { recursive: true })
         await mkdir(path.join(projectDir, 'public'), { recursive: true })
         // User-drifted AND owned: `--overwrite` ignores both, so this is the one path
@@ -417,7 +417,7 @@ describe('updateFromTemplateDir: binary assets', () => {
     })
 
     it('stages a drifted binary asset as .new only, with no textual .patch', async () => {
-        const rel = 'public/icon-512.png'
+        const rel = path.join('public', 'icon-512.png')
         await mkdir(path.join(templateDir, 'public'), { recursive: true })
         await mkdir(path.join(projectDir, 'public'), { recursive: true })
         const userEdit = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xaa, 0xbb])
@@ -445,7 +445,7 @@ describe('updateFromTemplateDir: binary assets', () => {
     })
 
     it('still writes a text file as text (the binary branch must not swallow everything)', async () => {
-        const rel = 'public/robots.txt'
+        const rel = path.join('public', 'robots.txt')
         await mkdir(path.join(templateDir, 'public'), { recursive: true })
         await mkdir(path.join(projectDir, 'public'), { recursive: true })
         const original = 'User-Agent: *\nDisallow: /\n'

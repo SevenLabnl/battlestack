@@ -120,24 +120,38 @@ describe('essentialsFeature: default favicon and app icons', () => {
 })
 
 describe('essentialsFeature: icon ownership', () => {
-    it('claims exactly the three icons as user-owned', () => {
+    it('claims exactly the three icons', () => {
         const owned = essentialsFeature.structuralFiles?.(ctx()) ?? []
         expect(owned).toEqual([
-            'public/favicon.ico',
-            'public/favicon.svg',
-            'public/apple-touch-icon.png',
+            path.join('public', 'favicon.ico'),
+            path.join('public', 'favicon.svg'),
+            path.join('public', 'apple-touch-icon.png'),
         ])
+    })
+
+    it('claims paths that match the manifest keys the feature actually records', async () => {
+        const c = ctx()
+        await essentialsFeature.execute(c)
+        const recorded = Object.keys(c.state['files:nuxt4:essentials'] as Record<string, string>)
+
+        // The ownership check is an exact string match against these keys, and they are
+        // built with `path.join`. A posix literal in `structuralFiles()` matches on Linux
+        // and silently misses on Windows, letting `pull` overwrite client branding.
+        for (const owned of essentialsFeature.structuralFiles?.(c) ?? []) {
+            expect(recorded, `${owned} is not a key this feature records`).toContain(owned)
+        }
     })
 
     it('does NOT claim robots.txt: that one stays tracked and updatable', () => {
         const owned = essentialsFeature.structuralFiles?.(ctx()) ?? []
-        expect(owned).not.toContain('public/robots.txt')
+        expect(owned).not.toContain(path.join('public', 'robots.txt'))
     })
 
     it('leaves a project-replaced icon alone on update', async () => {
         await essentialsFeature.execute(ctx())
 
-        const rel = 'public/favicon.svg'
+        const owned = essentialsFeature.structuralFiles?.(ctx()) ?? []
+        const rel = owned.find((f) => f.endsWith('favicon.svg'))!
         const clientBranding = '<svg xmlns="http://www.w3.org/2000/svg"><!-- client logo --></svg>\n'
         await writeFile(path.join(projectDir, rel), clientBranding, 'utf8')
 
@@ -145,7 +159,7 @@ describe('essentialsFeature: icon ownership', () => {
             id: 'nuxt4:essentials',
             version: '1.1.0',
             files: {},
-            ownedByUser: [...(essentialsFeature.structuralFiles?.(ctx()) ?? [])],
+            ownedByUser: [...owned],
         }
         const report = await essentialsFeature.update!(ctx(), prev)
 

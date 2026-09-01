@@ -6,6 +6,7 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
 /** Navy plate from the battlestack icon pack. Matches `pwa.manifest.theme_color`. */
 const BRAND_NAVY = '#0D1520'
 
+/** Posix-declared; `structuralFiles()` converts to the platform separator. */
 const ICON_FILES = [
     'public/favicon.ico',
     'public/favicon.svg',
@@ -64,7 +65,10 @@ export const essentialsFeature: Feature = {
 
     // Branding: every project replaces these with the client's own icons.
     structuralFiles() {
-        return [...ICON_FILES]
+        // Manifest keys come from `path.join` in `walkTemplateFiles`, so they carry the
+        // platform separator. Returning the posix literals verbatim would miss on
+        // Windows and let `pull` overwrite a project's branding.
+        return ICON_FILES.map((rel) => rel.split('/').join(path.sep))
     },
 
     async execute(ctx) {
