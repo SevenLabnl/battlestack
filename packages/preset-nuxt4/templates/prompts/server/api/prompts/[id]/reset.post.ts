@@ -4,6 +4,7 @@ import { prompts } from '#server/database/schema/prompts'
 import { Role } from '#server/database/schema/users'
 import { requireRole, requireRouterParam } from '#server/utils/auth'
 import { tryLogAudit } from '#server/utils/audit-bridge'
+import { invalidatePromptCache } from '#server/utils/prompts'
 
 export default defineEventHandler(async (event) => {
     await requireRole(event, Role.Admin)
@@ -35,6 +36,8 @@ export default defineEventHandler(async (event) => {
     if (!reset) {
         throw createError({ statusCode: 500, statusMessage: 'Reset failed' })
     }
+
+    await invalidatePromptCache(reset.key)
 
     await tryLogAudit(event, 'prompt.reset', null, {
         promptId: reset.id,

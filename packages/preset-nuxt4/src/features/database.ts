@@ -250,7 +250,7 @@ export const databaseFeature: Feature = {
     id: 'nuxt4:database',
     // 1.6.0: migrate.mjs and the boot migrator apply `server/database/extensions/*.sql` before
     // migrations, so CREATE EXTENSION / CREATE SCHEMA no longer need a manual step in prod.
-    version: '1.6.0',
+    version: '1.7.0',
     label: 'PostgreSQL + Drizzle ORM (Docker)',
     frameworks: ['nuxt4'],
     stage: STAGE.DATABASE,

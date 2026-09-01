@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto'
 import path from 'node:path'
 import postgres from 'postgres'
 
-/** Must match MIGRATE_ADVISORY_LOCK_KEY in server/plugins/00-db-migrate-on-boot.ts. */
+/** Must match ADVISORY_LOCK.MIGRATE in server/utils/advisory-locks.ts, the registry of every key. */
 const MIGRATE_ADVISORY_LOCK_KEY = 6_154_321_001_001_001
 
 const url = process.env.NUXT_DATABASE_URL

@@ -118,6 +118,23 @@ processes against real Postgres, asserts exactly one applies each migration,
 and also runs every scenario against a copy with the `pg_advisory_lock` call
 stripped out, failing if that copy passes.
 
+`scripts/replica-race.mjs` applies the same rule to the opposite property.
+Where a lock must stop something happening twice, the cache bus must make
+something happen everywhere, so its scenarios assert that all four replicas
+drop an entry and its controls strip one mechanism each: the `LISTEN`
+subscription for the first scenario, the reconnect callback for the second.
+The cache TTL is pinned far above the run length on purpose. Expiry and
+invalidation look identical from outside, so a short TTL would let every
+scenario pass without the bus doing anything.
+
+Both scripts need a real database and a scaffolded project, and neither runs
+in CI for that reason:
+
+```
+NUXT_DATABASE_URL=postgres://... pnpm race:migrate-lock --project <dir>
+NUXT_DATABASE_URL=postgres://... pnpm race:replicas --project <dir>
+```
+
 > If a control stops tripping, that is a red result **about the test**, never a
 > reason to relax the assertion. Widen the contention window until it trips
 > again.
