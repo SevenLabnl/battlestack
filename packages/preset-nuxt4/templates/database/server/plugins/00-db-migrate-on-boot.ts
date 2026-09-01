@@ -5,12 +5,13 @@ import path from 'node:path'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate as runMigrate } from 'drizzle-orm/postgres-js/migrator'
 import postgres from 'postgres'
+import { ADVISORY_LOCK } from '#server/utils/advisory-locks'
 
 /**
  * The single migration path, identical under `nuxt dev` and in the container, so no manual or initContainer step exists to forget.
  * The advisory lock is what makes multi-replica rollouts safe: the other replicas block, then no-op. Disable via `NUXT_DISABLE_DB_MIGRATE_ON_BOOT`.
  */
-const MIGRATE_ADVISORY_LOCK_KEY = 6_154_321_001_001_001
+const MIGRATE_ADVISORY_LOCK_KEY = ADVISORY_LOCK.MIGRATE
 
 export default defineNitroPlugin(async () => {
     const config = useRuntimeConfig()

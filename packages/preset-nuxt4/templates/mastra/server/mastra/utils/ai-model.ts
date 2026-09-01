@@ -5,14 +5,13 @@ import { db } from '../../database/client'
 import { aiModelConfigs } from '../../database/schema/ai'
 import { inferProviderFromName } from '../gateways/openai-compat'
 import { envModelDefault } from './env-defaults'
+import { createTtlCache, invalidate } from '../../utils/cache-bus'
 
-interface CacheEntry {
-    value: string
-    expires: number
-}
-
-const cache = new Map<string, CacheEntry>()
+const CACHE_NAMESPACE = 'ai-model'
+/** Ceiling on how long an admin edit can stay invisible if its NOTIFY is never delivered. */
 const TTL_MS = 30_000
+
+const cache = createTtlCache<string>(CACHE_NAMESPACE, TTL_MS)
 
 // `key === 'embedding'` falls back to the embedding env default; every other key (chat + custom configs) falls back to the chat model env.
 function readFallback(key: string): string {
@@ -25,7 +24,7 @@ function readFallback(key: string): string {
  */
 export async function getActiveModelId(key: string): Promise<string> {
     const cached = cache.get(key)
-    if (cached && cached.expires > Date.now()) return cached.value
+    if (cached !== undefined) return cached
     try {
         const [row] = await db
             .select({ model: aiModelConfigs.model })
@@ -34,7 +33,7 @@ export async function getActiveModelId(key: string): Promise<string> {
             .limit(1)
         const raw = row?.model?.trim() || readFallback(key)
         const value = toRouterId(raw)
-        cache.set(key, { value, expires: Date.now() + TTL_MS })
+        cache.set(key, value)
         return value
     } catch {
         return toRouterId(readFallback(key))
@@ -51,7 +50,7 @@ const EMBEDDING_CACHE_KEY = 'embedding:raw'
  */
 export async function getActiveEmbeddingModelId(fallback?: string): Promise<string> {
     const cached = cache.get(EMBEDDING_CACHE_KEY)
-    if (cached && cached.expires > Date.now()) return cached.value
+    if (cached !== undefined) return cached
     try {
         const [row] = await db
             .select({ model: aiModelConfigs.model })
@@ -59,7 +58,7 @@ export async function getActiveEmbeddingModelId(fallback?: string): Promise<stri
             .where(eq(aiModelConfigs.key, 'embedding'))
             .limit(1)
         const value = row?.model?.trim() || fallback?.trim() || readFallback('embedding')
-        cache.set(EMBEDDING_CACHE_KEY, { value, expires: Date.now() + TTL_MS })
+        cache.set(EMBEDDING_CACHE_KEY, value)
         return value
     } catch {
         return fallback?.trim() || readFallback('embedding')
@@ -80,14 +79,17 @@ function toRouterId(stored: string): string {
 }
 
 
-/** Drop cached entry so the next call re-reads the DB. Called from the admin PUT endpoint. */
-export function invalidateActiveModel(key?: string): void {
-    if (key) {
-        cache.delete(key)
-        // The `embedding` config is cached twice: prefixed (via getActiveModelId)
-        // and raw (via getActiveEmbeddingModelId). Clear both.
-        if (key === 'embedding') cache.delete(EMBEDDING_CACHE_KEY)
-    } else {
-        cache.clear()
+/**
+ * Drops a model config from the cache on every replica so the next call re-reads the DB.
+ * Call it after any write to `ai_model_configs`, and await it before responding.
+ */
+export async function invalidateActiveModel(key?: string): Promise<void> {
+    if (!key) {
+        await invalidate(CACHE_NAMESPACE)
+        return
     }
+    await invalidate(CACHE_NAMESPACE, key)
+    // The `embedding` config is cached twice: prefixed (via getActiveModelId)
+    // and raw (via getActiveEmbeddingModelId). Clear both.
+    if (key === 'embedding') await invalidate(CACHE_NAMESPACE, EMBEDDING_CACHE_KEY)
 }

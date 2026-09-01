@@ -6,7 +6,7 @@ import type { Feature } from '@battlestack/core'
 /** Admin-editable AI agent prompts. */
 export const promptsFeature: Feature = {
     id: 'nuxt4:prompts',
-    version: '1.1.2',
+    version: '1.2.0',
     label: 'AI prompt management',
     description: 'Admin-editable agent prompts with shipped registry defaults.',
     frameworks: ['nuxt4'],

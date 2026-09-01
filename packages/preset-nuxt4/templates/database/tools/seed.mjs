@@ -5,7 +5,7 @@
 import { hash } from '@node-rs/argon2'
 import postgres from 'postgres'
 
-/** Distinct from the migrator's key: a seed must never block a migration. */
+/** Must match ADVISORY_LOCK.SEED in server/utils/advisory-locks.ts, the registry of every key. */
 const SEED_ADVISORY_LOCK_KEY = 6_154_321_001_001_002
 
 if (

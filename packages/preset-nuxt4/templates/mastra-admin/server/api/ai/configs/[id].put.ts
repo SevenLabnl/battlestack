@@ -34,8 +34,7 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 404, statusMessage: 'Model config not found' })
     }
 
-    // Drop the in-process cache so subsequent agent calls pick up the new model.
-    invalidateActiveModel(updated.key as 'chat' | 'embedding')
+    await invalidateActiveModel(updated.key)
 
     await tryLogAudit(event, 'ai.model-config.updated', null, {
         configId: updated.id,
