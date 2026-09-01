@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -9,6 +9,7 @@ const execFileAsync = promisify(execFile)
 
 import { githubFeature } from '../src/features/github.js'
 import { mockRunContext } from './test-utils.js'
+import { hashFile } from '@battlestack/core'
 import type { PackageManager } from '@battlestack/core'
 
 let projectDir: string
@@ -39,11 +40,11 @@ async function exists(rel: string): Promise<boolean> {
 }
 
 describe('githubFeature', () => {
-    it('emits the quality-gate workflow + sonar config', async () => {
+    it('emits the quality-gate workflow', async () => {
         await githubFeature.execute(ctx())
 
         const workflow = await readFile(
-            path.join(projectDir, '.github/workflows/lint-test-sonarqube.yml'),
+            path.join(projectDir, '.github/workflows/lint-test.yml'),
             'utf8',
         )
         expect(workflow.length).toBeGreaterThan(0)
@@ -53,25 +54,34 @@ describe('githubFeature', () => {
         // IS the test. Do not "clean it up"; leak-guard.sh allowlists this file for it.
         expect(workflow).not.toMatch(/sevenlab/i)
         expect(workflow).toContain('if: vars.CI_RUNNER_APT_PACKAGES')
+    })
 
-        const sonar = await readFile(path.join(projectDir, 'sonar-project.properties'), 'utf8')
-        expect(sonar.length).toBeGreaterThan(0)
+    // SonarQube moved out of the public preset. Without these, the emit could quietly
+    // come back and every other assertion here would still pass.
+    it('emits nothing SonarQube-related', async () => {
+        await githubFeature.execute(ctx())
+
+        const workflow = await readFile(
+            path.join(projectDir, '.github/workflows/lint-test.yml'),
+            'utf8',
+        )
+        expect(workflow).not.toMatch(/sonar/i)
+        expect(await exists('sonar-project.properties')).toBe(false)
+        expect(await exists('.github/workflows/lint-test-sonarqube.yml')).toBe(false)
     })
 
     /**
-     * A fork gets no SonarQube server, so an ungated step reddens its first push. Only
-     * the service-dependent step is gated; it turns itself on when its variable is set.
+     * Every remaining step runs with no configuration, so a fork's first push is green
+     * and no step is gated on a variable only one organisation ever sets.
      */
-    it('skips the steps needing external services, so a fork\'s first push is green', async () => {
+    it('leaves every quality step ungated, so a fork\'s first push runs them all', async () => {
         await githubFeature.execute(ctx())
         const workflow = await readFile(
-            path.join(projectDir, '.github/workflows/lint-test-sonarqube.yml'),
+            path.join(projectDir, '.github/workflows/lint-test.yml'),
             'utf8',
         )
 
-        expect(workflow).toContain("if: vars.SONAR_HOST_URL != ''")
-
-        // The guard must sit on that step alone; a config-free fork still runs all four.
+        // The four run unconditionally; a config-free fork still runs all four.
         // Split on the step delimiter so a resized step cannot shift the assertion.
         const steps = workflow.split(/^ {6}- (?=name:|uses:)/m)
         for (const stepName of [
@@ -110,21 +120,75 @@ describe('githubFeature', () => {
         expect(body).not.toMatch(/kustomiz/i)
     })
 
-    it('update() reports the workflow + sonar config as written', async () => {
+    describe('dropping the pre-3.0.0 SonarQube files', () => {
+        const OLD_WORKFLOW = '.github/workflows/lint-test-sonarqube.yml'
+        const OLD_SONAR = 'sonar-project.properties'
+
+        /** A project as 2.x left it: both files on disk and recorded against their hashes. */
+        async function legacyProject(opts: { edited?: boolean } = {}) {
+            const shipped = 'name: Lint, Test & SonarQube\n'
+            await mkdir(path.join(projectDir, '.github/workflows'), { recursive: true })
+            await writeFile(path.join(projectDir, OLD_WORKFLOW), shipped)
+            await writeFile(path.join(projectDir, OLD_SONAR), 'sonar.projectKey=x\n')
+            // Hashes recorded against the SHIPPED bytes, then the edit lands on top, so
+            // an edited file genuinely differs from its record the way drift does.
+            const recorded = {
+                [OLD_WORKFLOW]: await hashFile(path.join(projectDir, OLD_WORKFLOW)),
+                [OLD_SONAR]: await hashFile(path.join(projectDir, OLD_SONAR)),
+            }
+            if (opts.edited) {
+                await writeFile(path.join(projectDir, OLD_WORKFLOW), `${shipped}# mine\n`)
+            }
+            return mockRunContext({
+                projectDir,
+                enabledFeatures: new Set(['shared:github']),
+                state: { 'packageManager': 'pnpm', 'files:shared:github': recorded },
+            })
+        }
+
+        it('deletes both when untouched, and unrecords them', async () => {
+            const c = await legacyProject()
+            const report = await githubFeature.update!(c, null)
+
+            expect(await exists(OLD_WORKFLOW)).toBe(false)
+            expect(await exists(OLD_SONAR)).toBe(false)
+            expect(report.notes.join(' ')).toContain('removed')
+            const recorded = c.state['files:shared:github'] as Record<string, string>
+            expect(Object.keys(recorded)).not.toContain(OLD_WORKFLOW)
+            expect(Object.keys(recorded)).not.toContain(OLD_SONAR)
+        })
+
+        // The disabled run: an edited file must survive. Without this the cleanup could
+        // delete unconditionally and the test above would still pass.
+        it('keeps an edited file, and says so', async () => {
+            const c = await legacyProject({ edited: true })
+            const report = await githubFeature.update!(c, null)
+
+            expect(await exists(OLD_WORKFLOW)).toBe(true)
+            expect(await readFile(path.join(projectDir, OLD_WORKFLOW), 'utf8')).toContain('# mine')
+            expect(report.notes.join(' ')).toContain(OLD_WORKFLOW)
+            expect(report.notes.join(' ')).toContain('no longer managed')
+            // The untouched one still goes.
+            expect(await exists(OLD_SONAR)).toBe(false)
+        })
+
+        it('is a no-op on a project that never had them', async () => {
+            const report = await githubFeature.update!(ctx(), null)
+            expect(report.notes).toEqual([])
+        })
+    })
+
+    it('update() reports the workflow as written', async () => {
         const report = await githubFeature.update!(ctx(), null)
-        expect(report.written).toEqual([
-            '.github/workflows/lint-test-sonarqube.yml',
-            'sonar-project.properties',
-        ])
-        expect(await exists('.github/workflows/lint-test-sonarqube.yml')).toBe(true)
-        expect(await exists('sonar-project.properties')).toBe(true)
+        expect(report.written).toEqual(['.github/workflows/lint-test.yml'])
+        expect(await exists('.github/workflows/lint-test.yml')).toBe(true)
     })
 
     it('collectDocs documents the quality gate under a single GitHub Actions heading', () => {
         const docs = githubFeature.collectDocs!(ctx())
         expect(docs).toHaveLength(1)
         expect(docs?.[0].heading).toBe('GitHub Actions')
-        expect(docs?.[0].body).toContain('lint-test-sonarqube.yml')
+        expect(docs?.[0].body).toContain('lint-test.yml')
         expect(docs?.[0].body).toContain('CI_RUNNER')
         expect(docs?.[0].body).toContain('CI_RUNNER_APT_PACKAGES')
         expect(docs?.[0].targets).toEqual(['readme', 'agents'])
@@ -138,7 +202,7 @@ describe('githubFeature', () => {
         it('emits no OWASP Dependency-Check step and names no NVD mirror', async () => {
             await githubFeature.execute(ctx())
             const workflow = await readFile(
-                path.join(projectDir, '.github/workflows/lint-test-sonarqube.yml'),
+                path.join(projectDir, '.github/workflows/lint-test.yml'),
                 'utf8',
             )
 
@@ -159,7 +223,7 @@ describe('githubFeature', () => {
         it('runs the audit as advisory; it never fails the build', async () => {
             await githubFeature.execute(ctx())
             const workflow = await readFile(
-                path.join(projectDir, '.github/workflows/lint-test-sonarqube.yml'),
+                path.join(projectDir, '.github/workflows/lint-test.yml'),
                 'utf8',
             )
 
@@ -181,7 +245,7 @@ describe('githubFeature', () => {
         it('writes audit counts to the job summary so an advisory result is not buried', async () => {
             await githubFeature.execute(ctx())
             const workflow = await readFile(
-                path.join(projectDir, '.github/workflows/lint-test-sonarqube.yml'),
+                path.join(projectDir, '.github/workflows/lint-test.yml'),
                 'utf8',
             )
 
@@ -197,7 +261,7 @@ describe('githubFeature', () => {
         it('blocks newly introduced vulnerable deps on PRs via dependency-review', async () => {
             await githubFeature.execute(ctx())
             const workflow = await readFile(
-                path.join(projectDir, '.github/workflows/lint-test-sonarqube.yml'),
+                path.join(projectDir, '.github/workflows/lint-test.yml'),
                 'utf8',
             )
 
@@ -213,21 +277,6 @@ describe('githubFeature', () => {
             expect(review).not.toContain('continue-on-error')
         })
 
-        it('leaves no Sonar config pointing at an OWASP report nothing generates', async () => {
-            await githubFeature.execute(ctx())
-            const sonar = await readFile(path.join(projectDir, 'sonar-project.properties'), 'utf8')
-
-            // Uncommented `sonar.dependencyCheck.*` keys aim Sonar at a report the
-            // workflow no longer produces: a config that silently reports nothing.
-            const active = sonar
-                .split('\n')
-                .filter((l) => !l.trimStart().startsWith('#'))
-                .join('\n')
-            expect(active).not.toContain('sonar.dependencyCheck')
-            // Coverage ingestion must survive the edit.
-            expect(active).toContain('sonar.javascript.lcov.reportPaths=coverage/lcov.info')
-        })
-
         /**
          * Nothing type-checks the inline `node -e` program in the YAML, so every
          * "contains GITHUB_STEP_SUMMARY" test stays green while it is broken.
@@ -237,7 +286,7 @@ describe('githubFeature', () => {
             async function extractSummaryProgram(): Promise<string> {
                 await githubFeature.execute(ctx())
                 const workflow = await readFile(
-                    path.join(projectDir, '.github/workflows/lint-test-sonarqube.yml'),
+                    path.join(projectDir, '.github/workflows/lint-test.yml'),
                     'utf8',
                 )
                 const m = workflow.match(/node -e '\n([\s\S]*?)\n {10}'\n/)
