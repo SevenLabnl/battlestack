@@ -31,13 +31,19 @@ const REQUIRED_PATTERNS = [
     '*.battlestack.bak',
     '*.battlestack.new',
     '*.battlestack.patch',
-    // SonarQube and OWASP scan scratch.
-    '.scannerwork',
-    'dependencycheck',
 ]
 
 // Patterns earlier CLI versions emitted, removed here.
-const OBSOLETE_PATTERNS = ['*.battlestack', '*.wolf', '*.wolf.bak', '*.wolf.new', '*.wolf.patch']
+const OBSOLETE_PATTERNS = [
+    '*.battlestack',
+    '*.wolf',
+    '*.wolf.bak',
+    '*.wolf.new',
+    '*.wolf.patch',
+    // Scan scratch for tooling that no longer ships in the public preset.
+    '.scannerwork',
+    'dependencycheck',
+]
 
 async function applyPatterns(projectDir: string): Promise<void> {
     const target = path.join(projectDir, '.gitignore')
@@ -184,7 +190,7 @@ async function applyNuxtIgnore(projectDir: string): Promise<void> {
 export const gitignoreFeature: Feature = {
     id: 'nuxt4:gitignore',
     // 1.4.0: owns the ESLint formatting and stylistic rules.
-    version: '1.4.0',
+    version: '1.5.0',
     label: 'Enforce ignore patterns (git, Nuxt, ESLint)',
     frameworks: ['nuxt4'],
     stage: STAGE.GITIGNORE,

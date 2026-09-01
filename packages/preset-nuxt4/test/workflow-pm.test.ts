@@ -29,7 +29,7 @@ async function render(pm: PackageManager): Promise<string> {
         }),
     )
     return readFile(
-        path.join(projectDir, '.github/workflows/lint-test-sonarqube.yml'),
+        path.join(projectDir, '.github/workflows/lint-test.yml'),
         'utf8',
     )
 }
