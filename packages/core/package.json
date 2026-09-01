@@ -58,7 +58,7 @@
     "dependencies": {
         "diff": "^9.0.0",
         "magicast": "^0.5.4",
-        "ora": "^8.2.0"
+        "ora": "^9.4.1"
     },
     "devDependencies": {
         "@types/diff": "^8.0.0"
