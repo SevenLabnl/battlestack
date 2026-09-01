@@ -4,12 +4,13 @@ import { aiModelConfigs, agents } from '#server/database/schema/ai'
 import { getDefaultModelConfigs } from '#server/mastra/utils/model-configs'
 import { getAgentDefinition } from '#server/mastra/agents/registry'
 import { mastra } from '#server/mastra'
+import { ADVISORY_LOCK } from '#server/utils/advisory-locks'
 
 /**
  * Runs every boot so the `ai_model_configs`/`agents` rows always exist, unlike `db:seed`, which refuses to run in production.
  * Insert-if-missing only, never update or delete, so admin edits survive; the advisory lock serialises replicas during a rollout.
  */
-const SYNC_ADVISORY_LOCK_KEY = 6_154_321_001_001_002
+const SYNC_ADVISORY_LOCK_KEY = ADVISORY_LOCK.SYNC_AI
 
 export default defineNitroPlugin(async () => {
     const config = useRuntimeConfig()

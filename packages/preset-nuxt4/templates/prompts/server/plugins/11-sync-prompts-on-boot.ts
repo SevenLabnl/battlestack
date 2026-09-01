@@ -2,12 +2,13 @@ import { eq, sql } from 'drizzle-orm'
 import { db } from '#server/database/client'
 import { prompts } from '#server/database/schema/prompts'
 import { getDefaultPrompts } from '#server/utils/prompts/defaults'
+import { ADVISORY_LOCK } from '#server/utils/advisory-locks'
 
 /**
  * Counterpart to `10-sync-ai-on-boot`: guarantees a row per registry prompt every boot, without the dev-only `db:seed`.
  * Additive and edit-safe: refreshes `default_content`, never overwrites admin-edited `content`; the advisory lock serialises replicas.
  */
-const SYNC_ADVISORY_LOCK_KEY = 6_154_321_001_001_003
+const SYNC_ADVISORY_LOCK_KEY = ADVISORY_LOCK.SYNC_PROMPTS
 
 export default defineNitroPlugin(async () => {
     const config = useRuntimeConfig()

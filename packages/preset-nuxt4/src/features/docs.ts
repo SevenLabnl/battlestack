@@ -81,7 +81,7 @@ function buildServerStateSection(ctx: RunContext): DocSection {
         '',
         `The test to apply: if this process restarts right now and the in-memory state is gone, is anything wrong beyond one extra query or one slower request? If a request would now wrongly succeed or wrongly fail, it's authoritative state and belongs in ${store}. If the only cost is "a little slower until it's warm again," a module-level cache is fine.`,
         '',
-        'Three examples:',
+        'Examples:',
         '',
         '- **Bug**: an in-memory request counter that *is* the rate limit. Across N replicas behind a non-sticky load balancer, each one enforces the limit independently against only its own share of traffic. The effective limit becomes roughly N× the intended one, and a flood (or a client that just gets rebalanced mid-burst) sails through.',
         `- **Fine**: an in-memory cache of a denial decision ${store} already recorded (e.g. "blocked until \`resetAt\`"), expiring at that same fixed time. A replica with a cold cache (just restarted, or never saw this key) asks the store, gets the same answer every other replica already has, and caches it too. Losing the cache costs one extra query per replica per denial; it never lets through a request the store would deny, and never denies one it would allow.`,
@@ -90,6 +90,22 @@ function buildServerStateSection(ctx: RunContext): DocSection {
             ? [`- **Fine, a different shape**: \`server/utils/redis-rate-limit.ts\`'s circuit-breaker flag (\"is Redis reachable from THIS replica right now\"). Unlike the denial-decision cache above, this isn't a cache of anything ${store} recorded; it's a local liveness signal each replica learns and forgets independently. Losing it on restart just means starting optimistic (closed) and re-learning from the next call; it never changes what a rate-limit check answers, only which backend answers it.`]
             : []),
     ]
+
+    body.push(
+        '',
+        '### Request affinity is not guaranteed',
+        '',
+        'A second failure mode, distinct from the one above: nothing routes a client back to the replica that served its previous request. Work started in one request and observed by a later one must record its state where every replica can read it. This does not fail loudly. The follow-up request lands on a replica that never saw the first one, so a status poll answers "unknown" or 404 for no reason the client can predict, at a rate that rises with replica count.',
+        '',
+        '- **Bug**: a module-level `Map` recording an upload as `pending`, written by `POST /api/uploads` and read by `GET /api/uploads/:id`. The upload succeeds, the poll hits another replica, and the client is told its own upload does not exist.',
+        `- **Fine**: the write records status in ${store} and the poll reads it back. Every replica answers identically, and a restart loses nothing.`,
+    )
+    if (hasStorage) {
+        body.push(
+            '',
+            'This is why the shipped upload path has no status to poll. `POST /api/files/upload-url` streams the bytes to S3 and returns the object key in the same response; `POST /api/files` then confirms the object with `headObject` and records a `files` row. Both requests are self-contained, so neither depends on which replica served the other. Keep that shape when adding uploads of your own: if a flow ever does need to run longer than one request, give it a status column and poll that, never a value held in the process that started the work.',
+        )
+    }
 
     const mechanics: string[] = []
     // Ships with the base `nuxt4:auth` tree, so gated on `hasAuth`, not on a specific extra.
@@ -102,8 +118,24 @@ function buildServerStateSection(ctx: RunContext): DocSection {
     if (hasDb && bootSyncPlugins.length > 0) {
         mechanics.push(`- ${bootSyncPlugins.join(' / ')}: boot-time work that must run exactly once per rollout takes \`pg_advisory_xact_lock\` before touching the database; every other replica booting concurrently blocks on the lock, then no-ops instead of racing.`)
     }
+    if (hasDb) {
+        mechanics.push('- `server/utils/advisory-locks.ts`: the registry of every advisory lock key in the project. Advisory keys share one namespace per database, so two unrelated call sites that pick the same number block each other. Add new keys there, never as a literal at the call site.')
+        mechanics.push('- `server/utils/cache-bus.ts` + `server/plugins/02-cache-invalidation.ts`: cross-replica cache invalidation. `createTtlCache(namespace, ttlMs)` builds a read-through cache; `invalidate(namespace, key)` drops the entry locally and `pg_notify`s the rest, which the plugin applies on every replica through a dedicated `LISTEN` connection. The TTL is a floor, not the mechanism: it bounds staleness to `ttlMs` even if a notification is never delivered. The listener also drops every cache each time it connects, since anything published while it was down was missed. Budget for it when sizing the database: each replica holds its query pool plus one dedicated listener connection.')
+    }
     if (mechanics.length > 0) {
         body.push('', 'Patterns already in this codebase for the mechanics above:', '', ...mechanics)
+    }
+
+    const accepted = buildAcceptedStalenessBullets(ctx)
+    if (accepted.length > 0) {
+        body.push(
+            '',
+            '### Deliberately not stateless',
+            '',
+            'These hold per-replica state on purpose. Each one is a cache or a connection, never the source of truth for a decision, so N replicas disagreeing costs latency or a repeated lookup, never a wrong answer.',
+            '',
+            ...accepted,
+        )
     }
 
     body.push('', 'Before adding a module-level variable, apply the restart test above.')
@@ -113,6 +145,27 @@ function buildServerStateSection(ctx: RunContext): DocSection {
         body: body.join('\n'),
         targets: ['agents'],
     }
+}
+
+/** Per-replica state that is accepted rather than fixed, with the reason. `ctx`-gated. */
+function buildAcceptedStalenessBullets(ctx: RunContext): string[] {
+    const bullets: string[] = []
+    const configCaches: string[] = []
+    if (isFeatureEnabled(ctx, 'nuxt4:mastra')) {
+        configCaches.push('`server/mastra/utils/ai-model.ts`', '`server/mastra/utils/agent-runtime.ts`')
+    }
+    if (isFeatureEnabled(ctx, 'nuxt4:prompts')) configCaches.push('`server/utils/prompts.ts`')
+    if (configCaches.length > 0) {
+        bullets.push(`- ${configCaches.join(', ')}: admin-editable config, cached for 30s per replica. An edit propagates immediately over the invalidation bus; if that notification is ever lost, the TTL still clears it within 30s. Reading these on every agent call instead would put a query in front of every LLM request to remove a staleness window nobody can act inside.`)
+    }
+    if (isFeatureEnabled(ctx, 'nuxt4:auth')) {
+        bullets.push('- `server/utils/rate-limit.ts`, the `deniedUntil` map: caches an already-recorded denial until its fixed `resetAt`. The counts themselves live in Postgres, so this can only avoid a repeat query, never widen a limit.')
+    }
+    if (isFeatureEnabled(ctx, 'nuxt4:redis')) {
+        bullets.push('- `server/utils/redis-rate-limit.ts`, the circuit-breaker flag: each replica learns for itself whether Redis is reachable from where it runs. Sharing it would be wrong, not just unnecessary.')
+    }
+    bullets.push('- Lazily constructed clients (S3, SMTP, Postgres pools, embedding models): connections belong to the process holding them. Each replica builds its own on first use.')
+    return bullets
 }
 
 /** The `runtimeConfig`-not-`process.env` house rule, `ctx`-gated. */

@@ -19,7 +19,8 @@
         "build:clean": "tsc -b tsconfig.build.json --clean",
         "pack:smoke": "pnpm build && node scripts/pack-smoke.mjs",
         "pack:smoke:matrix": "pnpm build && node scripts/pack-smoke-matrix.mjs",
-        "race:migrate-lock": "node scripts/migrate-lock-race.mjs"
+        "race:migrate-lock": "node scripts/migrate-lock-race.mjs",
+        "race:replicas": "node scripts/replica-race.mjs"
     },
     "devDependencies": {
         "tsx": "^4.23.12",
