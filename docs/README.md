@@ -40,7 +40,7 @@ New here? Read [Requirements](requirements.md), then
 
 | Page | What it answers |
 | --- | --- |
-| [Product requirements](prd.md) | What battlestack is for, what it commits to, and what it deliberately refuses to do. |
+| [Product requirements](PRD.md) | What battlestack is for, what it commits to, and what it deliberately refuses to do. |
 | [Architecture](architecture.md) | Internals of the plugin system: the package split, how ids are resolved, feature stages and execution order. [Plugins](plugins.md) is the practical guide; this is the reference behind it. |
 | [Contributing](../CONTRIBUTING.md) | Local development of battlestack itself, and what CI verifies. |
 | [Releasing](releasing.md) | How a release is cut. |
