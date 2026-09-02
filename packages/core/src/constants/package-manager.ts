@@ -8,6 +8,9 @@ export const DEFAULT_PM_PRIORITY: PackageManager[] = ['pnpm', 'bun', 'npm']
 /** The pnpm version this repo develops and tests against. Not injected into generated projects. */
 export const PNPM_PIN = 'pnpm@11.8.0'
 
+/** Oldest pnpm the scaffold supports. Preflight fails below it. */
+export const PNPM_MIN = '11.3.0'
+
 /** Day-0 release-age. Must be 0, and must be set explicitly. */
 export const RELEASE_AGE_SCAFFOLD_DAYS = 0
 

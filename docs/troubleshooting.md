@@ -42,6 +42,14 @@ is going to use pnpm, which is the default.
 Non-blocking. battlestack is tested against a specific pnpm version and says so
 when yours is older. `pnpm self-update` clears it.
 
+### `Preflight failed: pnpm ≥ 11.3.0`
+
+Blocking, and deliberately so. pnpm 11.3 is the oldest version battlestack
+supports. Older releases fail part-way through the install instead: pnpm 10 has
+no `--all` flag on `approve-builds`, so the scaffold ran for minutes and then
+died on `ERROR Unknown option: 'all'`. Run `pnpm self-update`, or scaffold with
+`--pm npm`.
+
 ### `npx` runs an old version
 
 `npx` can reuse a cached copy. Always name the tag:

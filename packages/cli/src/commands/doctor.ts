@@ -24,6 +24,7 @@ import {
     type ProjectManifest,
     type ReservedCommand,
 } from '@battlestack/core'
+import { pnpmVersionChecks } from '@battlestack/core/utils/preflight.js'
 
 /** Static metadata only. `run` is built per-dispatch in `project.ts`. */
 export const doctorReservedMeta: Omit<ReservedCommand, 'run'> = {
@@ -198,6 +199,11 @@ async function cliDoctor(): Promise<void> {
             : `none of ${SUPPORTED_PMS.join('/')} found on PATH`,
     })
 
+    if (anyPm.includes('pnpm')) {
+        const pnpmVersion = safeSpawnSync('pnpm', ['--version'], { encoding: 'utf8', timeout: 5000 })
+        checks.push(...pnpmVersionChecks((pnpmVersion.stdout ?? '').trim()))
+    }
+
     const git = safeSpawnSync('git', ['--version'], { stdio: 'ignore' })
     checks.push({
         label: 'git on PATH',
@@ -247,12 +253,14 @@ async function runPreflight(
     })
 
     const pm = manifest.packageManager
-    const pmCheck = safeSpawnSync(pm, ['--version'], { stdio: 'ignore' })
+    const pmCheck = safeSpawnSync(pm, ['--version'], { encoding: 'utf8', timeout: 5000 })
+    const pmOnPath = pmCheck.status === 0
     out.push({
         label: `${pm} on PATH`,
-        state: pmCheck.status === 0 ? 'ok' : 'fail',
-        detail: pmCheck.status === 0 ? undefined : `\`${pm}\` not found: install it or change packageManager in manifest`,
+        state: pmOnPath ? 'ok' : 'fail',
+        detail: pmOnPath ? undefined : `\`${pm}\` not found: install it or change packageManager in manifest`,
     })
+    if (pmOnPath && pm === 'pnpm') out.push(...pnpmVersionChecks((pmCheck.stdout ?? '').trim()))
 
     const enabled = new Set(manifest.features.map((f) => f.id))
 

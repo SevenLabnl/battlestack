@@ -1,6 +1,6 @@
 import net from 'node:net'
 import { CLIError, ErrorCode } from './errors.js'
-import { PNPM_PIN } from '../constants/package-manager.js'
+import { PNPM_MIN, PNPM_PIN } from '../constants/package-manager.js'
 import { getUiPort } from '../ui-port.js'
 import { spawnSyncResolved as safeSpawnSync } from './win-exec.js'
 import { describePortAttribution, diagnosePort } from './port-diagnosis.js'
@@ -36,20 +36,37 @@ function pmChecks(pm: string): PreflightCheck[] {
         },
     ]
 
-    // Non-blocking nudge toward PNPM_PIN.
     if (pmOnPath && pm === 'pnpm') {
-        const installed = (pmCheck.stdout ?? '').trim()
-        const wanted = PNPM_PIN.slice(PNPM_PIN.indexOf('@') + 1)
-        if (installed && semverLt(installed, wanted)) {
-            checks.push({
+        checks.push(...pnpmVersionChecks((pmCheck.stdout ?? '').trim()))
+    }
+    return checks
+}
+
+/** pnpm version gate: below PNPM_MIN fails, below the tested PNPM_PIN warns. */
+export function pnpmVersionChecks(installed: string): PreflightCheck[] {
+    if (!installed) return []
+    if (semverLt(installed, PNPM_MIN)) {
+        return [
+            {
+                label: `pnpm ≥ ${PNPM_MIN}`,
+                state: 'fail',
+                detail: `you have ${installed}; battlestack needs pnpm ${PNPM_MIN} or newer, `
+                    + 'so run `pnpm self-update`',
+            },
+        ]
+    }
+    const wanted = PNPM_PIN.slice(PNPM_PIN.indexOf('@') + 1)
+    if (semverLt(installed, wanted)) {
+        return [
+            {
                 label: 'pnpm up to date',
                 state: 'warn',
                 detail: `battlestack is tested with pnpm ${wanted}; you have ${installed}, so run `
                     + '`pnpm self-update`',
-            })
-        }
+            },
+        ]
     }
-    return checks
+    return []
 }
 
 function dockerCheck(): PreflightCheck {
