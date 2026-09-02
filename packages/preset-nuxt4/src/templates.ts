@@ -1,6 +1,17 @@
 import type { BattlestackPluginContext } from '@battlestack/core'
 
-/** No template hardcodes a private deploy feature. A private plugin adds one via `extendTemplate`. */
+/**
+ * No template hardcodes a private deploy feature. A private plugin adds one via `extendTemplate`.
+ *
+ * `nuxt4:battlestack-theme` is optional-but-default-on in all three templates, not
+ * required. Required would be wrong while `@battlestack/theme` is not on a registry yet:
+ * this preset is published, so a required feature would make every `battlestack create`
+ * fail at install time. Default-on because it is the house standard, and a SevenLab
+ * project that starts without it is a project that diverges. Nothing else depends on it,
+ * so switching it off leaves a working (unbranded) Nuxt UI + Tailwind app rather than a
+ * broken one. Revisit once the package is published: required is the better default
+ * then — the only reason it is not required today is distribution, not design.
+ */
 export function registerNuxtTemplates(battlestack: BattlestackPluginContext): void {
     battlestack.addTemplate({
         id: 'nuxt4-ai',
@@ -35,6 +46,7 @@ export function registerNuxtTemplates(battlestack: BattlestackPluginContext): vo
             'nuxt4:finalize',
         ],
         optionalFeatures: [
+            'nuxt4:battlestack-theme',
             'nuxt4:audit-log',
             'nuxt4:user-admin',
             'nuxt4:auth-passkeys',
@@ -50,6 +62,7 @@ export function registerNuxtTemplates(battlestack: BattlestackPluginContext): vo
             'shared:playwright',
         ],
         defaultEnabledOptional: [
+            'nuxt4:battlestack-theme',
             'nuxt4:pwa',
             'shared:ci',
             'nuxt4:audit-log',
@@ -97,6 +110,7 @@ export function registerNuxtTemplates(battlestack: BattlestackPluginContext): vo
             'nuxt4:finalize',
         ],
         optionalFeatures: [
+            'nuxt4:battlestack-theme',
             'nuxt4:audit-log',
             'nuxt4:user-admin',
             'nuxt4:auth-passkeys',
@@ -113,6 +127,7 @@ export function registerNuxtTemplates(battlestack: BattlestackPluginContext): vo
             'shared:playwright',
         ],
         defaultEnabledOptional: [
+            'nuxt4:battlestack-theme',
             'nuxt4:pwa',
             'shared:ci',
             'nuxt4:audit-log',
@@ -153,12 +168,14 @@ export function registerNuxtTemplates(battlestack: BattlestackPluginContext): vo
             'nuxt4:finalize',
         ],
         optionalFeatures: [
+            'nuxt4:battlestack-theme',
             'nuxt4:landing-shell',
             'nuxt4:pwa',
             'shared:ci',
             'shared:playwright',
         ],
         defaultEnabledOptional: [
+            'nuxt4:battlestack-theme',
             'nuxt4:landing-shell',
             'nuxt4:pwa',
             'shared:ci',

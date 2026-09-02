@@ -1,0 +1,30 @@
+{
+    "name": "@battlestack/theme",
+    "version": "0.0.0",
+    "description": "Battlestack Design System Nuxt — the Nuxt UI theme: token values for light and dark, brand assets, and the Logo lockup. No components; Nuxt UI is the component library.",
+    "license": "MIT",
+    "type": "module",
+    "main": "./nuxt.config.ts",
+    "exports": {
+        ".": "./nuxt.config.ts",
+        "./tokens.css": "./tokens.css",
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "assets",
+        "components",
+        "nuxt.config.ts",
+        "scripts",
+        "tokens.css"
+    ],
+    "sideEffects": [
+        "*.css"
+    ],
+    "dependencies": {
+        "@nuxt/kit": "^4.5.2"
+    },
+    "scripts": {
+        "check:contrast": "node scripts/check-contrast.mjs",
+        "check:contract": "node scripts/check-contract.mjs"
+    }
+}

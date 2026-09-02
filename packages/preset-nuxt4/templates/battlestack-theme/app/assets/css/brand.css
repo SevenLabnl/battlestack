@@ -1,0 +1,48 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   This project's brand.
+
+   The one place a project is allowed to differ visually from the design
+   system. Everything here is a token re-value: the names are Nuxt UI's
+   `--ui-*` variables (https://ui.nuxt.com/docs/getting-started/theme/css-variables),
+   already valued by @battlestack/theme. A name this file invents is a name no
+   component reads.
+
+   Loaded last in app/assets/css/main.css — after Tailwind, after Nuxt UI and
+   after the theme's tokens.css — so a value set here wins.
+
+   Dark mode is the `.dark` class. Any name you set on `:root` must be restated
+   in `.dark`, otherwise your light value silently wins in dark mode too
+   (these declarations come after Nuxt UI's own `.dark` block).
+
+   Semantic color *aliases* (which ramp `primary` points at) do not live here:
+   they are `ui.colors` in app/app.config.ts. This file is for value-level
+   tuning; a full re-brand is a client theme package.
+
+   Re-verify contrast after any colour change — text >= 4.5:1, non-text
+   (focus ring, control borders) >= 3:1, in both modes.
+
+   `battlestack pull` never touches this file. See DESIGN_SYSTEM.md in the
+   repo root for the rules this file operates under.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+    /* Accent shade. The ramp comes from the theme; this picks which shade
+       carries buttons, links, focus. */
+    /* --ui-primary: var(--ui-color-primary-600); */
+
+    /* Surfaces. */
+    /* --ui-bg: var(--ui-color-neutral-50); */
+
+    /* Shape. One base value scales every rounded-* utility. */
+    /* --ui-radius: 0.5rem; */
+
+    /* Layout. */
+    /* --ui-container: 90rem; */
+}
+
+.dark {
+    /* Dark is not a filter over light: restate every name set above with a
+       value that reads on a dark canvas. */
+    /* --ui-primary: var(--ui-color-primary-300); */
+    /* --ui-bg: var(--ui-color-neutral-950); */
+}

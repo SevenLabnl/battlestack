@@ -18,6 +18,8 @@ Answer these questions before touching any template code:
 
 ### 2. Audit the Existing Design System
 Check these files before making design decisions:
+- `DESIGN_SYSTEM.md` (repo root, when present): the binding design-system rules — the `battlestack-ui` skill is the working procedure for them
+- `app/assets/css/brand.css` (when present): this project's token overrides
 - `app.config.ts`: project color scheme and theme tokens
 - `app/assets/css/main.css`: Tailwind CSS v4 design tokens and custom properties
 - `app/components/`: existing component patterns
@@ -110,7 +112,7 @@ Before completing UI work:
 - **Do not animate**: layout shifts, large content reflows
 
 ## Rules
-- Never use raw hex colors; use theme tokens or Tailwind color classes
+- Never use raw hex colors; use theme tokens — prefer the semantic utilities (`text-muted`, `bg-elevated`, `text-primary`) over raw Tailwind palette classes
 - Never build a custom component when Nuxt UI v4 has an equivalent
 - Always test at mobile width first
 - Always include loading and empty states

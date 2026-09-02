@@ -17,7 +17,8 @@ const SUPPORTED: AiTool[] = ['claude-code', 'gemini-cli', 'cursor', 'codex']
 export const aiToolConfigFeature: Feature = {
     id: 'shared:ai-tool-config',
     // 1.1.6: `.mcp.json` gained its Playwright entry, plus corrected rule globs.
-    version: '1.1.7',
+    // 1.1.8: `battlestack-ui` skill (design system on Nuxt UI) + frontend-design audit pointers.
+    version: '1.1.8',
     label: 'AI coding tool config',
     stage: STAGE.AI_TOOL_CONFIG,
 

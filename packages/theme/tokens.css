@@ -1,0 +1,120 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Battlestack Design System Nuxt — default theme ("Warm Modern Fintech").
+
+   This file + `ui.colors` in the project's app.config ARE the design system's
+   entire styling surface. Components come from Nuxt UI and are never themed by
+   editing them — only through these values.
+
+   Source of truth: the "Battlestack Design System Nuxt" project on
+   claude.ai/design. Change values there first, then mirror them here.
+
+   Load order (wired by `nuxt4:battlestack-theme` in app/assets/css/main.css):
+
+       @import "tailwindcss";
+       @import "@nuxt/ui";
+       @import "@battlestack/theme/tokens.css";   <- this file
+       @import "./brand.css";                      <- project-owned overrides
+
+   `@theme` requires compilation inside the project's Tailwind root, which is
+   why this file is @imported there instead of being loaded by the layer.
+
+   Dark mode is Nuxt UI's own convention: the `.dark` class. Every token
+   overridden on `:root` below restates its dark value in `.dark`, because
+   these declarations come after Nuxt UI's own `.dark` block and would
+   otherwise win in both modes.
+
+   Theming reference:
+     https://ui.nuxt.com/docs/getting-started/theme/design-system
+     https://tailwindcss.com/docs/theme
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@theme static {
+    /* Typography — self-hosted by @nuxt/fonts, declared in the layer config. */
+    --font-sans: "Plus Jakarta Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    /* Brand accent — signal blue. `ui.colors.primary` points here. */
+    --color-brand-50: #eff4ff;
+    --color-brand-100: #dde8ff;
+    --color-brand-200: #bcd2ff;
+    --color-brand-300: #8fb2ff;
+    --color-brand-400: #5b8cff;
+    --color-brand-500: #2f66f5;
+    --color-brand-600: #1149dd;
+    --color-brand-700: #0d38ad;
+    --color-brand-800: #102f89;
+    --color-brand-900: #11255f;
+    --color-brand-950: #0b1840;
+
+    /* Secondary accent — lilac. `ui.colors.secondary` points here. */
+    --color-lilac-50: #f5f3fd;
+    --color-lilac-100: #eae6fb;
+    --color-lilac-200: #cfc9f7;
+    --color-lilac-300: #b7adf4;
+    --color-lilac-400: #a596f0;
+    --color-lilac-500: #8672e0;
+    --color-lilac-600: #5946c8;
+    --color-lilac-700: #4837a3;
+    --color-lilac-800: #3a2d82;
+    --color-lilac-900: #2e2563;
+    --color-lilac-950: #1c1740;
+
+    /* Neutral — Battlestack's warm stone, overriding Tailwind's stone.
+       `ui.colors.neutral` points here; it carries text, borders, surfaces. */
+    --color-stone-50: #f4f1ec;
+    --color-stone-100: #eae6df;
+    --color-stone-200: #e0dbd3;
+    --color-stone-300: #d0cac1;
+    --color-stone-400: #a8a29a;
+    --color-stone-500: #7c766e;
+    --color-stone-600: #5c5751;
+    --color-stone-700: #423e39;
+    --color-stone-800: #2c2926;
+    --color-stone-900: #1c1a18;
+    --color-stone-950: #121110;
+}
+
+:root {
+    /* Radius: base 7px → controls (rounded-md) 10.5px, cards (lg) 14px,
+       dialogs (xl) 21px. One variable scales every rounded-* utility. */
+    --ui-radius: 0.4375rem;
+
+    /* Surfaces: white cards on a warm stone canvas. */
+    --ui-bg: white;
+    --ui-bg-muted: var(--ui-color-neutral-50);
+    --ui-bg-elevated: var(--ui-color-neutral-100);
+    --ui-bg-accented: var(--ui-color-neutral-200);
+
+    /* Text: warm ink. */
+    --ui-text-highlighted: var(--ui-color-neutral-950);
+    --ui-text: var(--ui-color-neutral-700);
+
+    /* Primary: brand-500 fill — white text clears 4.5:1 (verified by
+       `check:contrast`); links and focus follow it. */
+    --ui-primary: var(--ui-color-primary-500);
+}
+
+.dark {
+    /* Warm near-black, no pure black. */
+    --ui-bg: #141311;
+    --ui-bg-muted: var(--ui-color-neutral-900);
+    --ui-bg-elevated: var(--ui-color-neutral-800);
+    --ui-bg-accented: var(--ui-color-neutral-700);
+    --ui-border: var(--ui-color-neutral-800);
+
+    /* Dark restatements for the :root overrides above. */
+    --ui-text-highlighted: white;
+    --ui-text: var(--ui-color-neutral-200);
+
+    /* The accent lifts in dark mode: ink text on light-blue fills. */
+    --ui-primary: var(--ui-color-primary-400);
+}
+
+/* Design-system decision: buttons keep the pointer cursor (Tailwind v4's
+   preflight switched to `cursor: default`). */
+@layer base {
+    button:not(:disabled),
+    [role="button"]:not(:disabled) {
+        cursor: pointer;
+    }
+}
