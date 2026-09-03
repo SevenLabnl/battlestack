@@ -23,6 +23,12 @@ vi.mock('@battlestack/core', async (importOriginal) => ({
     spawnSyncResolved: (...args: unknown[]) => spawnSyncResolved(...args),
 }))
 
+// `pmChecks` spawns through core's own `win-exec` import, bypassing the barrel above.
+vi.mock('@battlestack/core/utils/win-exec.js', async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    spawnSyncResolved: (...args: unknown[]) => spawnSyncResolved(...args),
+}))
+
 function ok(): { status: number } {
     return { status: 0 }
 }

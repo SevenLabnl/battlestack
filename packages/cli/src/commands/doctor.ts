@@ -24,7 +24,7 @@ import {
     type ProjectManifest,
     type ReservedCommand,
 } from '@battlestack/core'
-import { pnpmVersionChecks } from '@battlestack/core/utils/preflight.js'
+import { pmChecks, pnpmVersionChecks } from '@battlestack/core/utils/preflight.js'
 
 /** Static metadata only. `run` is built per-dispatch in `project.ts`. */
 export const doctorReservedMeta: Omit<ReservedCommand, 'run'> = {
@@ -187,10 +187,12 @@ async function cliDoctor(): Promise<void> {
 
     checks.push(cliVersionCheck())
 
-    // Warns rather than fails. In-project, `runPreflight` hard-fails on the manifest's PM.
-    const anyPm = SUPPORTED_PMS.filter(
-        (pm) => safeSpawnSync(pm, ['--version'], { stdio: 'ignore' }).status === 0,
-    )
+    const pmVersions = new Map<string, string>()
+    for (const pm of SUPPORTED_PMS) {
+        const probe = safeSpawnSync(pm, ['--version'], { encoding: 'utf8', timeout: 5000 })
+        if (probe.status === 0) pmVersions.set(pm, (probe.stdout ?? '').trim())
+    }
+    const anyPm = [...pmVersions.keys()]
     checks.push({
         label: 'package manager on PATH',
         state: anyPm.length > 0 ? 'ok' : 'fail',
@@ -199,10 +201,8 @@ async function cliDoctor(): Promise<void> {
             : `none of ${SUPPORTED_PMS.join('/')} found on PATH`,
     })
 
-    if (anyPm.includes('pnpm')) {
-        const pnpmVersion = safeSpawnSync('pnpm', ['--version'], { encoding: 'utf8', timeout: 5000 })
-        checks.push(...pnpmVersionChecks((pnpmVersion.stdout ?? '').trim()))
-    }
+    const pnpmVersion = pmVersions.get('pnpm')
+    if (pnpmVersion !== undefined) checks.push(...pnpmVersionChecks(pnpmVersion))
 
     const git = safeSpawnSync('git', ['--version'], { stdio: 'ignore' })
     checks.push({
@@ -253,14 +253,10 @@ async function runPreflight(
     })
 
     const pm = manifest.packageManager
-    const pmCheck = safeSpawnSync(pm, ['--version'], { encoding: 'utf8', timeout: 5000 })
-    const pmOnPath = pmCheck.status === 0
-    out.push({
-        label: `${pm} on PATH`,
-        state: pmOnPath ? 'ok' : 'fail',
-        detail: pmOnPath ? undefined : `\`${pm}\` not found: install it or change packageManager in manifest`,
-    })
-    if (pmOnPath && pm === 'pnpm') out.push(...pnpmVersionChecks((pmCheck.stdout ?? '').trim()))
+    out.push(...pmChecks(pm, {
+        notFoundDetail: `\`${pm}\` not found: install it or change packageManager in manifest`,
+        belowMinState: 'warn',
+    }))
 
     const enabled = new Set(manifest.features.map((f) => f.id))
 

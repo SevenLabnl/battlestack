@@ -61,7 +61,9 @@ npm i -g pnpm
 pnpm 11.3 or newer is required. Preflight fails on anything older, before the
 scaffold starts, rather than part-way through the install. Above that floor but
 below the version battlestack is tested against, preflight prints a warning
-rather than failing. Both suggest `pnpm self-update`.
+rather than failing, and suggests `pnpm self-update`. The blocking row points at
+`npm i -g` and at `--pm npm` instead, since neither needs the old pnpm to work.
+[Troubleshooting](troubleshooting.md) covers why the floor sits at 11.3.
 
 Node 25 dropped bundled Corepack, so a freshly installed Node often has npm and
 nothing else. That is fine: scaffold with `npx` and pass `--pm npm`.

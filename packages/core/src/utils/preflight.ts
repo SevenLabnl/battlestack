@@ -1,6 +1,6 @@
 import net from 'node:net'
 import { CLIError, ErrorCode } from './errors.js'
-import { PNPM_MIN, PNPM_PIN } from '../constants/package-manager.js'
+import { PNPM_MIN, PNPM_PIN, PNPM_PIN_VERSION } from '../constants/package-manager.js'
 import { getUiPort } from '../ui-port.js'
 import { spawnSyncResolved as safeSpawnSync } from './win-exec.js'
 import { describePortAttribution, diagnosePort } from './port-diagnosis.js'
@@ -23,7 +23,15 @@ function nodeCheck(minNodeMajor: number): PreflightCheck {
     }
 }
 
-function pmChecks(pm: string): PreflightCheck[] {
+export interface PmChecksOptions {
+    /** Replaces the default detail on the not-on-PATH row. */
+    notFoundDetail?: string
+    /** State of the below-PNPM_MIN row. */
+    belowMinState?: 'fail' | 'warn'
+}
+
+/** Package manager on PATH, plus the pnpm version gate when the pm is pnpm. */
+export function pmChecks(pm: string, opts: PmChecksOptions = {}): PreflightCheck[] {
     const pmCheck = safeSpawnSync(pm, ['--version'], { encoding: 'utf8', timeout: 5000 })
     const pmOnPath = pmCheck.status === 0
     const checks: PreflightCheck[] = [
@@ -32,37 +40,40 @@ function pmChecks(pm: string): PreflightCheck[] {
             state: pmOnPath ? 'ok' : 'fail',
             detail: pmOnPath
                 ? undefined
-                : `\`${pm}\` not found; run \`npm i -g ${PNPM_PIN}\`, or pass --pm npm to use npm instead`,
+                : opts.notFoundDetail
+                ?? `\`${pm}\` not found; run \`npm i -g ${PNPM_PIN}\`, or pass --pm npm to use npm instead`,
         },
     ]
 
     if (pmOnPath && pm === 'pnpm') {
-        checks.push(...pnpmVersionChecks((pmCheck.stdout ?? '').trim()))
+        checks.push(...pnpmVersionChecks((pmCheck.stdout ?? '').trim(), opts.belowMinState))
     }
     return checks
 }
 
 /** pnpm version gate: below PNPM_MIN fails, below the tested PNPM_PIN warns. */
-export function pnpmVersionChecks(installed: string): PreflightCheck[] {
+export function pnpmVersionChecks(
+    installed: string,
+    belowMinState: 'fail' | 'warn' = 'fail',
+): PreflightCheck[] {
     if (!installed) return []
     if (semverLt(installed, PNPM_MIN)) {
         return [
             {
                 label: `pnpm ≥ ${PNPM_MIN}`,
-                state: 'fail',
-                detail: `you have ${installed}; battlestack needs pnpm ${PNPM_MIN} or newer, `
-                    + 'so run `pnpm self-update`',
+                state: belowMinState,
+                detail: `you have ${installed}; battlestack needs pnpm ${PNPM_MIN} or newer, so run `
+                    + `\`npm i -g ${PNPM_PIN}\`, or pass --pm npm to use npm instead`,
             },
         ]
     }
-    const wanted = PNPM_PIN.slice(PNPM_PIN.indexOf('@') + 1)
-    if (semverLt(installed, wanted)) {
+    if (semverLt(installed, PNPM_PIN_VERSION)) {
         return [
             {
                 label: 'pnpm up to date',
                 state: 'warn',
-                detail: `battlestack is tested with pnpm ${wanted}; you have ${installed}, so run `
-                    + '`pnpm self-update`',
+                detail: `battlestack is tested with pnpm ${PNPM_PIN_VERSION}; you have ${installed}, `
+                    + 'so run `pnpm self-update`',
             },
         ]
     }

@@ -45,10 +45,28 @@ when yours is older. `pnpm self-update` clears it.
 ### `Preflight failed: pnpm ≥ 11.3.0`
 
 Blocking, and deliberately so. pnpm 11.3 is the oldest version battlestack
-supports. Older releases fail part-way through the install instead: pnpm 10 has
-no `--all` flag on `approve-builds`, so the scaffold ran for minutes and then
-died on `ERROR Unknown option: 'all'`. Run `pnpm self-update`, or scaffold with
-`--pm npm`.
+supports, and the floor is a supply-chain policy decision rather than a missing
+flag.
+
+Every scaffolded project gets `minimumReleaseAge` and `allowBuilds` written into
+its `pnpm-workspace.yaml`. pnpm 11.0 made those the only release-age and
+build-approval surface, but the early 11.x releases did not enforce them
+reliably in a workspace. `minimumReleaseAge` was ignored in monorepos from
+11.0.3 ([pnpm#11433](https://github.com/pnpm/pnpm/issues/11433)), and the fixes
+landed across 11.1.2, 11.1.3 and 11.2. 11.3 is the first release with none of
+that still outstanding. A policy that is silently unenforced is worse than one
+that fails loudly, so preflight blocks rather than warns.
+
+pnpm 10.32 and newer can technically run the scaffold, since that is where
+`approve-builds --all` landed, and 10.26 already had `allowBuilds`. They are
+rejected anyway, because 10.x is no longer supported. Below 10.32 the install
+dies part-way through with `ERROR Unknown option: 'all'`.
+
+The failure names two ways out: install a supported pnpm with the `npm i -g`
+command it prints, or scaffold with `--pm npm` and skip pnpm entirely. It does
+not suggest `pnpm self-update`, which does not exist on much older releases and
+rewrites a local `packageManager` pin instead of the global install when run
+inside a project.
 
 ### `npx` runs an old version
 
