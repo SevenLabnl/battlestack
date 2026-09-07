@@ -150,9 +150,17 @@ export async function applyColorAliases(ctx: RunContext): Promise<void> {
  */
 async function rebaseline(ctx: RunContext, rel: string): Promise<void> {
     const hash = await hashFile(path.join(ctx.projectDir, rel))
+    // Recorded rels are platform-separated (`path.join` in the emit path), so on
+    // Windows the maps hold `app\...` keys — compare separator-insensitively and
+    // re-record under the exact key each map already uses.
+    const posix = rel.replaceAll(path.sep, '/')
     for (const key of Object.keys(ctx.state)) {
         if (!key.startsWith('files:')) continue
         const map = ctx.state[key] as Record<string, string>
-        if (rel in map) recordFile(ctx, key.slice('files:'.length), rel, hash)
+        for (const tracked of Object.keys(map)) {
+            if (tracked.replaceAll(path.sep, '/') === posix) {
+                recordFile(ctx, key.slice('files:'.length), tracked, hash)
+            }
+        }
     }
 }

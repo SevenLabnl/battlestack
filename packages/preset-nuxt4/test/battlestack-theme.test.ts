@@ -143,7 +143,8 @@ describe('battlestackThemeFeature: emitted files', () => {
         const emitCtx = ctx()
         await battlestackThemeFeature.execute(emitCtx)
         const emitted = Object.keys(emitCtx.state[`files:${FEATURE_ID}`] as Record<string, string>)
-        expect(emitted.sort()).toEqual(['DESIGN_SYSTEM.md', BRAND_CSS])
+        // Recorded rels are platform-separated; compare in posix form.
+        expect(emitted.map((r) => r.replaceAll(path.sep, '/')).sort()).toEqual(['DESIGN_SYSTEM.md', BRAND_CSS])
         await expect(readdir(path.join(projectDir, 'app', 'components'))).rejects.toThrow()
     })
 
@@ -289,17 +290,20 @@ describe('battlestackThemeFeature: patched files stay in baseline', () => {
      * `pull` — verified here through `nuxt4:nuxt-ui`'s real update path.
      */
     it('re-baselines nuxt-ui\'s recorded hashes for main.css and app.config.ts', async () => {
+        // Platform-separated, exactly as the emit path records them (`app\...` on Windows).
+        const mainCssRel = path.join(MAIN_CSS)
+        const appConfigRel = path.join(APP_CONFIG)
         const runCtx = ctx()
         // What `nuxt4:nuxt-ui` recorded at scaffold time, before the theme patched the files.
         runCtx.state['files:nuxt4:nuxt-ui'] = {
-            [MAIN_CSS]: await hashFile(path.join(projectDir, MAIN_CSS)),
-            [APP_CONFIG]: await hashFile(path.join(projectDir, APP_CONFIG)),
+            [mainCssRel]: await hashFile(path.join(projectDir, MAIN_CSS)),
+            [appConfigRel]: await hashFile(path.join(projectDir, APP_CONFIG)),
         }
         await battlestackThemeFeature.execute(runCtx)
 
         const recorded = runCtx.state['files:nuxt4:nuxt-ui'] as Record<string, string>
-        expect(recorded[MAIN_CSS]).toBe(await hashFile(path.join(projectDir, MAIN_CSS)))
-        expect(recorded[APP_CONFIG]).toBe(await hashFile(path.join(projectDir, APP_CONFIG)))
+        expect(recorded[mainCssRel]).toBe(await hashFile(path.join(projectDir, MAIN_CSS)))
+        expect(recorded[appConfigRel]).toBe(await hashFile(path.join(projectDir, APP_CONFIG)))
 
         // The proof that matters: nuxt-ui's own update sees no drift on the next pull.
         const prev: InstalledFeatureRecord = {
@@ -344,18 +348,20 @@ describe('battlestackThemeFeature: sibling features', () => {
     // as installed — confidently wrong context in a project that switched it off.
     it('ai-tool-config gates the battlestack-ui skill on the theme feature', async () => {
         const SKILL = '.claude/skills/battlestack-ui/SKILL.md'
+        // State keys are platform-separated; `read` takes the posix form either way.
+        const skillKey = path.join(SKILL)
 
         const withTheme = ctx()
         await aiToolConfigFeature.execute(withTheme)
         await expect(read(SKILL)).resolves.toContain('battlestack-ui')
-        expect(withTheme.state['files:shared:ai-tool-config']).toHaveProperty([SKILL])
+        expect(withTheme.state['files:shared:ai-tool-config']).toHaveProperty([skillKey])
 
         await rm(path.join(projectDir, '.claude'), { recursive: true, force: true })
 
         const withoutTheme = mockRunContext({ projectDir, enabledFeatures: new Set(), state: {} })
         await aiToolConfigFeature.execute(withoutTheme)
         await expect(read(SKILL)).rejects.toThrow()
-        expect(withoutTheme.state['files:shared:ai-tool-config']).not.toHaveProperty([SKILL])
+        expect(withoutTheme.state['files:shared:ai-tool-config']).not.toHaveProperty([skillKey])
     })
 })
 

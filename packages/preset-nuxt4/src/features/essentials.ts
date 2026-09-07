@@ -16,7 +16,11 @@ const ICON_FILES = [
 /** Always-on Nuxt essentials: `@nuxt/eslint`, `@nuxt/fonts`, `@nuxt/image`, datepicker, `@iconify/vue`. */
 export const essentialsFeature: Feature = {
     id: 'nuxt4:essentials',
-    version: '1.1.0',
+    // 1.1.1: `h3` declared as a direct dependency — server templates import from
+    // 'h3', and as a phantom dep it resolved through pnpm's hidden hoist, which
+    // sometimes picked the h3 v2 RC pulled in transitively by @nuxt/eslint's
+    // config inspector and broke `nuxi typecheck` (H3Event v1 vs v2 mismatch).
+    version: '1.1.1',
     label: 'Nuxt essentials (eslint, fonts, image, iconify, datepicker, nodemailer)',
     frameworks: ['nuxt4'],
     stage: STAGE.BASE_CONFIG,
@@ -27,7 +31,10 @@ export const essentialsFeature: Feature = {
 
     collectDeps() {
         return {
-            prod: ['@vuepic/vue-datepicker', '@iconify/vue'],
+            // `h3@^1` explicitly: server templates import from 'h3', and Nuxt 4 runs
+            // h3 v1 — without the direct dep, TS resolution rides pnpm's hidden hoist
+            // and can land on a transitive h3 v2 RC, breaking `nuxi typecheck`.
+            prod: ['@vuepic/vue-datepicker', '@iconify/vue', 'h3@^1.15.0'],
             // `@iconify-json/lucide` is a local icon bundle. eslint/typescript/vue-tsc are explicit.
             dev: ['@iconify-json/lucide', 'eslint', 'typescript', 'vue-tsc'],
         }
