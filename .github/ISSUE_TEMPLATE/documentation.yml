@@ -1,0 +1,41 @@
+name: Documentation
+description: Something in the docs is wrong, missing, or misleading.
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Documentation that states something untrue is worse than documentation
+        that says nothing, so these are worth filing even when small.
+
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: File path or URL, and a heading or line if you have one.
+      placeholder: docs/configuration.md, the "Ports" section
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is wrong with it
+      options:
+        - It states something that is not true
+        - It is missing something it should cover
+        - It is accurate but confusing
+        - A broken link, command or code sample
+        - It contradicts another page
+    validations:
+      required: true
+
+  - type: textarea
+    id: detail
+    attributes:
+      label: Details
+      description: >
+        What it says, what is actually the case, and how you found out. If a
+        command in the docs failed, paste it and its output.
+    validations:
+      required: true

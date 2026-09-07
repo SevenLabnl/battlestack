@@ -1,0 +1,50 @@
+title: "[Idea]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For half-formed ideas and things worth talking through before they
+        become an issue. A concrete, ready-to-build proposal can go straight to a
+        [feature request](https://github.com/SevenLabnl/battlestack/issues/new?template=feature_request.yml).
+
+        Worth knowing first: battlestack is a plugin system, and a plugin can
+        register features, templates, commands and deploy targets through the
+        same public API the built-in preset uses. If your idea is specific to how
+        your team works, a plugin may get you there today. See
+        [docs/plugins.md](https://github.com/SevenLabnl/battlestack/blob/main/docs/plugins.md).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What are you trying to do, and what stops you? Describe the situation
+        rather than the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: >
+        What might exist that does not. Rough is fine, that is what this category
+        is for.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Who is this for
+      description: >
+        Honest answers help. Something useful to one team is a strong case for a
+        plugin rather than for the public catalog.
+      options:
+        - Most people scaffolding a Nuxt app
+        - People using a specific service or provider
+        - Mainly my own team or organisation
+        - Not sure
+    validations:
+      required: true

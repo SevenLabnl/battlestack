@@ -33,7 +33,7 @@ export default defineConfig({
         ],
     },
     test: {
-        include: ['packages/*/test/**/*.{test,spec}.ts'],
+        include: ['packages/*/test/**/*.{test,spec}.ts', 'scripts/test/**/*.{test,spec}.ts'],
         environment: 'node',
         globals: false,
         // 30s, not 10s. Several tests drive real deadlines (a DB-unreachable

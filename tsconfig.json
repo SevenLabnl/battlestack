@@ -17,12 +17,13 @@
         // must keep resolving cross-package imports through each other's
         // built `dist/*.d.ts` via ordinary node_modules resolution — that's
         // what makes `tsc -b`'s project-reference build order meaningful.
-        "baseUrl": ".",
+        // No `baseUrl`: TypeScript 7 removed it. `paths` targets are relative to this
+        // file's directory instead, which is the same repo root `baseUrl` pointed at.
         "paths": {
-            "@battlestack/core": ["packages/core/src/index.ts"],
-            "@battlestack/core/*": ["packages/core/src/*"],
-            "@battlestack/tui": ["packages/tui/src/index.ts"],
-            "@battlestack/preset-nuxt4": ["packages/preset-nuxt4/src/index.ts"]
+            "@battlestack/core": ["./packages/core/src/index.ts"],
+            "@battlestack/core/*": ["./packages/core/src/*"],
+            "@battlestack/tui": ["./packages/tui/src/index.ts"],
+            "@battlestack/preset-nuxt4": ["./packages/preset-nuxt4/src/index.ts"]
         }
     },
     "include": ["packages/**/src/**/*.ts", "packages/**/test/**/*.ts", "scripts/**/*.ts"],

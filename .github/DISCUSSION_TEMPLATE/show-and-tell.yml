@@ -1,0 +1,32 @@
+title: "[Show and tell]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Built something with battlestack, wrote a plugin, or worked out a pattern
+        worth passing on? This is the place.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What you built
+    validations:
+      required: true
+
+  - type: input
+    id: link
+    attributes:
+      label: Link
+      description: Repository, site, or write-up. Optional.
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything worth passing on
+      description: >
+        What was harder than it should have been, what you would do differently,
+        a trick that saved you time. This is the useful part for everybody else.
+    validations:
+      required: false

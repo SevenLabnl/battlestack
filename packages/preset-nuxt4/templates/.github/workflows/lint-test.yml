@@ -1,4 +1,4 @@
-name: Lint, Test & SonarQube
+name: Lint & Test
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   quality:
-    name: Lint, test & analyse
+    name: Lint & test
     # Defaults to a GitHub-hosted runner so this works with zero configuration.
     # Set the repo/org variable `CI_RUNNER` to a self-hosted runner label to point this job at your own fleet, no template edit needed.
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
@@ -118,17 +118,3 @@ __PM_CACHE__
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
-
-      # Talks to a SonarQube server this repo can't provide, so it stays skipped unless `vars.SONAR_HOST_URL` is configured.
-      # Lint, typecheck, test and the audit above still give a fork a meaningful run with zero setup.
-      - name: SonarQube Scan
-        if: vars.SONAR_HOST_URL != ''
-        uses: SonarSource/sonarqube-scan-action@v8
-        env:
-          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          skipSignatureVerification: true
-          args: >
-            -Dsonar.projectKey=${{ github.event.repository.name }}
-            -Dsonar.projectName=${{ github.event.repository.name }}

@@ -6,7 +6,7 @@ export const SUPPORTED_PMS: PackageManager[] = ['pnpm', 'bun', 'npm']
 export const DEFAULT_PM_PRIORITY: PackageManager[] = ['pnpm', 'bun', 'npm']
 
 /** The pnpm version this repo develops and tests against. Not injected into generated projects. */
-export const PNPM_PIN = 'pnpm@11.5.1'
+export const PNPM_PIN = 'pnpm@11.8.0'
 
 /** Day-0 release-age. Must be 0, and must be set explicitly. */
 export const RELEASE_AGE_SCAFFOLD_DAYS = 0

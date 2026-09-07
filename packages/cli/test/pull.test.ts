@@ -338,6 +338,46 @@ describe('battlestack pull: ownedByUser is inviolable', () => {
         expect(rec.ownedByUser).toEqual(['a.ts'])
     })
 
+    it('CORE PROPERTY: records ownership for a structural path that only becomes claimable after the update runs', async () => {
+        // A `structuralFiles()` that claims only paths the feature has actually recorded, which is
+        // what stops `pull` skipping a file it has never written (`classifyForUpdate` returns
+        // `owned` before it tests `!exists(dest)`). That makes the hook context-dependent: it
+        // returns nothing before `update()` populates the state, so seeding cannot persist
+        // ownership and only the post-update pass can.
+        const projectDir = await tmp('battlestack-pull-late-structural-')
+        const tplV1 = await tmp('battlestack-pull-late-structural-v1-')
+        const tplV2 = await tmp('battlestack-pull-late-structural-v2-')
+        await writeTemplateFile(tplV1, 'kept.ts', 'v1\n')
+        await writeTemplateFile(tplV2, 'kept.ts', 'v1\n')
+        // Ships only in v2: absent from the project and from the old manifest.
+        await writeTemplateFile(tplV2, 'branding.svg', '<svg><!-- shipped --></svg>\n')
+
+        const registriesV1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplV1)
+        registriesV1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+
+        const registriesV2 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV2 = makeFileFeature('test:feat-a', '2.0.0', tplV2)
+        featV2.structuralFiles = (c) => {
+            const recorded = (c.state['files:test:feat-a'] as Record<string, string> | undefined) ?? {}
+            return ['branding.svg'].filter((rel) => rel in recorded)
+        }
+        registriesV2.features.register(featV2, origin)
+
+        await runPull(projectDir, registriesV2)
+
+        // Written, not silently skipped as pre-owned.
+        expect(await readFile(path.join(projectDir, 'branding.svg'), 'utf8'))
+            .toBe('<svg><!-- shipped --></svg>\n')
+        const after = await readManifestRaw(projectDir)
+        const rec = after.features.find((f) => f.id === fqid('test:feat-a'))!
+        // And owned from now on, so the project replacing it is not reported as drift forever.
+        expect(rec.ownedByUser).toEqual(['branding.svg'])
+    })
+
     // `--overwrite` may still reset an owned file, but only behind a confirmation. The
     // hooks below strip CI env vars so a real runner cannot make these vacuously auto-yes.
     describe('--overwrite + an owned file: confirmation-gated, not silent', () => {

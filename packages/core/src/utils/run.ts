@@ -73,6 +73,21 @@ function runInner(command: string, args: string[], options: RunOptions): Promise
         let stdout = ''
         let stderr = ''
 
+        // A timeout kill must reject, but `close` treats any signal as a clean
+        // stop (Ctrl-C on an inherited child) — so the flag decides which.
+        let timedOut = false
+        let timer: NodeJS.Timeout | undefined
+        if (options.timeoutMs) {
+            timer = setTimeout(() => {
+                timedOut = true
+                try {
+                    child.kill()
+                } catch {
+                    // child already gone
+                }
+            }, options.timeoutMs)
+        }
+
         child.stdout?.on('data', (chunk: Buffer) => {
             stdout += chunk.toString()
         })
@@ -103,12 +118,23 @@ function runInner(command: string, args: string[], options: RunOptions): Promise
         }
 
         child.on('error', (err) => {
+            if (timer) clearTimeout(timer)
             detachHandlers?.()
             reject(new CLIError(ErrorCode.EXEC_FAILED, `Failed to spawn ${command}`, err))
         })
 
         child.on('close', (code, signal) => {
+            if (timer) clearTimeout(timer)
             detachHandlers?.()
+            if (timedOut) {
+                reject(
+                    new CLIError(
+                        ErrorCode.EXEC_FAILED,
+                        `${command} ${args.join(' ')} timed out after ${options.timeoutMs}ms`,
+                    ),
+                )
+                return
+            }
             // A signal-terminated child is not a failure.
             if (signal) {
                 if (options.inherit) restoreTerminal()

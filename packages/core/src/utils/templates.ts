@@ -160,6 +160,18 @@ export async function classifyFileState(
     return currentHash === recordedHash ? 'pristine' : 'drifted'
 }
 
+// Mirrors the `binary` rules in `.gitattributes`. These never round-trip through a
+// utf8 string: doing so replaces every non-UTF8 byte with U+FFFD and corrupts the file.
+const BINARY_EXTENSIONS = new Set([
+    '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico',
+    '.woff', '.woff2', '.ttf', '.otf',
+    '.pdf', '.tgz', '.zip',
+])
+
+function isBinaryPath(rel: string): boolean {
+    return BINARY_EXTENSIONS.has(path.extname(rel).toLowerCase())
+}
+
 function sha256(content: string | Buffer): string {
     return createHash('sha256').update(content).digest('hex')
 }
@@ -274,7 +286,7 @@ type UpdateState = 'owned' | 'missing' | 'converged' | 'pristine' | 'drifted'
 async function classifyForUpdate(
     dest: string,
     rel: string,
-    newContent: string,
+    newContent: Buffer,
     ownedSet: Set<string>,
     recordedHash: string | undefined,
 ): Promise<{ state: UpdateState, newHash: string }> {
@@ -296,7 +308,7 @@ async function applyUpdateState(
         src: string
         dest: string
         rel: string
-        newContent: string
+        newContent: Buffer
         newHash: string
         recordedHash: string | undefined
         report: UpdateReport
@@ -308,7 +320,7 @@ async function applyUpdateState(
     // `--overwrite` ignores every protection.
     if (overwrite) {
         await mkdir(path.dirname(dest), { recursive: true })
-        await writeFile(dest, newContent, 'utf8')
+        await writeFile(dest, newContent)
         recordFile(ctx, featureId, rel, newHash)
         report.written.push(rel)
         await clearArtifacts(ctx, dest, rel)
@@ -335,7 +347,7 @@ async function applyUpdateState(
         return
     }
     if (state === 'pristine') {
-        await writeFile(dest, newContent, 'utf8')
+        await writeFile(dest, newContent)
         recordFile(ctx, featureId, rel, newHash)
         report.written.push(rel)
         await clearArtifacts(ctx, dest, rel)
@@ -343,7 +355,7 @@ async function applyUpdateState(
     }
     // drifted + `--force`: overwrite, keeping the user's content as a staged `.bak`.
     if (ctx.state.force === true) {
-        const currentContent = await readFile(dest, 'utf8')
+        const currentContent = await readFile(dest)
         const bakPath = stagedArtifact(ctx, rel, '.bak')
         await rmIfExists(stagedArtifact(ctx, rel, '.new'))
         await rmIfExists(stagedArtifact(ctx, rel, '.patch'))
@@ -351,8 +363,8 @@ async function applyUpdateState(
         await rmIfExists(`${dest}.battlestack.patch`)
         await rmIfExists(`${dest}.battlestack.bak`)
         await mkdir(path.dirname(bakPath), { recursive: true })
-        await writeFile(bakPath, currentContent, 'utf8')
-        await writeFile(dest, newContent, 'utf8')
+        await writeFile(bakPath, currentContent)
+        await writeFile(dest, newContent)
         recordFile(ctx, featureId, rel, newHash)
         report.written.push(rel)
         const bakRel = path.relative(ctx.projectDir, bakPath)
@@ -360,17 +372,27 @@ async function applyUpdateState(
         return
     }
     // drifted: stage the new version and a patch for manual merge.
-    const currentContent = await readFile(dest, 'utf8')
     const newPath = stagedArtifact(ctx, rel, '.new')
-    const patchPath = stagedArtifact(ctx, rel, '.patch')
     await mkdir(path.dirname(newPath), { recursive: true })
-    await writeFile(newPath, newContent, 'utf8')
-    const patch = createPatch(rel, currentContent, newContent, 'current', 'new')
-    await writeFile(patchPath, patch, 'utf8')
+    await writeFile(newPath, newContent)
     // Legacy in-tree artifacts beside the real file.
     await rmIfExists(`${dest}.battlestack.new`)
     await rmIfExists(`${dest}.battlestack.patch`)
     report.skipped.push(rel)
+
+    // A textual diff of a binary asset is noise, so stage only the `.new` there.
+    if (isBinaryPath(rel)) {
+        await rmIfExists(stagedArtifact(ctx, rel, '.patch'))
+        report.notes.push(
+            `${rel}: binary asset, see ${path.relative(ctx.projectDir, newPath)} to compare (re-run with \`battlestack pull --force\` to overwrite)`,
+        )
+        return
+    }
+
+    const currentContent = await readFile(dest, 'utf8')
+    const patchPath = stagedArtifact(ctx, rel, '.patch')
+    const patch = createPatch(rel, currentContent, newContent.toString('utf8'), 'current', 'new')
+    await writeFile(patchPath, patch, 'utf8')
     report.notes.push(
         `${rel}: see ${path.relative(ctx.projectDir, newPath)} and ${path.relative(ctx.projectDir, patchPath)} to merge (re-run with \`battlestack pull --force\` to overwrite)`,
     )
@@ -436,7 +458,7 @@ export async function updateFromTemplateDirs(
             seen.add(rel)
             const dest = path.join(ctx.projectDir, rel)
             const recordedHash = prev?.files[rel]
-            const newContent = await readFile(src, 'utf8')
+            const newContent = await readFile(src)
             const { state, newHash } = await classifyForUpdate(
                 dest,
                 rel,

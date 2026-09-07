@@ -1,0 +1,129 @@
+name: Bug report
+description: Something behaves differently than documented, or breaks.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, two commands answer a surprising share of problems:
+
+        ```bash
+        battlestack doctor      # drift, stale features, missing config, environment
+        battlestack describe    # what is running, on which ports
+        ```
+
+        [docs/troubleshooting.md](https://github.com/SevenLabnl/battlestack/blob/main/docs/troubleshooting.md)
+        covers the common ones by symptom.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+      placeholder: |
+        I ran `battlestack dev` on a fresh nuxt4-fullstack scaffold and expected
+        the dev server. Postgres started, then the command exited with ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: >
+        Exact commands, starting from a fresh scaffold if you can. A repro
+        somebody can paste into a terminal is worth more than a description.
+      placeholder: |
+        1. npx battlestack@latest my-app nuxt4-fullstack --yes
+        2. cd my-app
+        3. battlestack dev
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Where does it happen
+      options:
+        - Scaffolding a new project
+        - Inside a generated project (dev, build, test)
+        - Database or migrations
+        - Auth or login
+        - Gateway, HTTPS or ports
+        - pull / bump / sync / doctor
+        - Production image or deployment
+        - Somewhere else
+    validations:
+      required: true
+
+  - type: dropdown
+    id: template
+    attributes:
+      label: Template
+      options:
+        - nuxt4-minimal
+        - nuxt4-fullstack
+        - nuxt4-ai
+        - Not template-specific
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Paste the output of these commands.
+      render: shell
+      placeholder: |
+        battlestack --version
+        node -v
+        docker --version
+        # OS and version, e.g. macOS 15.3 / Windows 11 / Ubuntu 24.04 / WSL2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: pm
+    attributes:
+      label: Package manager
+      description: The one the generated project uses, set by `--pm`.
+      options:
+        - pnpm (default)
+        - npm
+        - bun
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: battlestack doctor
+      description: Its full output, even if it looks clean.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: debug-log
+    attributes:
+      label: Debug output
+      description: >
+        Re-run the failing command with `-d` and paste the output. Trim any
+        secrets first: `.env` values, tokens, connection strings.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I am on Node 24 or newer
+          required: true
+        - label: If this involves a database, Docker is installed and `docker ps` works
+          required: false
+        - label: I searched existing issues
+          required: true

@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import { db } from '#server/database/client'
 import { sql } from 'drizzle-orm'
-import { checkEnvVars } from '#server/utils/health-checks'
+import { checkEnvVars, sessionPasswordFrom } from '#server/utils/health-checks'
 
 type HealthBody = {
     status: 'ok' | 'degraded'
@@ -18,11 +18,8 @@ export default defineEventHandler(async (event) => {
             | string
             | undefined) ?? 'dev'
 
-    const sessionPassword = String(
-        (config.session as { password?: unknown } | undefined)?.password ?? '',
-    )
     const databaseUrl = String((config as Record<string, unknown>).databaseUrl ?? '')
-    const missingEnv = checkEnvVars(sessionPassword, databaseUrl)
+    const missingEnv = checkEnvVars(sessionPasswordFrom(config), databaseUrl)
     if (missingEnv.length > 0) {
         return respond(
             event,
@@ -37,12 +34,13 @@ export default defineEventHandler(async (event) => {
 
     const dbStart = Date.now()
     let dbCheck: { ok: boolean; latencyMs?: number; error?: string }
+    let timer: ReturnType<typeof setTimeout> | undefined
     try {
         await Promise.race([
             db.execute(sql`select 1`),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error(`db ping > ${dbTimeoutMs}ms`)), dbTimeoutMs),
-            ),
+            new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new Error(`db ping > ${dbTimeoutMs}ms`)), dbTimeoutMs)
+            }),
         ])
         dbCheck = { ok: true, latencyMs: Date.now() - dbStart }
     } catch (err) {
@@ -50,6 +48,8 @@ export default defineEventHandler(async (event) => {
             ok: false,
             error: err instanceof Error ? err.message : 'db check failed',
         }
+    } finally {
+        clearTimeout(timer)
     }
 
     return respond(

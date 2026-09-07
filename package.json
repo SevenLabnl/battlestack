@@ -11,6 +11,11 @@
         "check:contrast": "pnpm --filter @battlestack/theme check:contrast",
         "check:contract": "pnpm --filter @battlestack/theme check:contract",
         "check:ds": "pnpm check:contrast && pnpm check:contract",
+        "version:print": "node scripts/release-version.mjs --print",
+        "version:check": "node scripts/release-version.mjs --check",
+        "version:set": "node scripts/release-version.mjs --set",
+        "version:bump": "node scripts/release-version.mjs --bump",
+        "version:changelog": "node scripts/release-version.mjs --changelog",
         "test": "vitest run",
         "test:watch": "vitest",
         "build": "tsc -b tsconfig.build.json && node scripts/build-post.mjs",
@@ -20,10 +25,10 @@
         "race:migrate-lock": "node scripts/migrate-lock-race.mjs"
     },
     "devDependencies": {
-        "tsx": "^4.22.4",
-        "typescript": "^5.9.3",
-        "vitest": "^4.1.8",
-        "@types/node": "^22.19.21"
+        "tsx": "^4.23.12",
+        "typescript": "^7.0.2",
+        "vitest": "^4.1.11",
+        "@types/node": "^26.4.0"
     },
     "engines": {
         "node": ">=24"

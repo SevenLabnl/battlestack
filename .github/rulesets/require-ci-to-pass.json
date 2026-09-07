@@ -1,0 +1,29 @@
+{
+    "name": "Require CI to pass",
+    "target": "branch",
+    "enforcement": "active",
+    "bypass_actors": [],
+    "conditions": {
+        "ref_name": {
+            "include": ["~DEFAULT_BRANCH"],
+            "exclude": []
+        }
+    },
+    "rules": [
+        {
+            "type": "required_status_checks",
+            "parameters": {
+                "strict_required_status_checks_policy": false,
+                "do_not_enforce_on_create": false,
+                "required_status_checks": [
+                    { "context": "Feature version bump check", "integration_id": 15368 },
+                    { "context": "Type-check and test (Node 24)", "integration_id": 15368 },
+                    { "context": "Type-check and test (Node 26)", "integration_id": 15368 },
+                    { "context": "Type-check, test, build, CLI smoke (Windows, Node 24)", "integration_id": 15368 },
+                    { "context": "Type-check, test, build, CLI smoke (Windows, Node 26)", "integration_id": 15368 },
+                    { "context": "Scaffold a project and run its own gates", "integration_id": 15368 }
+                ]
+            }
+        }
+    ]
+}

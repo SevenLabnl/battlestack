@@ -18,7 +18,7 @@ const FILES = ['lefthook.yml'] as const
 export const ciFeature: Feature = {
     id: 'shared:ci',
     // 1.1.0: dropped the Prettier pre-commit hook.
-    version: '1.1.0',
+    version: '1.1.1',
     label: 'Git hooks (lefthook)',
     description: 'Pre-commit eslint on staged files via lefthook.',
     stage: STAGE.GITIGNORE,
@@ -35,7 +35,7 @@ export const ciFeature: Feature = {
                 body: [
                     'Lefthook at `lefthook.yml` wires pre-commit (eslint on staged files). Install hooks once: `lefthook install`. Typecheck (`nuxi typecheck`) runs in CI rather than on push to keep local cycles fast.',
                     '',
-                    'CI/CD runs on GitHub Actions. Deploy pipelines and the lint/test/SonarQube quality gate live under `.github/workflows/` (see the GitHub Actions section).',
+                    'CI/CD runs on GitHub Actions. Deploy pipelines and the lint/test quality gate live under `.github/workflows/` (see the GitHub Actions section).',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },
