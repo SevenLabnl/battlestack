@@ -3,8 +3,9 @@ import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createPatch } from 'diff'
-import { dropRecordedFile, hashFile, recordCreated, recordFile, recordOwned } from '../manifest.js'
-import type { InstalledFeatureRecord } from '../types/feature.js'
+import { dropRecordedFile, hashFile, rebaselineRecordedFile, recordCreated, recordFile, recordOwned } from '../manifest.js'
+import { topoOrder } from '../orchestrator.js'
+import type { Feature, InstalledFeatureRecord } from '../types/feature.js'
 import type { RunContext } from '../types/run-context.js'
 import type { UpdateReport } from '../types/update-report.js'
 import { writeFileEnsured, exists } from './fs.js'
@@ -214,8 +215,16 @@ export async function copyTemplateDirRecorded(
         const preexisted = await exists(dest)
         const buf = await readFile(src)
         await writeFile(dest, buf)
-        recordFile(ctx, featureId, rel, sha256(buf))
-        if (!preexisted) recordCreated(ctx, featureId, rel)
+        const hash = sha256(buf)
+        recordFile(ctx, featureId, rel, hash)
+        if (preexisted) {
+            // A preexisting file may be tracked by an earlier feature (e.g. the
+            // landing shell overwriting nuxt-ui's app shell): move every recorded
+            // baseline to the new bytes, or those features drift permanently.
+            rebaselineRecordedFile(ctx, rel, hash)
+        } else {
+            recordCreated(ctx, featureId, rel)
+        }
     }
 }
 
@@ -285,6 +294,69 @@ export async function writeRecorded(
     if (!preexisted) recordCreated(ctx, featureId, relPath)
 }
 
+/** Posix-normalized rel, so platform-separated recorded keys compare across maps. */
+function toPosix(rel: string): string {
+    return rel.replaceAll(path.sep, '/')
+}
+
+/** How other enabled features relate to `featureId`'s files during an update. */
+interface SharedRelOwnership {
+    /** posix rel → bare id of an enabled feature ordered after `featureId` that tracks it.
+     *  The final on-disk content is that feature's (it overwrote ours at scaffold), so an
+     *  update here must not emit the rel. */
+    deferredToLater: Map<string, string>
+    /** posix rels tracked by any other enabled feature: never deleted from disk as obsolete. */
+    trackedElsewhere: Set<string>
+}
+
+/**
+ * Consults the other enabled features' `files:` state maps (pre-seeded from the manifest
+ * by `pull`/`add`) plus the scaffold execution order. Features missing from the registry,
+ * or a `featureId` that isn't registered, degrade to empty results — the update then
+ * behaves as if the file were unshared.
+ */
+function sharedRelOwnership(ctx: RunContext, featureId: string): SharedRelOwnership {
+    const deferredToLater = new Map<string, string>()
+    const trackedElsewhere = new Set<string>()
+    const { features } = ctx.registries
+
+    // Deduped on bare id: `enabledFeatures` may hold fqids while state maps key bare.
+    const enabled = new Map<string, Feature>()
+    for (const id of ctx.enabledFeatures) {
+        if (!features.has(id)) continue
+        const f = features.get(id)
+        if (f.frameworks && !f.frameworks.includes(ctx.framework.id)) continue
+        enabled.set(f.id, f)
+    }
+    const selfId = features.has(featureId) ? features.get(featureId).id : featureId
+
+    const relsOf = (f: Feature): string[] => {
+        const map = ctx.state[`files:${f.id}`] as Record<string, string> | undefined
+        return Object.keys(map ?? {}).map(toPosix)
+    }
+
+    for (const f of enabled.values()) {
+        if (f.id === selfId) continue
+        for (const rel of relsOf(f)) trackedElsewhere.add(rel)
+    }
+
+    let ordered: Feature[] = []
+    try {
+        ordered = topoOrder([...enabled.values()])
+    } catch {
+        // A cycle among installed features: no order to reason about, defer nothing.
+    }
+    const selfIndex = ordered.findIndex((f) => f.id === selfId)
+    if (selfIndex !== -1) {
+        for (const later of ordered.slice(selfIndex + 1)) {
+            for (const rel of relsOf(later)) {
+                if (!deferredToLater.has(rel)) deferredToLater.set(rel, later.id)
+            }
+        }
+    }
+    return { deferredToLater, trackedElsewhere }
+}
+
 /**
  * `owned` carries the recorded hash forward, `missing` writes and records, `converged`
  * disk already matches, `pristine` safe to overwrite, `drifted` staged for manual merge.
@@ -325,11 +397,16 @@ async function applyUpdateState(
     const { state, src, dest, rel, newContent, newHash, recordedHash, report } = args
     const overwrite = ctx.state.overwrite === true
 
+    // Every branch that changes (or blesses) the on-disk bytes also moves the baseline
+    // of every OTHER feature tracking this rel (their maps are pre-seeded by pull/add),
+    // mirroring the scaffold path — otherwise a shared file drifts for them permanently.
+
     // `--overwrite` ignores every protection.
     if (overwrite) {
         await mkdir(path.dirname(dest), { recursive: true })
         await writeFile(dest, newContent)
         recordFile(ctx, featureId, rel, newHash)
+        rebaselineRecordedFile(ctx, rel, newHash)
         report.written.push(rel)
         await clearArtifacts(ctx, dest, rel)
         return
@@ -342,7 +419,9 @@ async function applyUpdateState(
     if (state === 'missing') {
         await mkdir(path.dirname(dest), { recursive: true })
         await copyFile(src, dest)
-        recordFile(ctx, featureId, rel, await hashFile(dest))
+        const writtenHash = await hashFile(dest)
+        recordFile(ctx, featureId, rel, writtenHash)
+        rebaselineRecordedFile(ctx, rel, writtenHash)
         report.written.push(rel)
         // A recorded hash means the user deleted a tracked file.
         if (recordedHash) (report.restoredDeleted ??= []).push(rel)
@@ -350,6 +429,7 @@ async function applyUpdateState(
     }
     if (state === 'converged') {
         recordFile(ctx, featureId, rel, newHash)
+        rebaselineRecordedFile(ctx, rel, newHash)
         report.written.push(rel)
         await clearArtifacts(ctx, dest, rel)
         return
@@ -357,6 +437,7 @@ async function applyUpdateState(
     if (state === 'pristine') {
         await writeFile(dest, newContent)
         recordFile(ctx, featureId, rel, newHash)
+        rebaselineRecordedFile(ctx, rel, newHash)
         report.written.push(rel)
         await clearArtifacts(ctx, dest, rel)
         return
@@ -374,6 +455,7 @@ async function applyUpdateState(
         await writeFile(bakPath, currentContent)
         await writeFile(dest, newContent)
         recordFile(ctx, featureId, rel, newHash)
+        rebaselineRecordedFile(ctx, rel, newHash)
         report.written.push(rel)
         const bakRel = path.relative(ctx.projectDir, bakPath)
         report.notes.push(`${rel}: overwritten (--force); prior content saved to ${bakRel}`)
@@ -406,17 +488,26 @@ async function applyUpdateState(
     )
 }
 
-/** Deletes pristine files no longer shipped. User-modified ones stay, with a note. */
+/** Deletes pristine files no longer shipped. User-modified ones stay, with a note.
+ *  A rel another enabled feature still tracks is only dropped from this feature's
+ *  records — the file is that feature's to keep. */
 async function deleteObsoleteFiles(
     ctx: RunContext,
+    featureId: string,
     prev: InstalledFeatureRecord | null,
     seen: Set<string>,
+    trackedElsewhere: Set<string>,
     report: UpdateReport,
 ): Promise<void> {
     if (!prev) return
-    for (const [rel, recordedHash] of Object.entries(prev.files)) {
+    // `prev.id` may be the manifest fqid while state maps key on the bare `featureId`,
+    // and an earlier feature's update in this same run may have re-baselined our map.
+    const live = (ctx.state[`files:${featureId}`] as Record<string, string> | undefined) ?? {}
+    for (const [rel, prevHash] of Object.entries(prev.files)) {
         if (seen.has(rel)) continue
-        dropRecordedFile(ctx, prev.id, rel)
+        const recordedHash = live[rel] ?? prevHash
+        dropRecordedFile(ctx, featureId, rel)
+        if (trackedElsewhere.has(toPosix(rel))) continue
         const dest = path.join(ctx.projectDir, rel)
         if (!(await exists(dest))) continue
         const currentHash = await hashFile(dest)
@@ -463,12 +554,23 @@ export async function updateFromTemplateDirs(
 
     for (const p of ownedSet) recordOwned(ctx, featureId, p)
 
+    const { deferredToLater, trackedElsewhere } = sharedRelOwnership(ctx, featureId)
+
     for (const srcDir of srcDirs) {
         for await (const { src, rel } of walkTemplateFiles(srcDir)) {
             // Not added to `seen`: a previously-installed copy is now obsolete and
             // the deleteObsoleteFiles pass below removes it (if still pristine).
             if (opts.exclude?.(rel)) continue
             seen.add(rel)
+            // A rel a later-ordered feature also ships (landing-shell over nuxt-ui's app
+            // shell): the bytes on disk are that feature's, so emitting ours here would
+            // silently replace them. The carried-forward baseline stays valid because
+            // every write path re-baselines all tracking features.
+            const laterOwner = deferredToLater.get(toPosix(rel))
+            if (laterOwner !== undefined) {
+                report.notes.push(`${rel}: also shipped by ${laterOwner} (which runs later), left unchanged`)
+                continue
+            }
             const dest = path.join(ctx.projectDir, rel)
             const recordedHash = prev?.files[rel]
             const newContent = await readFile(src)
@@ -492,7 +594,7 @@ export async function updateFromTemplateDirs(
         }
     }
 
-    await deleteObsoleteFiles(ctx, prev, seen, report)
+    await deleteObsoleteFiles(ctx, featureId, prev, seen, trackedElsewhere, report)
     return report
 }
 

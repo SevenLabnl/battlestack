@@ -1,12 +1,14 @@
-import { STAGE, type Feature, type RunContext } from '@battlestack/core'
+import { STAGE, isFeatureEnabled, type Feature, type RunContext } from '@battlestack/core'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
+import { importThemeCss } from './battlestack-theme.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
 
 /** Nuxt UI v4 + Tailwind v4. Registers `@nuxt/ui` module and wires `assets/css/main.css`. */
 export const nuxtUiFeature: Feature = {
     id: 'nuxt4:nuxt-ui',
     // 1.2.1: token-placement doc corrected — overrides import after `@nuxt/ui`,
-    // matching where `nuxt4:battlestack-theme` splices its imports.
+    // matching where `nuxt4:battlestack-theme` splices its imports. update() also
+    // re-applies that splice: re-emitting `main.css` used to silently drop it.
     version: '1.2.1',
     label: 'Nuxt UI v4 + Tailwind v4',
     frameworks: ['nuxt4'],
@@ -44,6 +46,10 @@ export const nuxtUiFeature: Feature = {
     async update(ctx, prev) {
         const result = await emitTemplateUpdate(ctx, 'nuxt4:nuxt-ui', import.meta.url, 'nuxt-ui', prev)
         await configureNuxtConfig(ctx)
+        // Re-emitting `main.css` drops `nuxt4:battlestack-theme`'s spliced imports; the
+        // theme's own update() only runs when the theme itself is bumped, so restore
+        // them here (idempotent, and it re-baselines every tracking feature).
+        if (isFeatureEnabled(ctx, 'nuxt4:battlestack-theme')) await importThemeCss(ctx)
         return result
     },
 }

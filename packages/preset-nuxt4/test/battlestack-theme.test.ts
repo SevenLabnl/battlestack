@@ -334,6 +334,36 @@ describe('battlestackThemeFeature: sibling features', () => {
         expect(config).toContain("neutral: 'stone'")
     })
 
+    // A nuxt-ui-only bump re-emits main.css from the template: the spliced copy hashes
+    // as pristine, so the update overwrites it — and must then restore the splice, or
+    // every themed project silently loses its tokens on the next `battlestack pull`.
+    it('nuxt-ui\'s update keeps the theme\'s spliced imports in main.css', async () => {
+        const scaffoldCtx = ctx()
+        scaffoldCtx.state['files:nuxt4:nuxt-ui'] = {
+            [path.join(MAIN_CSS)]: await hashFile(path.join(projectDir, MAIN_CSS)),
+        }
+        await battlestackThemeFeature.execute(scaffoldCtx)
+
+        const pullCtx = mockRunContext({
+            projectDir,
+            enabledFeatures: new Set([FEATURE_ID, 'nuxt4:nuxt-ui']),
+            state: { packageManager: 'pnpm' },
+        })
+        const prev: InstalledFeatureRecord = {
+            id: 'nuxt4:nuxt-ui',
+            version: '0.0.1', // any older version: only update() matters here
+            files: { ...(scaffoldCtx.state['files:nuxt4:nuxt-ui'] as Record<string, string>) },
+        }
+        await nuxtUiFeature.update!(pullCtx, prev)
+
+        const css = await read(MAIN_CSS)
+        expect(css).toContain('@import "@battlestack/theme/tokens.css";')
+        expect(css).toContain('@import "./brand.css";')
+        // And the re-splice moved the baseline with it: no phantom drift next pull.
+        const recorded = pullCtx.state['files:nuxt4:nuxt-ui'] as Record<string, string>
+        expect(recorded[path.join(MAIN_CSS)]).toBe(await hashFile(path.join(projectDir, MAIN_CSS)))
+    })
+
     it('landing-shell keeps the scaffold defaults when the theme is off', async () => {
         const addCtx = mockRunContext({
             projectDir,

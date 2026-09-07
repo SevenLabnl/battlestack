@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
-import { STAGE, hashFile, recordFile, type Feature, type RunContext } from '@battlestack/core'
+import { STAGE, hashFile, rebaselineRecordedFile, type Feature, type RunContext } from '@battlestack/core'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
 
@@ -91,8 +91,12 @@ async function wireTheme(ctx: RunContext): Promise<void> {
  * template-owned: two features owning one file would fight on every `pull`, and the CSS
  * has to live in this exact file — `@theme` only takes effect inside the stylesheet that
  * imports `tailwindcss`. Idempotent: each line is added once, order fixed by insertion.
+ *
+ * Exported for `nuxt4:nuxt-ui`: its update re-emits `main.css` from the template (the
+ * spliced copy hashes as pristine, so it is overwritten), and only the bumped feature's
+ * `update()` runs on a pull — so it re-applies the splice itself when the theme is enabled.
  */
-async function importThemeCss(ctx: RunContext): Promise<void> {
+export async function importThemeCss(ctx: RunContext): Promise<void> {
     const rel = 'app/assets/css/main.css'
     const cssPath = path.join(ctx.projectDir, rel)
     const original = await readFile(cssPath, 'utf8')
@@ -149,18 +153,5 @@ export async function applyColorAliases(ctx: RunContext): Promise<void> {
  * `pull` stages a conflict and every `doctor` reports drift, permanently.
  */
 async function rebaseline(ctx: RunContext, rel: string): Promise<void> {
-    const hash = await hashFile(path.join(ctx.projectDir, rel))
-    // Recorded rels are platform-separated (`path.join` in the emit path), so on
-    // Windows the maps hold `app\...` keys — compare separator-insensitively and
-    // re-record under the exact key each map already uses.
-    const posix = rel.replaceAll(path.sep, '/')
-    for (const key of Object.keys(ctx.state)) {
-        if (!key.startsWith('files:')) continue
-        const map = ctx.state[key] as Record<string, string>
-        for (const tracked of Object.keys(map)) {
-            if (tracked.replaceAll(path.sep, '/') === posix) {
-                recordFile(ctx, key.slice('files:'.length), tracked, hash)
-            }
-        }
-    }
+    rebaselineRecordedFile(ctx, rel, await hashFile(path.join(ctx.projectDir, rel)))
 }

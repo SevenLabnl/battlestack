@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
-import { STAGE, isFeatureEnabled, hashFile, recordFile, type Feature, type RunContext } from '@battlestack/core'
+import { STAGE, isFeatureEnabled, hashFile, rebaselineRecordedFile, recordFile, type Feature, type RunContext } from '@battlestack/core'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
 import { applyColorAliases } from './battlestack-theme.js'
 
@@ -60,5 +60,10 @@ async function applyAuthVariant(ctx: RunContext, featureId: string): Promise<voi
     }
 
     await writeFile(file, content, 'utf8')
-    recordFile(ctx, featureId, rel, await hashFile(file))
+    const hash = await hashFile(file)
+    recordFile(ctx, featureId, rel, hash)
+    // `nuxt4:nuxt-ui` ships (and records) its own `default.vue` that this feature's
+    // template just overwrote; the patch above changes the bytes again, so every
+    // tracking feature's baseline has to move with them.
+    rebaselineRecordedFile(ctx, rel, hash)
 }

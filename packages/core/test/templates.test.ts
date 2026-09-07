@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { copyTemplateDirRecorded, reconcilePostFormat, snapshotTrackedHashes, updateFromTemplateDir } from '../src/utils/templates.js'
 import { exists } from '../src/utils/fs.js'
 import { BattlestackRegistries } from '../src/registry.js'
-import type { InstalledFeatureRecord } from '../src/types/feature.js'
+import { STAGE } from '../src/constants/stages.js'
+import type { Feature, InstalledFeatureRecord } from '../src/types/feature.js'
 import type { RunContext } from '../src/types/run-context.js'
 
 const origin = { plugin: 'test-plugin', namespace: 'test' }
@@ -64,6 +65,31 @@ describe('copyTemplateDirRecorded', () => {
         expect(Object.keys(recorded)).toContain('a.ts')
         expect(Object.keys(recorded)).toContain(path.join('sub', 'b.ts'))
         expect(recorded['a.ts']).toMatch(/^[a-f0-9]{64}$/)
+    })
+
+    /**
+     * Two features may deliberately ship the same rel (nuxt-ui's app shell, overwritten
+     * by landing-shell). The overwrite must move every tracking feature's baseline to
+     * the new bytes, or the earlier feature reports drift on every `doctor` and stages
+     * merge artifacts on every `pull`, permanently.
+     */
+    it('re-baselines every feature tracking a preexisting file it overwrites', async () => {
+        await writeFile(path.join(templateDir, 'shared.ts'), 'export const v = 2\n')
+        const ctx = makeCtx()
+        // The earlier feature's emit: file on disk, hash recorded under its id.
+        const oldContent = 'export const v = 1\n'
+        await writeFile(path.join(projectDir, 'shared.ts'), oldContent)
+        const oldHash = createHash('sha256').update(oldContent).digest('hex')
+        ctx.state['files:test:earlier'] = { 'shared.ts': oldHash, 'other.ts': 'unrelated-hash' }
+
+        await copyTemplateDirRecorded(ctx, 'test:later', templateDir)
+
+        const newHash = createHash('sha256').update('export const v = 2\n').digest('hex')
+        expect(ctx.state['files:test:later']).toMatchObject({ 'shared.ts': newHash })
+        const earlier = ctx.state['files:test:earlier'] as Record<string, string>
+        expect(earlier['shared.ts']).toBe(newHash)
+        // A rel the overwrite never touched keeps its baseline.
+        expect(earlier['other.ts']).toBe('unrelated-hash')
     })
 
     it('never emits stray battlestack-merge artifacts even if committed into a template dir', async () => {
@@ -354,6 +380,154 @@ describe('updateFromTemplateDir', () => {
         // Notes mention both
         expect(report.notes.some((n) => n.includes('pristine.ts'))).toBe(true)
         expect(report.notes.some((n) => n.includes('modified.ts'))).toBe(true)
+    })
+})
+
+/**
+ * The nuxt-ui/landing-shell shape: two features deliberately ship the same rels, the
+ * later-ordered one's bytes win at scaffold, and both track the file. These suites
+ * register real features (unlike the rest of this file) because the shared-file logic
+ * reads the execution order and the other features' pre-seeded `files:` state maps —
+ * exactly what `battlestack pull` provides.
+ */
+describe('updateFromTemplateDir: rels shared across features', () => {
+    const REL = path.join('app', 'app.vue')
+    const SHELL_CONTENT = '<template>landing shell</template>\n'
+
+    const sharedOrigin = { plugin: 'shared-test-plugin', namespace: 'shared' }
+    let sharedRegistries: BattlestackRegistries
+
+    const sha = (s: string) => createHash('sha256').update(s).digest('hex')
+
+    beforeEach(() => {
+        sharedRegistries = new BattlestackRegistries()
+        sharedRegistries.frameworks.register(
+            { id: 'tpl-test', label: 'tpl-test', supportedFeatures: [] },
+            sharedOrigin,
+        )
+        sharedRegistries.templates.register(
+            { id: 'tpl-test', label: 'tpl-test', framework: 'tpl-test', requiredFeatures: [], optionalFeatures: [] },
+            sharedOrigin,
+        )
+        const noop = async (): Promise<void> => {}
+        // Mirrors production: the shell sits in an EARLIER stage but declares
+        // `after: [ui]`, so the topo edge (not the stage sort) makes it run later.
+        const ui: Feature = {
+            id: 'tpl:ui', label: 'ui', version: '1.0.0', stage: STAGE.STYLING,
+            frameworks: ['tpl-test'], execute: noop,
+        }
+        const shell: Feature = {
+            id: 'tpl:shell', label: 'shell', version: '1.0.0', stage: STAGE.BASE_CONFIG,
+            frameworks: ['tpl-test'], after: ['tpl:ui'], execute: noop,
+        }
+        sharedRegistries.features.register(ui, sharedOrigin)
+        sharedRegistries.features.register(shell, sharedOrigin)
+    })
+
+    /** Pull-shaped ctx: enabled by fqid, `files:` maps pre-seeded by bare id. */
+    function makeSharedCtx(seed: Record<string, Record<string, string>>): RunContext {
+        const ctx: RunContext = {
+            projectName: 'demo',
+            projectDir,
+            framework: sharedRegistries.frameworks.get('tpl-test'),
+            template: sharedRegistries.templates.get('tpl-test'),
+            enabledFeatures: new Set(['shared:tpl:ui', 'shared:tpl:shell']),
+            state: { packageManager: 'pnpm' },
+            debug: false,
+            dryRun: false,
+            registries: sharedRegistries,
+        }
+        for (const [bareId, files] of Object.entries(seed)) {
+            ctx.state[`files:${bareId}`] = { ...files }
+        }
+        return ctx
+    }
+
+    it('does not emit a rel a later-ordered enabled feature also tracks (nuxt-ui-bump-only pull)', async () => {
+        // ui's new template ships its minimal shell; disk holds the shell feature's bytes,
+        // and (after scaffold-time re-baselining) BOTH features record those bytes.
+        await mkdir(path.join(templateDir, 'app'), { recursive: true })
+        await writeFile(path.join(templateDir, REL), '<template>minimal ui shell v2</template>\n')
+        await mkdir(path.join(projectDir, 'app'), { recursive: true })
+        await writeFile(path.join(projectDir, REL), SHELL_CONTENT)
+        const shellHash = sha(SHELL_CONTENT)
+
+        const ctx = makeSharedCtx({
+            'tpl:ui': { [REL]: shellHash },
+            'tpl:shell': { [REL]: shellHash },
+        })
+        const prev: InstalledFeatureRecord = {
+            id: 'shared:tpl:ui', // manifest records carry the fqid
+            version: '0.9.0',
+            files: { [REL]: shellHash },
+        }
+
+        const report = await updateFromTemplateDir(ctx, 'tpl:ui', templateDir, prev)
+
+        // The landing page survives, is still tracked by both, and was not staged as a conflict.
+        expect(await readFile(path.join(projectDir, REL), 'utf8')).toBe(SHELL_CONTENT)
+        expect(report.written).not.toContain(REL)
+        expect(report.skipped).not.toContain(REL)
+        expect(report.notes.join('\n')).toContain('tpl:shell')
+        expect((ctx.state['files:tpl:ui'] as Record<string, string>)[REL]).toBe(shellHash)
+        expect((ctx.state['files:tpl:shell'] as Record<string, string>)[REL]).toBe(shellHash)
+        // Skipped-but-shipped means NOT obsolete: the file must not be deleted.
+        expect(await exists(path.join(projectDir, REL))).toBe(true)
+    })
+
+    it('re-baselines the earlier feature when the later one rewrites a shared pristine rel', async () => {
+        // shell-bump-only pull: shell's update overwrites the shared file; ui's carried
+        // baseline must follow, or ui reports drift (and stages conflicts) forever.
+        const v1 = '<template>landing shell v1</template>\n'
+        const v2 = '<template>landing shell v2</template>\n'
+        await mkdir(path.join(templateDir, 'app'), { recursive: true })
+        await writeFile(path.join(templateDir, REL), v2)
+        await mkdir(path.join(projectDir, 'app'), { recursive: true })
+        await writeFile(path.join(projectDir, REL), v1)
+
+        const ctx = makeSharedCtx({
+            'tpl:ui': { [REL]: sha(v1) },
+            'tpl:shell': { [REL]: sha(v1) },
+        })
+        const prev: InstalledFeatureRecord = {
+            id: 'shared:tpl:shell',
+            version: '0.9.0',
+            files: { [REL]: sha(v1) },
+        }
+
+        const report = await updateFromTemplateDir(ctx, 'tpl:shell', templateDir, prev)
+
+        expect(report.written).toContain(REL)
+        expect(await readFile(path.join(projectDir, REL), 'utf8')).toBe(v2)
+        expect((ctx.state['files:tpl:shell'] as Record<string, string>)[REL]).toBe(sha(v2))
+        expect((ctx.state['files:tpl:ui'] as Record<string, string>)[REL]).toBe(sha(v2))
+    })
+
+    it('never deletes an obsolete rel that another enabled feature still tracks', async () => {
+        // ui's new version stops shipping the shared rel. It is pristine by ui's records,
+        // but the shell still ships it — only ui's tracking entry may go.
+        await writeFile(path.join(templateDir, 'other.ts'), 'export const o = 1\n')
+        await mkdir(path.join(projectDir, 'app'), { recursive: true })
+        await writeFile(path.join(projectDir, REL), SHELL_CONTENT)
+        const shellHash = sha(SHELL_CONTENT)
+
+        const ctx = makeSharedCtx({
+            'tpl:ui': { [REL]: shellHash },
+            'tpl:shell': { [REL]: shellHash },
+        })
+        const prev: InstalledFeatureRecord = {
+            id: 'shared:tpl:ui',
+            version: '0.9.0',
+            files: { [REL]: shellHash },
+        }
+
+        await updateFromTemplateDir(ctx, 'tpl:ui', templateDir, prev)
+
+        expect(await readFile(path.join(projectDir, REL), 'utf8')).toBe(SHELL_CONTENT)
+        // Dropped from ui's records (keyed by the BARE id even though prev.id is the fqid)…
+        expect((ctx.state['files:tpl:ui'] as Record<string, string>)[REL]).toBeUndefined()
+        // …while the shell's tracking entry is untouched.
+        expect((ctx.state['files:tpl:shell'] as Record<string, string>)[REL]).toBe(shellHash)
     })
 })
 

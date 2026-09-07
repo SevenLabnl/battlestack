@@ -234,6 +234,33 @@ export function recordFile(
     ctx.state[key] = map
 }
 
+/**
+ * Re-records `relativePath` under every feature whose `files:` state map tracks it.
+ * For a file emitted or patched by one feature but also recorded by others (e.g.
+ * `nuxt4:landing-shell` overwriting `nuxt4:nuxt-ui`'s app shell): without moving every
+ * baseline to the new bytes, the other features' recorded hashes never match disk again,
+ * so every `pull` stages a conflict and every `doctor` reports drift, permanently.
+ */
+export function rebaselineRecordedFile(
+    ctx: RunContext,
+    relativePath: string,
+    hash: string,
+): void {
+    // Recorded rels are platform-separated (`path.join` in the emit path), so on
+    // Windows the maps hold `app\...` keys — compare separator-insensitively and
+    // re-record under the exact key each map already uses.
+    const posix = relativePath.replaceAll(path.sep, '/')
+    for (const key of Object.keys(ctx.state)) {
+        if (!key.startsWith('files:')) continue
+        const map = ctx.state[key] as Record<string, string>
+        for (const tracked of Object.keys(map)) {
+            if (tracked.replaceAll(path.sep, '/') === posix) {
+                recordFile(ctx, key.slice('files:'.length), tracked, hash)
+            }
+        }
+    }
+}
+
 /** Idempotent. */
 export function dropRecordedFile(
     ctx: RunContext,
