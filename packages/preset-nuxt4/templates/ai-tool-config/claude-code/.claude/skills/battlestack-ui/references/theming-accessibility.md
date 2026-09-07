@@ -22,7 +22,8 @@ Structure, behaviour, states, and component APIs stay identical across clients �
 
 - `--ui-primary` with its button text (`text-inverted`) ≥ 4.5:1 — accents too light for white text pair with an ink foreground instead; the split may flip per mode;
 - accent used *as text* (`text-primary`, links) ≥ 4.5:1 on `--ui-bg` and `--ui-bg-muted`;
-- `--ui-primary` and control borders ≥ 3:1 non-text contrast against their background;
+- body and muted text (`--ui-text`, `--ui-text-muted`) ≥ 4.5:1 on `--ui-bg` and `--ui-bg-muted`;
+- `--ui-primary` ≥ 3:1 non-text contrast on `--ui-bg` and `--ui-bg-muted` (focus ring, state boundaries). Plain `--ui-border*` separators are decorative and carry no WCAG minimum, so the gate does not check them — a boundary that *conveys state* must come from primary or an accented token, never from `--ui-border` alone;
 - passing in the default theme is not sufficient — re-check the client theme.
 
 ## Accessibility baseline (WCAG 2.2 AA)

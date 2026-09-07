@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
-import { STAGE, type Feature, type RunContext } from '@battlestack/core'
+import { STAGE, hashFile, recordFile, type Feature, type RunContext } from '@battlestack/core'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
 
@@ -93,31 +93,66 @@ async function wireTheme(ctx: RunContext): Promise<void> {
  * imports `tailwindcss`. Idempotent: each line is added once, order fixed by insertion.
  */
 async function importThemeCss(ctx: RunContext): Promise<void> {
-    const cssPath = path.join(ctx.projectDir, 'app/assets/css/main.css')
-    let css = await readFile(cssPath, 'utf8')
+    const rel = 'app/assets/css/main.css'
+    const cssPath = path.join(ctx.projectDir, rel)
+    const original = await readFile(cssPath, 'utf8')
+    let css = original
     for (const line of ['@import "@battlestack/theme/tokens.css";', '@import "./brand.css";']) {
         if (css.includes(line)) continue
         // After the last existing @import, never at EOF: a project may have appended its
         // own rules to main.css, and CSS rejects an @import that follows a rule.
         const lines = css.split('\n')
-        const lastImport = lines.reduce((last, l, i) => (l.trimStart().startsWith('@import') ? i : last), -1)
+        // The anchor scan runs over a comment-blanked copy (same line numbering): an
+        // @import inside `/* … */` must not be picked, or the theme imports get spliced
+        // into the comment and silently never apply.
+        const scannable = css
+            .replace(/\/\*[\s\S]*?(?:\*\/|$)/g, (m) => m.replace(/[^\n]/g, ' '))
+            .split('\n')
+        const lastImport = scannable.reduce((last, l, i) => (l.trimStart().startsWith('@import') ? i : last), -1)
         lines.splice(lastImport + 1, 0, line)
         css = lines.join('\n')
     }
-    await writeFile(cssPath, css, 'utf8')
+    if (css !== original) {
+        await writeFile(cssPath, css, 'utf8')
+        await rebaseline(ctx, rel)
+    }
 }
 
 /**
  * Points the semantic aliases at the theme's ramps. Only the scaffold defaults
  * (`blue`/`purple`/`zinc`) are rewritten; any other value is a deliberate project
  * decision that a `pull` must not undo.
+ *
+ * Exported for `nuxt4:landing-shell`: `battlestack add nuxt4:landing-shell` re-emits
+ * `app/app.config.ts` with the scaffold defaults, and only the added feature's
+ * `execute()` runs — so it re-applies the aliases itself when the theme is enabled.
  */
-async function applyColorAliases(ctx: RunContext): Promise<void> {
-    const configPath = path.join(ctx.projectDir, 'app/app.config.ts')
+export async function applyColorAliases(ctx: RunContext): Promise<void> {
+    const rel = 'app/app.config.ts'
+    const configPath = path.join(ctx.projectDir, rel)
     const source = await readFile(configPath, 'utf8')
     const patched = source
         .replace(/(primary:\s*)(['"])blue\2/, "$1'brand'")
         .replace(/(secondary:\s*)(['"])purple\2/, "$1'lilac'")
         .replace(/(neutral:\s*)(['"])zinc\2/, "$1'stone'")
-    if (patched !== source) await writeFile(configPath, patched, 'utf8')
+    if (patched !== source) {
+        await writeFile(configPath, patched, 'utf8')
+        await rebaseline(ctx, rel)
+    }
+}
+
+/**
+ * The theme string-patches files that other features emitted and recorded
+ * (`nuxt4:nuxt-ui` records both paths; `nuxt4:landing-shell` also records
+ * `app/app.config.ts`). Every feature tracking the file gets its baseline moved to
+ * the patched bytes — otherwise the recorded hash never matches disk again, and every
+ * `pull` stages a conflict and every `doctor` reports drift, permanently.
+ */
+async function rebaseline(ctx: RunContext, rel: string): Promise<void> {
+    const hash = await hashFile(path.join(ctx.projectDir, rel))
+    for (const key of Object.keys(ctx.state)) {
+        if (!key.startsWith('files:')) continue
+        const map = ctx.state[key] as Record<string, string>
+        if (rel in map) recordFile(ctx, key.slice('files:'.length), rel, hash)
+    }
 }

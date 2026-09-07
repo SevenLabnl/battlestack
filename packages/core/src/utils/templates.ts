@@ -194,13 +194,21 @@ async function* walkTemplateFiles(
     }
 }
 
+/** Feature-gated subtrees inside one template dir: an excluded rel is not emitted,
+ *  and on update it is treated as no-longer-shipped (pristine copies get removed). */
+export interface TemplateDirOptions {
+    exclude?: (rel: string) => boolean
+}
+
 /** Records each emitted file's hash in `ctx.state`. */
 export async function copyTemplateDirRecorded(
     ctx: RunContext,
     featureId: string,
     srcDir: string,
+    opts: TemplateDirOptions = {},
 ): Promise<void> {
     for await (const { src, rel } of walkTemplateFiles(srcDir)) {
+        if (opts.exclude?.(rel)) continue
         const dest = path.join(ctx.projectDir, rel)
         await mkdir(path.dirname(dest), { recursive: true })
         const preexisted = await exists(dest)
@@ -429,8 +437,9 @@ export async function updateFromTemplateDir(
     featureId: string,
     srcDir: string,
     prev: InstalledFeatureRecord | null,
+    opts: TemplateDirOptions = {},
 ): Promise<UpdateReport> {
-    return updateFromTemplateDirs(ctx, featureId, [srcDir], prev)
+    return updateFromTemplateDirs(ctx, featureId, [srcDir], prev, [], opts)
 }
 
 /** Aggregates `seen` across every subtree before the obsolete-file pass. */
@@ -440,6 +449,7 @@ export async function updateFromTemplateDirs(
     srcDirs: string[],
     prev: InstalledFeatureRecord | null,
     keepRels: string[] = [],
+    opts: TemplateDirOptions = {},
 ): Promise<UpdateReport> {
     const report: UpdateReport = { written: [], skipped: [], notes: [] }
     const seen = new Set<string>(keepRels)
@@ -455,6 +465,9 @@ export async function updateFromTemplateDirs(
 
     for (const srcDir of srcDirs) {
         for await (const { src, rel } of walkTemplateFiles(srcDir)) {
+            // Not added to `seen`: a previously-installed copy is now obsolete and
+            // the deleteObsoleteFiles pass below removes it (if still pristine).
+            if (opts.exclude?.(rel)) continue
             seen.add(rel)
             const dest = path.join(ctx.projectDir, rel)
             const recordedHash = prev?.files[rel]

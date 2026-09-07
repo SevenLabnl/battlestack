@@ -7,6 +7,7 @@ import {
     applyPlugin,
     BattlestackRegistries,
     finalizeRegistries,
+    hashFile,
     topoOrder,
     type InstalledFeatureRecord,
     type RunContext,
@@ -14,6 +15,8 @@ import {
 
 import presetNuxt4 from '../src/index.js'
 import { nuxtUiFeature } from '../src/features/nuxt-ui.js'
+import { landingShellFeature } from '../src/features/landing-shell.js'
+import { aiToolConfigFeature } from '../src/features/ai-tool-config.js'
 import { battlestackThemeFeature } from '../src/features/battlestack-theme.js'
 import { mockRunContext } from './test-utils.js'
 
@@ -87,7 +90,7 @@ describe('battlestackThemeFeature: registration', () => {
             .toContain(registries.features.get(FEATURE_ID).fqid)
     })
 
-    it('is offered and default-on in all three templates', () => {
+    it('is offered but default-OFF in all three templates', () => {
         const registries = realRegistries()
         // Off the finalized registry, never hand-spelled: these lists are canonicalized
         // to fqids, and a literal would pass with and without that pass.
@@ -95,9 +98,11 @@ describe('battlestackThemeFeature: registration', () => {
         for (const id of ['nuxt4-minimal', 'nuxt4-fullstack', 'nuxt4-ai']) {
             const tpl = registries.templates.get(id)
             expect(tpl.optionalFeatures, id).toContain(fqid)
-            expect(tpl.defaultEnabledOptional, id).toContain(fqid)
-            // Optional, deliberately: `@battlestack/theme` is not on a registry yet and
-            // this preset is published, so a public scaffold has to be able to switch it off.
+            // Default-OFF, deliberately: `@battlestack/theme` is not on a registry yet
+            // and this preset is published, so any default that pulls the dependency in
+            // (required OR default-on) breaks `battlestack create` at install time for
+            // everyone accepting the defaults. Flip once the package is published.
+            expect(tpl.defaultEnabledOptional, id).not.toContain(fqid)
             expect(tpl.requiredFeatures, id).not.toContain(fqid)
         }
     })
@@ -180,6 +185,24 @@ describe('battlestackThemeFeature: wiring', () => {
         expect([...positions].sort((a, b) => a - b)).toEqual(positions)
     })
 
+    // A commented-out @import must not anchor the insertion: splicing inside the
+    // `/* … */` block would silently disable the whole theme, and the includes()
+    // guard would then skip the repair on every future pull.
+    it('never splices the imports into a CSS comment', async () => {
+        await writeFile(
+            path.join(projectDir, MAIN_CSS),
+            '@import "tailwindcss";\n@import "@nuxt/ui";\n/*\n@import "./legacy.css";\n*/\n.brand { color: red }\n',
+            'utf8',
+        )
+        await battlestackThemeFeature.execute(ctx())
+        const css = await read(MAIN_CSS)
+        const commentStart = css.indexOf('/*')
+        for (const line of ['@import "@battlestack/theme/tokens.css";', '@import "./brand.css";']) {
+            expect(css.indexOf(line)).toBeGreaterThan(css.indexOf('@import "@nuxt/ui";'))
+            expect(css.indexOf(line)).toBeLessThan(commentStart)
+        }
+    })
+
     // CSS rejects an @import that follows a rule, so insertion goes after the last
     // import, never at end-of-file.
     it('keeps imports valid when the project appended its own rules to main.css', async () => {
@@ -255,6 +278,84 @@ describe('battlestackThemeFeature: update is idempotent', () => {
         const report = await battlestackThemeFeature.update!(ctx(), prev)
         expect(report.written).toContain('DESIGN_SYSTEM.md')
         await expect(read('DESIGN_SYSTEM.md')).resolves.toContain('# Design system')
+    })
+})
+
+describe('battlestackThemeFeature: patched files stay in baseline', () => {
+    /**
+     * The theme string-patches files other features recorded. Without moving those
+     * baselines to the patched bytes, every themed project gets two permanent
+     * "drifted" entries in `doctor` and staged `.new`/`.patch` conflicts on every
+     * `pull` — verified here through `nuxt4:nuxt-ui`'s real update path.
+     */
+    it('re-baselines nuxt-ui\'s recorded hashes for main.css and app.config.ts', async () => {
+        const runCtx = ctx()
+        // What `nuxt4:nuxt-ui` recorded at scaffold time, before the theme patched the files.
+        runCtx.state['files:nuxt4:nuxt-ui'] = {
+            [MAIN_CSS]: await hashFile(path.join(projectDir, MAIN_CSS)),
+            [APP_CONFIG]: await hashFile(path.join(projectDir, APP_CONFIG)),
+        }
+        await battlestackThemeFeature.execute(runCtx)
+
+        const recorded = runCtx.state['files:nuxt4:nuxt-ui'] as Record<string, string>
+        expect(recorded[MAIN_CSS]).toBe(await hashFile(path.join(projectDir, MAIN_CSS)))
+        expect(recorded[APP_CONFIG]).toBe(await hashFile(path.join(projectDir, APP_CONFIG)))
+
+        // The proof that matters: nuxt-ui's own update sees no drift on the next pull.
+        const prev: InstalledFeatureRecord = {
+            id: 'nuxt4:nuxt-ui',
+            version: nuxtUiFeature.version,
+            files: { ...recorded },
+        }
+        const report = await nuxtUiFeature.update!(ctx(), prev)
+        expect(report.skipped).toEqual([])
+    })
+})
+
+describe('battlestackThemeFeature: sibling features', () => {
+    // `battlestack add nuxt4:landing-shell` re-emits app.config.ts with the scaffold
+    // defaults and runs only landing-shell's execute() — which must re-apply the
+    // theme's aliases itself, or the themed project silently loses its brand ramps.
+    it('landing-shell re-applies the color aliases on a themed project', async () => {
+        await battlestackThemeFeature.execute(ctx())
+        const addCtx = mockRunContext({
+            projectDir,
+            enabledFeatures: new Set([FEATURE_ID, 'nuxt4:landing-shell']),
+            state: { packageManager: 'pnpm' },
+        })
+        await landingShellFeature.execute(addCtx)
+        const config = await read(APP_CONFIG)
+        expect(config).toContain("primary: 'brand'")
+        expect(config).toContain("secondary: 'lilac'")
+        expect(config).toContain("neutral: 'stone'")
+    })
+
+    it('landing-shell keeps the scaffold defaults when the theme is off', async () => {
+        const addCtx = mockRunContext({
+            projectDir,
+            enabledFeatures: new Set(['nuxt4:landing-shell']),
+            state: { packageManager: 'pnpm' },
+        })
+        await landingShellFeature.execute(addCtx)
+        expect(await read(APP_CONFIG)).toContain("primary: 'blue'")
+    })
+
+    // The skill tells agents to read DESIGN_SYSTEM.md/brand.css and treat the theme
+    // as installed — confidently wrong context in a project that switched it off.
+    it('ai-tool-config gates the battlestack-ui skill on the theme feature', async () => {
+        const SKILL = '.claude/skills/battlestack-ui/SKILL.md'
+
+        const withTheme = ctx()
+        await aiToolConfigFeature.execute(withTheme)
+        await expect(read(SKILL)).resolves.toContain('battlestack-ui')
+        expect(withTheme.state['files:shared:ai-tool-config']).toHaveProperty([SKILL])
+
+        await rm(path.join(projectDir, '.claude'), { recursive: true, force: true })
+
+        const withoutTheme = mockRunContext({ projectDir, enabledFeatures: new Set(), state: {} })
+        await aiToolConfigFeature.execute(withoutTheme)
+        await expect(read(SKILL)).rejects.toThrow()
+        expect(withoutTheme.state['files:shared:ai-tool-config']).not.toHaveProperty([SKILL])
     })
 })
 

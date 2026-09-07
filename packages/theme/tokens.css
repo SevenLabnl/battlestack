@@ -39,7 +39,9 @@
     --color-brand-200: #bcd2ff;
     --color-brand-300: #8fb2ff;
     --color-brand-400: #5b8cff;
-    --color-brand-500: #2f66f5;
+    /* 500 darkened from the design draft's #2f66f5: as link text it must clear
+       4.5:1 on --ui-bg-muted (stone-50), which #2f66f5 missed at 4.29. */
+    --color-brand-500: #2b5fe8;
     --color-brand-600: #1149dd;
     --color-brand-700: #0d38ad;
     --color-brand-800: #102f89;
@@ -85,9 +87,11 @@
     --ui-bg-elevated: var(--ui-color-neutral-100);
     --ui-bg-accented: var(--ui-color-neutral-200);
 
-    /* Text: warm ink. */
+    /* Text: warm ink. Muted steps down to 600, not Nuxt UI's 500 default —
+       stone-500 misses 4.5:1 on both canvases (4.49 on white, 3.99 on stone-50). */
     --ui-text-highlighted: var(--ui-color-neutral-950);
     --ui-text: var(--ui-color-neutral-700);
+    --ui-text-muted: var(--ui-color-neutral-600);
 
     /* Primary: brand-500 fill — white text clears 4.5:1 (verified by
        `check:contrast`); links and focus follow it. */
@@ -102,9 +106,11 @@
     --ui-bg-accented: var(--ui-color-neutral-700);
     --ui-border: var(--ui-color-neutral-800);
 
-    /* Dark restatements for the :root overrides above. */
+    /* Dark restatements for the :root overrides above. Muted restates Nuxt UI's
+       own dark value (stone-400 clears 4.5:1 on every dark surface). */
     --ui-text-highlighted: white;
     --ui-text: var(--ui-color-neutral-200);
+    --ui-text-muted: var(--ui-color-neutral-400);
 
     /* The accent lifts in dark mode: ink text on light-blue fills. */
     --ui-primary: var(--ui-color-primary-400);

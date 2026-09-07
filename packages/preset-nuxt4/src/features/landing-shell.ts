@@ -2,11 +2,15 @@ import path from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
 import { STAGE, isFeatureEnabled, hashFile, recordFile, type Feature, type RunContext } from '@battlestack/core'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
+import { applyColorAliases } from './battlestack-theme.js'
 
 /** Frontend shell: `app.vue`, `app.config.ts`, layouts, landing page. All emitted files are structural. */
 export const landingShellFeature: Feature = {
     id: 'nuxt4:landing-shell',
-    version: '1.3.1',
+    // 1.3.2: re-applies `nuxt4:battlestack-theme`'s color aliases after emitting
+    // `app.config.ts` — `battlestack add` runs only this feature's execute(), which
+    // used to silently revert a themed project to the scaffold defaults.
+    version: '1.3.2',
     label: 'Landing shell (layouts, public landing page)',
     description: 'Public landing page, layouts, and frontend app shell.',
     frameworks: ['nuxt4'],
@@ -16,6 +20,7 @@ export const landingShellFeature: Feature = {
     async execute(ctx) {
         await emitTemplate(ctx, this.id, import.meta.url, 'landing-shell')
         await applyAuthVariant(ctx, this.id)
+        if (isFeatureEnabled(ctx, 'nuxt4:battlestack-theme')) await applyColorAliases(ctx)
     },
 
     structuralFiles(ctx) {
@@ -27,6 +32,7 @@ export const landingShellFeature: Feature = {
     async update(ctx, prev) {
         const report = await emitTemplateUpdate(ctx, this.id, import.meta.url, 'landing-shell', prev)
         await applyAuthVariant(ctx, this.id)
+        if (isFeatureEnabled(ctx, 'nuxt4:battlestack-theme')) await applyColorAliases(ctx)
         return report
     },
 }

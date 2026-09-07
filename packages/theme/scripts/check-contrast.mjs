@@ -7,11 +7,16 @@
  * declares (`primary: 'brand'`, `neutral: 'stone'`, …), then checks the pairs
  * the design system promises:
  *
- *   text on bg            >= 4.5   (normal text)
- *   highlighted on bg     >= 4.5
- *   primary as text on bg >= 4.5   (links)
- *   button: fg on primary >= 4.5   (white in light, ink in dark)
- *   primary vs bg         >= 3.0   (non-text: focus ring, control boundary)
+ *   text on bg / bg-muted        >= 4.5   (normal text, both canvases)
+ *   muted text on bg / bg-muted  >= 4.5   (secondary text, both canvases)
+ *   highlighted on bg            >= 4.5
+ *   primary as text on bg / bg-muted >= 4.5   (links, both canvases)
+ *   button: fg on primary        >= 4.5   (white in light, ink in dark)
+ *   primary vs bg / bg-muted     >= 3.0   (non-text: focus ring, control boundary)
+ *
+ * Border tokens are NOT checked: decorative separators carry no WCAG minimum
+ * (1.4.11 applies to boundaries that convey state, and those follow --ui-primary
+ * or component-selected accented tokens, not --ui-border).
  *
  * Both themes. Any failure exits 1.
  */
@@ -89,10 +94,14 @@ function check(themeName, vars, fgName, bgName, min, label) {
 for (const [themeName, vars] of [['light', { ...NUXT_UI_LIGHT, ...light }], ['dark', { ...NUXT_UI_DARK, ...light, ...dark }]]) {
     check(themeName, vars, '--ui-text', '--ui-bg', 4.5, 'body text on bg')
     check(themeName, vars, '--ui-text', '--ui-bg-muted', 4.5, 'body text on muted bg')
+    check(themeName, vars, '--ui-text-muted', '--ui-bg', 4.5, 'muted text on bg')
+    check(themeName, vars, '--ui-text-muted', '--ui-bg-muted', 4.5, 'muted text on muted bg')
     check(themeName, vars, '--ui-text-highlighted', '--ui-bg', 4.5, 'headings on bg')
-    check(themeName, vars, '--ui-primary', '--ui-bg', 4.5, 'primary as link text')
+    check(themeName, vars, '--ui-primary', '--ui-bg', 4.5, 'primary as link text on bg')
+    check(themeName, vars, '--ui-primary', '--ui-bg-muted', 4.5, 'primary as link text on muted')
     check(themeName, vars, '--ui-text-inverted', '--ui-primary', 4.5, 'button label on primary')
     check(themeName, vars, '--ui-primary', '--ui-bg', 3.0, 'primary non-text vs bg')
+    check(themeName, vars, '--ui-primary', '--ui-bg-muted', 3.0, 'primary non-text vs muted bg')
 }
 
 if (failures.length > 0) {

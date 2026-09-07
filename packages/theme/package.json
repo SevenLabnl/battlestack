@@ -1,6 +1,7 @@
 {
     "name": "@battlestack/theme",
     "version": "0.0.0",
+    "private": true,
     "description": "Battlestack Design System Nuxt — the Nuxt UI theme: token values for light and dark, brand assets, and the Logo lockup. No components; Nuxt UI is the component library.",
     "license": "MIT",
     "type": "module",
