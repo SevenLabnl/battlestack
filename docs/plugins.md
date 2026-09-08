@@ -235,11 +235,15 @@ battlestack.extendTemplate({
     templateId: 'nuxt4-fullstack',
     addFeatures: ['acme:observability'],          // always on
     addOptionalFeatures: ['acme:analytics'],      // a user-selectable checkbox
+    addDefaultEnabledOptional: ['acme:keur'],     // checked by default, new scaffolds only
 })
 ```
 
-`addFeatures` forces a feature on for everybody using that template.
-`addOptionalFeatures` keeps it a choice. Reach for the second unless the
+`addFeatures` forces a feature on for everybody using that template, and
+`battlestack pull` installs it into existing projects too. `addOptionalFeatures`
+keeps it a choice. `addDefaultEnabledOptional` is the middle: every new project
+gets it unless someone unticks it, and no existing project receives it unasked —
+`pull` rehydrates only required features. Reach for the second or third unless the
 template is genuinely broken without your feature.
 
 An unknown `templateId` warns and is skipped rather than failing the run, so a

@@ -168,8 +168,11 @@ The methods on that context, as they exist today:
   wiring its own deploy pipeline into the public `fullstack` template) and
   `addOptionalFeatures` (the user-selectable counterpart — appended to
   `optionalFeatures`, for a plugin-contributed feature that should stay a
-  checkbox). Both dedupe against *both* lists, so the same id can't land in
-  each. Extensions apply in a second pass after every plugin has finished
+  checkbox) and `addDefaultEnabledOptional` (optional *and* checked by
+  default on a new scaffold; `pull` never adds it to an existing project,
+  because `pull` rehydrates only required features). All three dedupe
+  against *both* lists, so the same id can't land in each. Extensions
+  apply in a second pass after every plugin has finished
   registering, so they're **load-order-independent**: it doesn't matter
   whether the plugin defining the template or the plugin extending it loads
   first. Extending a template no loaded plugin defined is skipped with a
@@ -392,7 +395,8 @@ Worth knowing about rather than discovering by surprise:
   and the `TemplateExtension` type echoes it with "(and, later, template
   files)" — but file-level template extension (a plugin patching or
   appending to a file another plugin's feature emits) isn't implemented; the
-  type carries only `templateId`, `addFeatures?` and `addOptionalFeatures?`.
+  type carries only `templateId`, `addFeatures?`, `addOptionalFeatures?` and
+  `addDefaultEnabledOptional?`.
   A plugin that
   needs to change generated output beyond adding a whole new feature has no
   hook for it today; it has to own the entire file itself.
