@@ -1,9 +1,9 @@
-import net from 'node:net'
 import { CLIError, ErrorCode } from './errors.js'
 import { PNPM_PIN } from '../constants/package-manager.js'
 import { getUiPort } from '../ui-port.js'
 import { spawnSyncResolved as safeSpawnSync } from './win-exec.js'
 import { describePortAttribution, diagnosePort } from './port-diagnosis.js'
+import { isPortFree } from './port-alloc.js'
 import type { PreflightCheck, PreflightInput } from '../types/preflight.js'
 
 /** Environment readiness: Node, package manager, Docker. Runs before the prompts. */
@@ -129,16 +129,4 @@ function semverLt(a: string, b: string): boolean {
         if (x !== y) return x < y
     }
     return false
-}
-
-async function isPortFree(port: number): Promise<boolean> {
-    return new Promise((resolve) => {
-        const sock = net
-            .createServer()
-            .once('error', () => resolve(false))
-            .once('listening', () => {
-                sock.close(() => resolve(true))
-            })
-            .listen(port, '127.0.0.1')
-    })
 }

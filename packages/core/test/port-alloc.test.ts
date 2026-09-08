@@ -29,6 +29,33 @@ describe('isPortFree', () => {
         await new Promise<void>((resolve) => server.close(() => resolve()))
         expect(await isPortFree(port)).toBe(true)
     })
+
+    for (const host of ['127.0.0.1', '::1']) {
+        it(`reports false while a port is bound on ${host} only`, async () => {
+            const server = net.createServer()
+            const bound: number | null = await new Promise((resolve) => {
+                server.once('error', () => resolve(null))
+                server.listen(0, host, () => resolve((server.address() as net.AddressInfo).port))
+            })
+            if (bound === null) return // no address in this family here
+
+            expect(await isPortFree(bound)).toBe(false)
+
+            await new Promise<void>((resolve) => server.close(() => resolve()))
+            expect(await isPortFree(bound)).toBe(true)
+        })
+    }
+
+    it('probes a single family when `host` is passed explicitly', async () => {
+        const server = net.createServer()
+        const port: number = await new Promise((resolve) => {
+            server.listen(0, '127.0.0.1', () => resolve((server.address() as net.AddressInfo).port))
+        })
+
+        expect(await isPortFree(port, '127.0.0.1')).toBe(false)
+
+        await new Promise<void>((resolve) => server.close(() => resolve()))
+    })
 })
 
 describe('allocatePort', () => {

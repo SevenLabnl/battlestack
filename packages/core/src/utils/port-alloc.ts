@@ -7,14 +7,30 @@ import { diagnosePort, type PortDiagnosis } from './port-diagnosis.js'
 import type { PortKind, ProjectPort } from '../types/ports.js'
 import type { BattlestackRegistries } from '../registry.js'
 
-/** True when nothing is listening on `port`. Racy: a later bind can still lose. */
-export function isPortFree(port: number, host = '127.0.0.1'): Promise<boolean> {
+// Bind errors meaning "no address in this family", not "port taken".
+const FAMILY_ABSENT = new Set(['EADDRNOTAVAIL', 'EAFNOSUPPORT', 'EINVAL', 'EPROTONOSUPPORT'])
+
+type BindResult = 'free' | 'busy' | 'absent'
+
+function tryBind(port: number, host: string): Promise<BindResult> {
     return new Promise((resolve) => {
         const sock = net.createServer()
-            .once('error', () => resolve(false))
-            .once('listening', () => sock.close(() => resolve(true)))
+            .once('error', (err: NodeJS.ErrnoException) => {
+                resolve(FAMILY_ABSENT.has(err.code ?? '') ? 'absent' : 'busy')
+            })
+            .once('listening', () => sock.close(() => resolve('free')))
             .listen(port, host)
     })
+}
+
+/**
+ * True when nothing is listening on `port` on either loopback family. Racy: a later bind
+ * can still lose. Pass `host` to probe one family only.
+ */
+export function isPortFree(port: number, host?: string): Promise<boolean> {
+    if (host !== undefined) return tryBind(port, host).then((r) => r === 'free')
+    return Promise.all([tryBind(port, '127.0.0.1'), tryBind(port, '::1')])
+        .then((results) => results.every((r) => r !== 'busy'))
 }
 
 // Per-project port: `1` prefixed to the service default (1xxxx → xxxx) plus a hash offset.
