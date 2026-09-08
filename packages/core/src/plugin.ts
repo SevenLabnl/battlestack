@@ -297,6 +297,13 @@ export function finalizeRegistries(
                 template.optionalFeatures.push(fqid)
             }
         }
+        for (const featureId of ext.addDefaultEnabledOptional ?? []) {
+            const fqid = resolveFeature(featureId, ext.requestedByPlugin, template.fqid)
+            if (!fqid || template.requiredFeatures.includes(fqid)) continue
+            if (!template.optionalFeatures.includes(fqid)) template.optionalFeatures.push(fqid)
+            template.defaultEnabledOptional ??= []
+            if (!template.defaultEnabledOptional.includes(fqid)) template.defaultEnabledOptional.push(fqid)
+        }
     }
 
     for (const template of registries.templates.all()) {

@@ -138,6 +138,38 @@ describe('finalizeRegistries', () => {
         assert.ok(!t.requiredFeatures.includes('acme:nuxt4:fontawesome'))
     })
 
+    it('applies addDefaultEnabledOptional as optional AND checked by default, never required', () => {
+        const registries = new BattlestackRegistries()
+        const loaded: LoadedPlugin[] = []
+        loaded.push(applyPlugin(defineBattlestackPlugin({
+            name: '@battlestack/preset-nuxt',
+            apiVersion: 1,
+            register(battlestack) {
+                battlestack.addFeature(feature('nuxt4:auth'))
+                battlestack.addFeature(feature('shared:docker'))
+                battlestack.addTemplate(fullstack())
+            },
+        }), 'bundled', registries))
+        loaded.push(applyPlugin(defineBattlestackPlugin({
+            name: '@acme/battlestack-plugin',
+            apiVersion: 1,
+            register(battlestack) {
+                battlestack.addFeature(feature('shared:keur'))
+                battlestack.extendTemplate({
+                    templateId: 'fullstack',
+                    addDefaultEnabledOptional: ['shared:keur'],
+                })
+            },
+        }), 'store', registries))
+
+        const warnings = finalizeRegistries(registries, loaded.flatMap((p) => p.extensions))
+        const t = registries.templates.get('fullstack')
+        assert.deepEqual(warnings, [])
+        assert.deepEqual(t.optionalFeatures, ['battlestack:shared:docker', 'acme:shared:keur'])
+        assert.deepEqual(t.defaultEnabledOptional, ['acme:shared:keur'])
+        assert.ok(!t.requiredFeatures.includes('acme:shared:keur'))
+    })
+
     it('dedupes an id that would otherwise land in both requiredFeatures and optionalFeatures', () => {
         const registries = new BattlestackRegistries()
         const loaded: LoadedPlugin[] = []
