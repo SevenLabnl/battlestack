@@ -16,7 +16,12 @@ const ICON_FILES = [
 /** Always-on Nuxt essentials: `@nuxt/eslint`, `@nuxt/fonts`, `@nuxt/image`, datepicker, `@iconify/vue`. */
 export const essentialsFeature: Feature = {
     id: 'nuxt4:essentials',
-    version: '1.1.0',
+    // 1.2.0: `h3@^1` as an explicit dependency. Templates `import type { H3Event } from 'h3'`
+    // while nothing declared h3, so the bare specifier resolved to whichever copy pnpm had
+    // hoisted — and `@nuxt/eslint`'s config inspector drags in h3@2 (rc). On the runner that
+    // copy won and every `H3Event` argument mismatched Nuxt's h3@1 (2026-09-08, 134 errors);
+    // locally it happened not to. Declaring the major Nuxt ships makes it the same everywhere.
+    version: '1.2.0',
     label: 'Nuxt essentials (eslint, fonts, image, iconify, datepicker, nodemailer)',
     frameworks: ['nuxt4'],
     stage: STAGE.BASE_CONFIG,
@@ -27,7 +32,7 @@ export const essentialsFeature: Feature = {
 
     collectDeps() {
         return {
-            prod: ['@vuepic/vue-datepicker', '@iconify/vue'],
+            prod: ['@vuepic/vue-datepicker', '@iconify/vue', 'h3@^1'],
             // `@iconify-json/lucide` is a local icon bundle. eslint/typescript/vue-tsc are explicit.
             dev: ['@iconify-json/lucide', 'eslint', 'typescript', 'vue-tsc'],
         }
