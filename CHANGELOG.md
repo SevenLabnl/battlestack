@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.0 (2026-09-08)
+
+- core: addDefaultEnabledOptional on extendTemplate (#31) (e94eed5)
+- docs: update PRD link in docs README (a79a501)
+- docs: rename prd.md to PRD.md (a2183e4)
+
+[Full changelog](https://github.com/SevenLabnl/battlestack/compare/v1.0.0...v1.1.0)
+
 ## v1.0.0 (2026-09-01)
 
 - revert(icons): restore the original apple-touch-icon bytes (3a31a3f)
