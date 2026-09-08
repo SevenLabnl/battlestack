@@ -10,9 +10,9 @@
  *   text on bg / bg-muted        >= 4.5   (normal text, both canvases)
  *   muted text on bg / bg-muted  >= 4.5   (secondary text, both canvases)
  *   highlighted on bg            >= 4.5
- *   primary as text on bg / bg-muted >= 4.5   (links, both canvases)
- *   button: fg on primary        >= 4.5   (white in light, ink in dark)
- *   primary vs bg / bg-muted     >= 3.0   (non-text: focus ring, control boundary)
+ *   primary/secondary as text on bg / bg-muted >= 4.5   (links, both canvases)
+ *   button: fg on primary/secondary >= 4.5   (white in light, ink in dark)
+ *   primary/secondary vs bg / bg-muted >= 3.0 (non-text: focus ring, control boundary)
  *
  * Border tokens are NOT checked: decorative separators carry no WCAG minimum
  * (1.4.11 applies to boundaries that convey state, and those follow --ui-primary
@@ -102,6 +102,13 @@ for (const [themeName, vars] of [['light', { ...NUXT_UI_LIGHT, ...light }], ['da
     check(themeName, vars, '--ui-text-inverted', '--ui-primary', 4.5, 'button label on primary')
     check(themeName, vars, '--ui-primary', '--ui-bg', 3.0, 'primary non-text vs bg')
     check(themeName, vars, '--ui-primary', '--ui-bg-muted', 3.0, 'primary non-text vs muted bg')
+    // Secondary gets the same treatment as primary: it is an aliased accent the
+    // components render as fills and text (`color="secondary"`, `text-secondary`).
+    check(themeName, vars, '--ui-secondary', '--ui-bg', 4.5, 'secondary as link text on bg')
+    check(themeName, vars, '--ui-secondary', '--ui-bg-muted', 4.5, 'secondary as link text on muted')
+    check(themeName, vars, '--ui-text-inverted', '--ui-secondary', 4.5, 'button label on secondary')
+    check(themeName, vars, '--ui-secondary', '--ui-bg', 3.0, 'secondary non-text vs bg')
+    check(themeName, vars, '--ui-secondary', '--ui-bg-muted', 3.0, 'secondary non-text vs muted bg')
 }
 
 if (failures.length > 0) {

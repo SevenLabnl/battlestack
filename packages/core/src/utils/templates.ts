@@ -564,10 +564,26 @@ export async function updateFromTemplateDirs(
             seen.add(rel)
             // A rel a later-ordered feature also ships (landing-shell over nuxt-ui's app
             // shell): the bytes on disk are that feature's, so emitting ours here would
-            // silently replace them. The carried-forward baseline stays valid because
-            // every write path re-baselines all tracking features.
+            // silently replace them.
             const laterOwner = deferredToLater.get(toPosix(rel))
             if (laterOwner !== undefined) {
+                // Repair an already-stale baseline while deferring: when disk matches the
+                // later owner's own baseline (pristine from its perspective), the stale
+                // hashes other features carry — from before shared-rel re-baselining
+                // existed, or where neither feature is bumped this release — can safely
+                // move to the on-disk bytes, and stale merge artifacts go with them.
+                // User-drifted bytes are left for the later owner's update to classify.
+                const dest = path.join(ctx.projectDir, rel)
+                if (await exists(dest)) {
+                    const diskHash = await hashFile(dest)
+                    const ownerMap = ctx.state[`files:${laterOwner}`] as Record<string, string> | undefined
+                    const ownerHash = Object.entries(ownerMap ?? {})
+                        .find(([r]) => toPosix(r) === toPosix(rel))?.[1]
+                    if (ownerHash === diskHash) {
+                        rebaselineRecordedFile(ctx, rel, diskHash)
+                        await clearArtifacts(ctx, dest, rel)
+                    }
+                }
                 report.notes.push(`${rel}: also shipped by ${laterOwner} (which runs later), left unchanged`)
                 continue
             }

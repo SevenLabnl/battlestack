@@ -149,8 +149,18 @@ describe('battlestackThemeFeature: emitted files', () => {
     })
 
     // Without this, `battlestack pull` overwrites the project's own brand every time.
-    it('marks the brand stylesheet as user-owned, and only that', () => {
-        expect(battlestackThemeFeature.structuralFiles!(ctx())).toEqual([BRAND_CSS])
+    // Platform-separated on purpose: manifest keys come from `path.join`, so a posix
+    // literal here would miss on Windows and `pull` would overwrite brand.css.
+    it('marks the brand stylesheet as user-owned, and only that', async () => {
+        const scaffold = ctx()
+        await battlestackThemeFeature.execute(scaffold)
+        expect(battlestackThemeFeature.structuralFiles!(scaffold)).toEqual([path.join(BRAND_CSS)])
+    })
+
+    // Nothing recorded yet means nothing to claim — a claim on a file this feature has
+    // not emitted would make `pull` skip writing it while the wiring still references it.
+    it('claims no files before it has emitted any', () => {
+        expect(battlestackThemeFeature.structuralFiles!(ctx())).toEqual([])
     })
 })
 
@@ -158,6 +168,21 @@ describe('battlestackThemeFeature: wiring', () => {
     it('extends the theme layer in nuxt.config', async () => {
         await battlestackThemeFeature.execute(ctx())
         expect(await read('nuxt.config.ts')).toMatch(/extends:\s*\[\s*["']@battlestack\/theme["']/)
+    })
+
+    // Nuxt accepts `extends` as a bare string; without normalization the add would
+    // throw `extends.push is not a function` and abort.
+    it('handles a bare-string extends entry', async () => {
+        await writeFile(
+            path.join(projectDir, 'nuxt.config.ts'),
+            "export default defineNuxtConfig({\n    extends: './layers/legacy',\n})\n",
+            'utf8',
+        )
+        await battlestackThemeFeature.execute(ctx())
+        const cfg = await read('nuxt.config.ts')
+        expect(cfg).toContain('./layers/legacy')
+        expect(cfg).toMatch(/extends:\s*\[/)
+        expect(cfg.indexOf('@battlestack/theme')).toBeGreaterThan(cfg.indexOf('./layers/legacy'))
     })
 
     it('leaves a hand-written config entry alone, appending after it', async () => {
@@ -313,6 +338,28 @@ describe('battlestackThemeFeature: patched files stay in baseline', () => {
         }
         const report = await nuxtUiFeature.update!(ctx(), prev)
         expect(report.skipped).toEqual([])
+    })
+
+    // The re-baseline hashes the whole file, so it must move only baselines that matched
+    // the pre-splice bytes: blessing a user-drifted file would let the next nuxt-ui bump
+    // classify it as pristine and overwrite the user's rules with nothing staged.
+    it('does not bless user drift in main.css while splicing', async () => {
+        const mainCssRel = path.join(MAIN_CSS)
+        const staleHash = 'a'.repeat(64) // nuxt-ui's baseline from before the user edited
+        await writeFile(
+            path.join(projectDir, MAIN_CSS),
+            (await read(MAIN_CSS)) + '\n.user-rule { color: red }\n',
+            'utf8',
+        )
+        const runCtx = ctx()
+        runCtx.state['files:nuxt4:nuxt-ui'] = { [mainCssRel]: staleHash }
+
+        await battlestackThemeFeature.execute(runCtx)
+
+        // The splice happened, but nuxt-ui's stale baseline stays stale: real drift.
+        await expect(read(MAIN_CSS)).resolves.toContain('@battlestack/theme/tokens.css')
+        const recorded = runCtx.state['files:nuxt4:nuxt-ui'] as Record<string, string>
+        expect(recorded[mainCssRel]).toBe(staleHash)
     })
 })
 

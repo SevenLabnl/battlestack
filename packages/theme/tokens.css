@@ -96,6 +96,10 @@
     /* Primary: brand-500 fill — white text clears 4.5:1 (verified by
        `check:contrast`); links and focus follow it. */
     --ui-primary: var(--ui-color-primary-500);
+
+    /* Secondary steps down to 600, not Nuxt UI's 500 default: white on
+       lilac-500 and lilac-500 as text are both 3.82:1, under AA. */
+    --ui-secondary: var(--ui-color-secondary-600);
 }
 
 .dark {
@@ -112,8 +116,10 @@
     --ui-text: var(--ui-color-neutral-200);
     --ui-text-muted: var(--ui-color-neutral-400);
 
-    /* The accent lifts in dark mode: ink text on light-blue fills. */
+    /* The accents lift in dark mode: ink text on light fills. Secondary restates
+       Nuxt UI's own dark value (lilac-400 clears 4.5:1 on every dark surface). */
     --ui-primary: var(--ui-color-primary-400);
+    --ui-secondary: var(--ui-color-secondary-400);
 }
 
 /* Design-system decision: buttons keep the pointer cursor (Tailwind v4's

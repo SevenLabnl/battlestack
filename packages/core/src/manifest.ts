@@ -245,6 +245,16 @@ export function rebaselineRecordedFile(
     ctx: RunContext,
     relativePath: string,
     hash: string,
+    opts: {
+        /**
+         * Move only baselines that equal this hash (the file's pre-write bytes). For a
+         * string-patch over a possibly user-drifted file: a feature whose baseline
+         * already diverged keeps its drift visible instead of having the user's edits
+         * silently blessed into the baseline — where the next template bump would
+         * classify the file as pristine and overwrite them without staging artifacts.
+         */
+        onlyIfPrevHash?: string
+    } = {},
 ): void {
     // Recorded rels are platform-separated (`path.join` in the emit path), so on
     // Windows the maps hold `app\...` keys — compare separator-insensitively and
@@ -254,9 +264,9 @@ export function rebaselineRecordedFile(
         if (!key.startsWith('files:')) continue
         const map = ctx.state[key] as Record<string, string>
         for (const tracked of Object.keys(map)) {
-            if (tracked.replaceAll(path.sep, '/') === posix) {
-                recordFile(ctx, key.slice('files:'.length), tracked, hash)
-            }
+            if (tracked.replaceAll(path.sep, '/') !== posix) continue
+            if (opts.onlyIfPrevHash !== undefined && map[tracked] !== opts.onlyIfPrevHash) continue
+            recordFile(ctx, key.slice('files:'.length), tracked, hash)
         }
     }
 }

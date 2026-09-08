@@ -475,6 +475,63 @@ describe('updateFromTemplateDir: rels shared across features', () => {
         expect(await exists(path.join(projectDir, REL))).toBe(true)
     })
 
+    // Neither feature bumped: the deferral is the ONLY path that touches the rel, so it
+    // must also repair a baseline that is already stale (e.g. recorded before shared-rel
+    // re-baselining existed) — otherwise `doctor` reports drift forever and even
+    // `pull --force` defers instead of repairing.
+    it('repairs an already-stale baseline while deferring to the later owner', async () => {
+        await mkdir(path.join(templateDir, 'app'), { recursive: true })
+        await writeFile(path.join(templateDir, REL), '<template>minimal ui shell v2</template>\n')
+        await mkdir(path.join(projectDir, 'app'), { recursive: true })
+        await writeFile(path.join(projectDir, REL), SHELL_CONTENT)
+        const shellHash = sha(SHELL_CONTENT)
+        const staleHash = sha('<template>old ui shell</template>\n')
+
+        const ctx = makeSharedCtx({
+            'tpl:ui': { [REL]: staleHash },
+            'tpl:shell': { [REL]: shellHash },
+        })
+        const prev: InstalledFeatureRecord = {
+            id: 'shared:tpl:ui',
+            version: '0.9.0',
+            files: { [REL]: staleHash },
+        }
+
+        await updateFromTemplateDir(ctx, 'tpl:ui', templateDir, prev)
+
+        // Disk matches the later owner's baseline (pristine from its perspective), so the
+        // stale record moves to the on-disk bytes and the drift is healed.
+        expect((ctx.state['files:tpl:ui'] as Record<string, string>)[REL]).toBe(shellHash)
+        expect(await readFile(path.join(projectDir, REL), 'utf8')).toBe(SHELL_CONTENT)
+    })
+
+    it('does not bless user drift while deferring: only the later owner may classify it', async () => {
+        await mkdir(path.join(templateDir, 'app'), { recursive: true })
+        await writeFile(path.join(templateDir, REL), '<template>minimal ui shell v2</template>\n')
+        await mkdir(path.join(projectDir, 'app'), { recursive: true })
+        const userContent = '<template>user rewrote this</template>\n'
+        await writeFile(path.join(projectDir, REL), userContent)
+        const shellHash = sha(SHELL_CONTENT)
+        const staleHash = sha('<template>old ui shell</template>\n')
+
+        const ctx = makeSharedCtx({
+            'tpl:ui': { [REL]: staleHash },
+            'tpl:shell': { [REL]: shellHash },
+        })
+        const prev: InstalledFeatureRecord = {
+            id: 'shared:tpl:ui',
+            version: '0.9.0',
+            files: { [REL]: staleHash },
+        }
+
+        await updateFromTemplateDir(ctx, 'tpl:ui', templateDir, prev)
+
+        // Disk diverges from the later owner's baseline: real drift, both records stay put.
+        expect((ctx.state['files:tpl:ui'] as Record<string, string>)[REL]).toBe(staleHash)
+        expect((ctx.state['files:tpl:shell'] as Record<string, string>)[REL]).toBe(shellHash)
+        expect(await readFile(path.join(projectDir, REL), 'utf8')).toBe(userContent)
+    })
+
     it('re-baselines the earlier feature when the later one rewrites a shared pristine rel', async () => {
         // shell-bump-only pull: shell's update overwrites the shared file; ui's carried
         // baseline must follow, or ui reports drift (and stages conflicts) forever.

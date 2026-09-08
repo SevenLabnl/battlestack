@@ -21,7 +21,16 @@ withDefaults(defineProps<{
 
 <template>
     <span class="bs-logo">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="bs-logo-mark">
+        <!-- Mark alone must still have an accessible name: an icon-only home link
+             would otherwise be announced as an unlabeled link (WCAG 2.4.4/4.1.2). -->
+        <svg
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            class="bs-logo-mark"
+            :aria-hidden="wordmark ? 'true' : undefined"
+            :role="wordmark ? undefined : 'img'"
+            :aria-label="wordmark ? undefined : 'Battlestack'"
+        >
             <rect x="7" y="2.5" width="14" height="5" rx="2.5" opacity=".45" />
             <rect x="4" y="9.5" width="17" height="5" rx="2.5" opacity=".72" />
             <rect x="1" y="16.5" width="20" height="5" rx="2.5" />
@@ -31,12 +40,14 @@ withDefaults(defineProps<{
 </template>
 
 <style scoped>
+/* No `color` here on purpose: the lockup is currentColor and inherits whatever
+   surface it sits on (see the docstring) — pinning a text token would render
+   near-black on inverted surfaces. */
 .bs-logo {
     display: inline-flex;
     align-items: center;
     gap: 0.45em;
     line-height: 1;
-    color: var(--ui-text-highlighted);
 }
 
 .bs-logo-mark {

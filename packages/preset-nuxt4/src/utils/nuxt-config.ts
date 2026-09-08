@@ -31,6 +31,10 @@ export class NuxtConfig {
      * order: a layer added later never shadows one an earlier feature already relied on.
      */
     addExtends(layer: string): this {
+        // Nuxt accepts `extends` as a bare string (`extends: './layers/base'`); left
+        // as-is, `pushUnique` would call `.push` on it and throw. Modules/css are
+        // array-only in Nuxt, so extends is the one key needing this.
+        if (typeof this.config.extends === 'string') this.config.extends = [this.config.extends]
         this.config.extends ||= []
         pushUnique(this.config.extends, layer)
         return this
