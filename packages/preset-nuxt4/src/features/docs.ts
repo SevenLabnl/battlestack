@@ -19,7 +19,7 @@ export const docsFeature: Feature = {
     // 1.0.11: extensions docs from `nuxt4:database` 1.6.0 and `nuxt4:rag`.
     // 1.0.14: favicon/app-icon docs from `nuxt4:essentials` 1.1.0 and `nuxt4:pwa` 1.1.0.
     // 1.0.15: clarified when `pull` first writes the user-owned icon paths.
-    version: '1.0.17',
+    version: '1.0.18',
     label: 'Generate AGENTS.md + CLAUDE.md + README.md',
     frameworks: ['nuxt4'],
     stage: STAGE.DOCS,
@@ -48,7 +48,7 @@ export const docsFeature: Feature = {
         const modulesSection = collectModulesSection(ctx)
         if (modulesSection) sections.unshift(modulesSection)
 
-        const readme = renderReadme(ctx, sections)
+        const readme = renderReadme(ctx)
         const agentsMd = renderAgentsMd(ctx, sections)
         const claudeMd = renderClaudePointer()
 
@@ -290,7 +290,7 @@ function collectModulesSection(ctx: RunContext): DocSection | null {
     }
 }
 
-function renderReadme(ctx: RunContext, sections: DocSection[]): string {
+function renderReadme(ctx: RunContext): string {
     const enabledList = [...ctx.enabledFeatures]
         .map((id) => `- \`${ctx.registries.features.get(id).id}\``)
         .join('\n')
@@ -322,12 +322,13 @@ function renderReadme(ctx: RunContext, sections: DocSection[]): string {
         '',
     ]
 
-    for (const s of sections) {
-        if (s.targets && !s.targets.includes('readme')) continue
-        out.push(`## ${s.heading}`, '', s.body, '')
-    }
-
     out.push(
+        '## Conventions and command reference',
+        '',
+        'In [AGENTS.md](./AGENTS.md): file ownership, the commands behind every `battlestack` task,',
+        'per-feature notes and the house rules. Generated from the same feature set as this file,',
+        'so it never disagrees with it.',
+        '',
         '## Updating',
         '',
         'Run `battlestack pull` (or `battlestack sync`) inside this project to pull',

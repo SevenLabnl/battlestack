@@ -5,7 +5,7 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
 /** Nuxt UI v4 + Tailwind v4. Registers `@nuxt/ui` module and wires `assets/css/main.css`. */
 export const nuxtUiFeature: Feature = {
     id: 'nuxt4:nuxt-ui',
-    version: '1.2.0',
+    version: '1.2.1',
     label: 'Nuxt UI v4 + Tailwind v4',
     frameworks: ['nuxt4'],
     stage: STAGE.STYLING,
@@ -28,6 +28,8 @@ export const nuxtUiFeature: Feature = {
                     'Document title: `app/app.vue` defines a `titleTemplate` that renders `"<page title> - <app name>"`. Set a per-page title with `useHead({ title: () => t(\'...\') })` (function form keeps it reactive on locale switch); pages without a title fall back to just the app name. The app name comes from `runtimeConfig.public.appName` (defaults to the project name; override with `NUXT_PUBLIC_APP_NAME` or in `nuxt.config.ts`).',
                     '',
                     'Datepicker stays on `@vuepic/vue-datepicker` (`nuxt4:essentials`): the Nuxt UI `<UCalendar>` keyboard semantics + locale support are too thin for our forms.',
+                    '',
+                    'The 17 `@tiptap/*` entries in `dependencies` look unused because nothing in `app/` imports them, but they are `@nuxt/ui`\'s **required** (non-optional) peer dependencies, written into `package.json` by the `nuxi module add` step at scaffold. Do not prune them: dropping them does not fall back to an auto-installed peer, it leaves `@tiptap/*` uninstalled and the Nuxt UI components built on it unresolvable.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },
