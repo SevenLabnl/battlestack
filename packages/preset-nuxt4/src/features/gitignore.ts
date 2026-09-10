@@ -66,22 +66,28 @@ const NUXT_IGNORE_PATTERNS = [
     '**/*.wolf',
 ]
 
-// `eslint .` walks the project root, including the `.agents/` trees `skills add` fetches.
-const ESLINT_IGNORE_PATTERNS = ['.agents/**']
+// `eslint .` walks the project root, including the `.agents/` trees `skills add` fetches and the
+// `.claude/` config tree. Neither is app source.
+const ESLINT_IGNORE_PATTERNS = ['.agents/**', '.claude/**']
 
 // Marks our block so the insert happens exactly once. The config file stays the user's.
 const ESLINT_IGNORE_MARKER = 'battlestack:fetched-skills'
 
 const ESLINT_CONFIG_FILE = 'eslint.config.mjs'
 
-/** Text-inserts an `ignores` entry for fetched skill content into the flat ESLint config. */
+/** Text-inserts an `ignores` entry for non-source trees into the flat ESLint config. */
 async function applyEslintIgnore(projectDir: string): Promise<void> {
     const target = path.join(projectDir, ESLINT_CONFIG_FILE)
     // An adopted project may never have added `@nuxt/eslint`.
     if (!(await exists(target))) return
 
     const current = await readFile(target, 'utf8')
-    if (current.includes(ESLINT_IGNORE_MARKER)) return
+    // A project scaffolded before a pattern was added carries the block without it, so top up
+    // the existing block rather than returning and leaving the new tree linted.
+    if (current.includes(ESLINT_IGNORE_MARKER)) {
+        await topUpEslintIgnore(target, current)
+        return
+    }
 
     // `withNuxt(` is `@nuxt/eslint`'s documented entry point.
     const anchor = current.indexOf('withNuxt(')
@@ -89,8 +95,9 @@ async function applyEslintIgnore(projectDir: string): Promise<void> {
         ui.warn(
             `${ESLINT_CONFIG_FILE}: no \`withNuxt(\` call found; skipping the `
             + `\`${ESLINT_IGNORE_PATTERNS.join(', ')}\` ignore. Fetched AI-agent skill `
-            + 'content under `.agents/` is third-party code; add it to this config\'s '
-            + '`ignores` by hand or `eslint .` will lint it as if it were yours.',
+            + 'content under `.agents/` is third-party code and `.claude/` is agent config, not '
+            + 'app source; add them to this config\'s `ignores` by hand or `eslint .` will lint '
+            + 'them as if they were yours.',
         )
         return
     }
@@ -106,6 +113,28 @@ async function applyEslintIgnore(projectDir: string): Promise<void> {
     ].join('\n')
 
     await writeFileEnsured(target, current.slice(0, insertAt) + block + current.slice(insertAt))
+}
+
+/**
+ * Adds patterns missing from an existing marked block, editing only the `ignores: [...]` array
+ * that follows the marker so anything the user added around it is untouched.
+ */
+async function topUpEslintIgnore(target: string, current: string): Promise<void> {
+    const markerAt = current.indexOf(ESLINT_IGNORE_MARKER)
+    const arrayStart = current.indexOf('ignores: [', markerAt)
+    if (arrayStart === -1) return
+    const open = arrayStart + 'ignores: ['.length
+    const close = current.indexOf(']', open)
+    if (close === -1) return
+
+    const listed = current.slice(open, close)
+    const absent = ESLINT_IGNORE_PATTERNS.filter((pattern) => !listed.includes(`'${pattern}'`))
+    if (absent.length === 0) return
+
+    const added = absent.map((pattern) => `'${pattern}'`).join(', ')
+    const separator = listed.trim().length > 0 ? ', ' : ''
+    const next = current.slice(0, close) + separator + added + current.slice(close)
+    await writeFileEnsured(target, next)
 }
 
 // A second, distinct marker from the ignore block's.
@@ -190,7 +219,7 @@ async function applyNuxtIgnore(projectDir: string): Promise<void> {
 export const gitignoreFeature: Feature = {
     id: 'nuxt4:gitignore',
     // 1.4.0: owns the ESLint formatting and stylistic rules.
-    version: '1.5.0',
+    version: '1.5.1',
     label: 'Enforce ignore patterns (git, Nuxt, ESLint)',
     frameworks: ['nuxt4'],
     stage: STAGE.GITIGNORE,

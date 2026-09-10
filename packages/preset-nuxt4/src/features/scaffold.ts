@@ -33,6 +33,8 @@ import {
 import { readDotEnv } from '@battlestack/core/utils/dotenv.js'
 import { usersTablePopulated } from '@battlestack/core/utils/db.js'
 import { describePortAttribution, diagnosePort } from '@battlestack/core/utils/port-diagnosis.js'
+import { pmChecks } from '@battlestack/core/utils/preflight.js'
+import { PNPM_PIN } from '@battlestack/core/constants/package-manager.js'
 import { ui } from '@battlestack/tui'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
 import { isDatabaseSeeded, markDatabaseSeeded } from './database.js'
@@ -40,7 +42,7 @@ import { isDatabaseSeeded, markDatabaseSeeded } from './database.js'
 /** Single-shot `nuxi init` with the union of every enabled feature's modules. */
 export const scaffoldFeature: Feature = {
     id: 'nuxt4:scaffold',
-    version: '1.2.0',
+    version: '1.2.1',
     label: 'Scaffold Nuxt project',
     frameworks: ['nuxt4'],
     stage: STAGE.SCAFFOLD,
@@ -214,12 +216,19 @@ export const scaffoldFeature: Feature = {
             // `nuxi module add` exits 0 even when its install failed, so verify here.
             const missing = await missingFromPackageJson(ctx.projectDir, bareModules)
             if (missing.length > 0) {
+                // `nuxi` shells out to the pm by name, so a pm that is not on PATH surfaces here
+                // as a failed install rather than as a missing binary.
+                const pmOnPath = pmChecks(pm).every((c) => c.state !== 'fail')
                 throw new CLIError(
                     ErrorCode.EXEC_FAILED,
                     `nuxi module add did not install: ${missing.join(', ')}. `
-                    + 'Its embedded package-manager call failed; re-run with --verbose to see why '
-                    + '(common causes: a registry/network error, or a release-age policy rejecting '
-                    + 'a freshly published module version).',
+                    + (pmOnPath
+                        ? 'Its embedded package-manager call failed; re-run with --verbose to see why '
+                        + '(common causes: a registry/network error, or a release-age policy rejecting '
+                        + 'a freshly published module version).'
+                        : `Its embedded \`${pm}\` call failed because \`${pm}\` is not on PATH. `
+                        + `Install it (\`npm i -g ${PNPM_PIN}\` for pnpm), or re-run with `
+                        + '`--pm npm` to scaffold with npm instead.'),
                 )
             }
         }
