@@ -53,18 +53,49 @@ describe('installSkills', () => {
         await installSkills(ctx({ packageManager: 'bun' }), ['mastra-ai/skills'])
         expect(runMock).toHaveBeenCalledWith(
             dlxBinary('bun'),
-            dlxArgs('bun', ['skills', 'add', 'mastra-ai/skills', '--yes']),
+            dlxArgs('bun', ['skills', 'add', 'mastra-ai/skills', '--yes', '--agent', 'claude-code']),
             { cwd: projectDir, inherit: true },
         )
     })
 
+    // Without `--agent` the installer writes to every agent it detects, so third-party skill code
+    // lands in editor directories the project never configured, and eslint then lints it.
+    it('installs only for the configured AI tool', async () => {
+        await installSkills(ctx({ aiTool: 'cursor' }), ['mastra-ai/skills'])
+        expect(runMock).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.arrayContaining(['--agent', 'cursor']),
+            expect.anything(),
+        )
+    })
+
+    it('falls back to claude-code when no AI tool is recorded or the value is unknown', async () => {
+        for (const aiTool of [undefined, 'not-a-tool']) {
+            runMock.mockClear()
+            await installSkills(ctx({ aiTool }), ['mastra-ai/skills'])
+            expect(runMock).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.arrayContaining(['--agent', 'claude-code']),
+                expect.anything(),
+            )
+        }
+    })
+
     // `skills add` prompts for confirmation on a TTY, which stalls an unattended scaffold or pull.
-    it('runs non-interactively: passes --yes, and never --global', async () => {
+    it('runs non-interactively and project-local: --yes, never --global', async () => {
         await installSkills(ctx(), ['mastra-ai/skills'])
-        const args = runMock.mock.calls[0]?.[1] as string[]
-        expect(args).toContain('--yes')
-        expect(args).not.toContain('--global')
-        expect(args).not.toContain('-g')
+        expect(runMock).toHaveBeenCalledWith(
+            dlxBinary('pnpm'),
+            expect.arrayContaining(['--yes']),
+            expect.objectContaining({ cwd: projectDir }),
+        )
+        for (const global of ['--global', '-g']) {
+            expect(runMock).not.toHaveBeenCalledWith(
+                expect.anything(),
+                expect.arrayContaining([global]),
+                expect.anything(),
+            )
+        }
     })
 
     it('is best-effort: a failing `skills add` warns but does not throw', async () => {
