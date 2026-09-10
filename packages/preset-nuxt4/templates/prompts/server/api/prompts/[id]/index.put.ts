@@ -5,6 +5,7 @@ import { prompts } from '#server/database/schema/prompts'
 import { Role } from '#server/database/schema/users'
 import { requireRole, requireRouterParam } from '#server/utils/auth'
 import { tryLogAudit } from '#server/utils/audit-bridge'
+import { invalidatePromptCache } from '#server/utils/prompts'
 
 const schema = z.object({
     content: z.string().min(1, 'Content is required').max(10_000),
@@ -37,6 +38,8 @@ export default defineEventHandler(async (event) => {
     if (!updated) {
         throw createError({ statusCode: 404, statusMessage: 'Prompt not found' })
     }
+
+    await invalidatePromptCache(updated.key)
 
     await tryLogAudit(event, 'prompt.updated', null, {
         promptId: updated.id,
