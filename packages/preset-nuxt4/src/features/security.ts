@@ -7,7 +7,7 @@ import { STAGE } from '@battlestack/core/constants/stages.js'
 /** `nuxt-security` wrapper: response headers and a module-level rate-limit floor. */
 export const securityFeature: Feature = {
     id: 'shared:security',
-    version: '1.0.3',
+    version: '1.0.4',
     label: 'Security headers (nuxt-security)',
     stage: STAGE.BASE_CONFIG,
     failureIsNonFatal: true,
@@ -32,6 +32,8 @@ export const securityFeature: Feature = {
                     '`strict` is left at its default (`false`), which gives `nuxt-security` the leeway to skip directives that would break common app patterns out of the box. Flip to `true` in `nuxt.config.ts#security` once your CSP and headers are stable; the module will then refuse to silently downgrade them.',
                     '',
                     'Override individual fields by editing the `security: {...}` block in `nuxt.config.ts`; that file is yours post-scaffold and `battlestack pull` will not clobber it.',
+                    '',
+                    'Separately, `server/middleware/01.origin-check.ts` rejects POST/PUT/PATCH/DELETE whose `Origin` (or `Referer`) does not match `NUXT_ALLOWED_ORIGINS`, with a 403. An empty `NUXT_ALLOWED_ORIGINS` disables the check entirely, which is why it is invisible in local dev. It is the first thing to check for an unexplained 403 from `curl`, or from an e2e run pointed at a deployed environment.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },

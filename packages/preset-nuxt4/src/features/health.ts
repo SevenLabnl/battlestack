@@ -10,7 +10,7 @@ export const healthFeature: Feature = {
     // `/api/health/ready` for readiness. Both variants gate readiness on env config
     // (with-db also pings Postgres), and only on APPLICABLE config: an absent
     // `session` runtimeConfig means auth is not installed, not misconfigured.
-    version: '1.3.0',
+    version: '1.3.1',
     label: 'Health endpoints (/api/health, /live, /ready)',
     frameworks: ['nuxt4'],
     stage: STAGE.BASE_CONFIG,
@@ -29,6 +29,8 @@ export const healthFeature: Feature = {
                     '- `/api/health` answers 200 when ok; 503 when degraded AND `runtimeConfig.health.failOnDegraded` is true (default).',
                     '- DB pings (when `nuxt4:database` is enabled) are bounded by `runtimeConfig.health.dbTimeoutMs` (default 1000ms) — shared by `/api/health` and `/api/health/ready`.',
                     '- Override per env via `NUXT_HEALTH_FAIL_ON_DEGRADED` and `NUXT_HEALTH_DB_TIMEOUT_MS`.',
+                    '',
+                    'The `version` field reads `runtimeConfig.public.appVersion`, which defaults to `dev`. Set `NUXT_PUBLIC_APP_VERSION` in the container environment (from the CI build number) to have a deployed app report what it is running; without it every environment reports `dev`.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },
@@ -59,8 +61,12 @@ function variant(ctx: RunContext): 'with-db' | 'env-only' {
 
 async function registerRuntimeConfig(projectDir: string): Promise<void> {
     await patchNuxtConfig(projectDir, (c) =>
-        c.mergeRuntimeConfig({
-            health: { failOnDegraded: true, dbTimeoutMs: 1000 },
-        }),
+        c
+            .mergeRuntimeConfig({
+                health: { failOnDegraded: true, dbTimeoutMs: 1000 },
+            })
+            // Declared so `NUXT_PUBLIC_APP_VERSION` can override it; Nuxt ignores env for keys
+            // absent from runtimeConfig.
+            .setRuntimePublicDefault('appVersion', 'dev'),
     )
 }
