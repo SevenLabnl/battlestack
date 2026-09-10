@@ -53,9 +53,18 @@ describe('installSkills', () => {
         await installSkills(ctx({ packageManager: 'bun' }), ['mastra-ai/skills'])
         expect(runMock).toHaveBeenCalledWith(
             dlxBinary('bun'),
-            dlxArgs('bun', ['skills', 'add', 'mastra-ai/skills']),
+            dlxArgs('bun', ['skills', 'add', 'mastra-ai/skills', '--yes']),
             { cwd: projectDir, inherit: true },
         )
+    })
+
+    // `skills add` prompts for confirmation on a TTY, which stalls an unattended scaffold or pull.
+    it('runs non-interactively: passes --yes, and never --global', async () => {
+        await installSkills(ctx(), ['mastra-ai/skills'])
+        const args = runMock.mock.calls[0]?.[1] as string[]
+        expect(args).toContain('--yes')
+        expect(args).not.toContain('--global')
+        expect(args).not.toContain('-g')
     })
 
     it('is best-effort: a failing `skills add` warns but does not throw', async () => {

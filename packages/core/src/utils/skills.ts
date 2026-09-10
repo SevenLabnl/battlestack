@@ -16,6 +16,11 @@ export function collectSkillSources(ctx: RunContext, registries: BattlestackRegi
     return [...seen]
 }
 
+// `skills add` prompts for confirmation unless told not to. Scaffold and pull are unattended,
+// and the feature set was already confirmed, so the prompt would stall the run waiting for input.
+// Project-local on purpose: no `--global`.
+const SKILLS_NONINTERACTIVE = '--yes'
+
 /** Installs or refreshes skill sources via the project's PM `dlx`. Failures warn, never throw. */
 export async function installSkills(ctx: RunContext, sources: readonly string[]): Promise<void> {
     // `--no-skills` sets state.skipSkills. `--skip-install` and dry-run also skip.
@@ -30,7 +35,7 @@ export async function installSkills(ctx: RunContext, sources: readonly string[])
 
     for (const source of unique) {
         try {
-            await run(dlxBinary(pm), dlxArgs(pm, ['skills', 'add', source]), {
+            await run(dlxBinary(pm), dlxArgs(pm, ['skills', 'add', source, SKILLS_NONINTERACTIVE]), {
                 cwd: ctx.projectDir,
                 inherit: true,
             })
