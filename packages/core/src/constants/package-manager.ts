@@ -8,6 +8,15 @@ export const DEFAULT_PM_PRIORITY: PackageManager[] = ['pnpm', 'bun', 'npm']
 /** The pnpm version this repo develops and tests against. Not injected into generated projects. */
 export const PNPM_PIN = 'pnpm@11.8.0'
 
+/** `PNPM_PIN` without the `pnpm@` prefix. */
+export const PNPM_PIN_VERSION = PNPM_PIN.slice(PNPM_PIN.indexOf('@') + 1)
+
+/**
+ * Oldest pnpm battlestack supports. Preflight fails below it.
+ * A supported-version floor, not a capability floor; docs/troubleshooting.md states the basis.
+ */
+export const PNPM_MIN = '11.3.0'
+
 /** Day-0 release-age. Must be 0, and must be set explicitly. */
 export const RELEASE_AGE_SCAFFOLD_DAYS = 0
 
