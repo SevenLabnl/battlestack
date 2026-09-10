@@ -13,7 +13,7 @@ const FEATURE_ID = 'shared:github'
 export const githubFeature: Feature = {
     id: 'shared:github',
     // 3.0.0: SonarQube left this feature; `lint-test-sonarqube.yml` is now `lint-test.yml`.
-    version: '3.0.0',
+    version: '3.0.1',
     label: 'GitHub Actions workflows',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,
@@ -39,7 +39,9 @@ export const githubFeature: Feature = {
                     '',
                     'Secrets: any Docker build secrets declared by enabled features (see the Docker section for the exact env var names). This workflow itself needs none.',
                     '',
-                    'This feature ships no deploy workflow. A plugin that contributes a deploy target adds its own `.github/workflows/*.yml` pipeline for it and documents its own deploy secrets.',
+                    '`lint-test.yml` is a quality gate only: **this feature ships no deploy, and merging runs none.** Deployment comes from a separate feature, which a plugin contributes; it brings its own pipeline (not necessarily a GitHub workflow, since it targets whichever CI runs the deploy), its own deploy secrets and its own section in this file.',
+                    '',
+                    'So if the project holds deploy files this document says nothing about, that feature is installed but not documenting itself. `features[].files` in `.battlestack/manifest.json` maps every tracked path to the feature that wrote it, which is how to find out which one.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },

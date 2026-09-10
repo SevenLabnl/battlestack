@@ -19,7 +19,7 @@ export const docsFeature: Feature = {
     // 1.0.11: extensions docs from `nuxt4:database` 1.6.0 and `nuxt4:rag`.
     // 1.0.14: favicon/app-icon docs from `nuxt4:essentials` 1.1.0 and `nuxt4:pwa` 1.1.0.
     // 1.0.15: clarified when `pull` first writes the user-owned icon paths.
-    version: '1.0.16',
+    version: '1.0.17',
     label: 'Generate AGENTS.md + CLAUDE.md + README.md',
     frameworks: ['nuxt4'],
     stage: STAGE.DOCS,
@@ -108,8 +108,8 @@ function buildOwnershipSection(): DocSection {
             '`battlestack doctor` lists drift without changing anything. Before editing a tracked file,',
             'pick one:',
             '',
-            '1. Add a sibling file and leave the original alone (`Dockerfile.azure` on top of',
-            '   `Dockerfile` is the worked example).',
+            '1. Add a sibling file that layers on top of the tracked one and leave the original',
+            '   alone, so `pull` keeps updating the original and your file survives.',
             '2. `battlestack own <path...>` to claim it. `pull` then skips it, and it stops receiving',
             '   upstream fixes. `battlestack disown <path...>` hands it back.',
             '',
