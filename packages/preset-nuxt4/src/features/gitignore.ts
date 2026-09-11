@@ -219,7 +219,7 @@ async function applyNuxtIgnore(projectDir: string): Promise<void> {
 export const gitignoreFeature: Feature = {
     id: 'nuxt4:gitignore',
     // 1.4.0: owns the ESLint formatting and stylistic rules.
-    version: '1.5.1',
+    version: '1.5.2',
     label: 'Enforce ignore patterns (git, Nuxt, ESLint)',
     frameworks: ['nuxt4'],
     stage: STAGE.GITIGNORE,

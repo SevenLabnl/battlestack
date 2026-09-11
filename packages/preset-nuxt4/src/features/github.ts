@@ -13,7 +13,7 @@ const FEATURE_ID = 'shared:github'
 export const githubFeature: Feature = {
     id: 'shared:github',
     // 3.0.0: SonarQube left this feature; `lint-test-sonarqube.yml` is now `lint-test.yml`.
-    version: '3.0.1',
+    version: '3.0.2',
     label: 'GitHub Actions workflows',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,
