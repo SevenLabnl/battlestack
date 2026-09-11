@@ -117,6 +117,75 @@ describe('gitignoreFeature: fetched AI-agent skill content (.agents/)', () => {
     })
 })
 
+// A project scaffolded before a pattern joined ESLINT_IGNORE_PATTERNS carries the marked
+// block without it. The marker used to short-circuit the whole feature, so `pull` left the
+// new tree linted forever; it now tops the existing array up.
+describe('gitignoreFeature: topping up an existing ignore block', () => {
+    // The shape this feature itself emits: one line, no trailing comma.
+    const blockWith = (entries: string): string => NUXT_ESLINT_STUB.replace(
+        '  // Your custom configs here',
+        `  // battlestack:fetched-skills (managed by @battlestack/preset-nuxt)\n  { ignores: [${entries}] },`,
+    )
+
+    const ignoresArray = (cfg: string): string => {
+        const start = cfg.indexOf('ignores: [')
+        return cfg.slice(start, cfg.indexOf(']', start) + 1)
+    }
+
+    it('adds a pattern the block predates, keeping the one already there', async () => {
+        await writeFile(path.join(projectDir, 'eslint.config.mjs'), blockWith("'.agents/**'"), 'utf8')
+        await gitignoreFeature.execute(ctx())
+        const out = await readEslint()
+        expect(ignoresArray(out)).toBe("ignores: ['.agents/**', '.claude/**']")
+        // Topping up must not also insert a second block.
+        expect(out.match(/battlestack:fetched-skills/g)).toHaveLength(1)
+    })
+
+    it('is idempotent: a block already holding every pattern is untouched', async () => {
+        const full = blockWith("'.agents/**', '.claude/**'")
+        await writeFile(path.join(projectDir, 'eslint.config.mjs'), full, 'utf8')
+        await gitignoreFeature.execute(ctx())
+        const afterFirst = await readEslint()
+        await gitignoreFeature.update!(ctx(), null)
+        expect(await readEslint()).toBe(afterFirst)
+        expect(afterFirst.match(/\.claude\/\*\*/g)).toHaveLength(1)
+    })
+
+    it('does not emit a double comma into an array reflowed with a trailing comma', async () => {
+        // What `eslint --fix` (comma-dangle) leaves once the array outgrows one line.
+        // Splicing ahead of the `]` here used to yield `'.agents/**',\n, '.claude/**'`,
+        // costing the project its whole config instead of just the ignore.
+        const reflowed = NUXT_ESLINT_STUB.replace(
+            '  // Your custom configs here',
+            '  // battlestack:fetched-skills (managed by @battlestack/preset-nuxt)\n'
+            + '  {\n    ignores: [\n      \'.agents/**\',\n    ],\n  },',
+        )
+        await writeFile(path.join(projectDir, 'eslint.config.mjs'), reflowed, 'utf8')
+        await gitignoreFeature.execute(ctx())
+        const out = await readEslint()
+        expect(ignoresArray(out)).not.toMatch(/,\s*,/)
+        expect(out).toContain("'.claude/**'")
+        // Parses as real JS, which a stray comma would not.
+        expect(() => new Function(`return ${ignoresArray(out).replace('ignores: ', '')}`)()).not.toThrow()
+    })
+
+    it('fills an array the user emptied without a leading comma', async () => {
+        await writeFile(path.join(projectDir, 'eslint.config.mjs'), blockWith(''), 'utf8')
+        await gitignoreFeature.execute(ctx())
+        expect(ignoresArray(await readEslint())).toBe("ignores: ['.agents/**', '.claude/**']")
+    })
+
+    it('leaves the user\'s own neighbouring entries in place', async () => {
+        await writeFile(
+            path.join(projectDir, 'eslint.config.mjs'),
+            blockWith("'.agents/**', 'vendor/**'"),
+            'utf8',
+        )
+        await gitignoreFeature.execute(ctx())
+        expect(ignoresArray(await readEslint())).toBe("ignores: ['.agents/**', 'vendor/**', '.claude/**']")
+    })
+})
+
 describe('gitignoreFeature: ESLint as the single formatter', () => {
     it('pins vue/html-self-closing to always, so `<img />` keeps its slash', async () => {
         await writeFile(path.join(projectDir, 'eslint.config.mjs'), NUXT_ESLINT_STUB, 'utf8')

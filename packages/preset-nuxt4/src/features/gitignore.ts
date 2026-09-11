@@ -132,8 +132,14 @@ async function topUpEslintIgnore(target: string, current: string): Promise<void>
     if (absent.length === 0) return
 
     const added = absent.map((pattern) => `'${pattern}'`).join(', ')
-    const separator = listed.trim().length > 0 ? ', ' : ''
-    const next = current.slice(0, close) + separator + added + current.slice(close)
+    // Append after the last entry rather than before the `]`: an array the user or
+    // `eslint --fix` reflowed onto several lines carries a trailing comma, and splicing a
+    // second one in front of it (`'.agents/**',\n, '.claude/**'`) is a syntax error, which
+    // would cost the project its whole config rather than just the ignore.
+    const trimmed = listed.trimEnd()
+    const separator = trimmed.length === 0 ? '' : trimmed.endsWith(',') ? ' ' : ', '
+    const insertAt = open + trimmed.length
+    const next = current.slice(0, insertAt) + separator + added + current.slice(insertAt)
     await writeFileEnsured(target, next)
 }
 
