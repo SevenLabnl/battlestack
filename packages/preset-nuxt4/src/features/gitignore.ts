@@ -66,8 +66,9 @@ const NUXT_IGNORE_PATTERNS = [
     '**/*.wolf',
 ]
 
-// `eslint .` walks the project root, including the `.agents/` trees `skills add` fetches.
-const ESLINT_IGNORE_PATTERNS = ['.agents/**']
+// `eslint .` walks the project root, including the `.agents/` trees `skills add` fetches and the
+// `.claude/` config tree. Neither is app source.
+const ESLINT_IGNORE_PATTERNS = ['.agents/**', '.claude/**']
 
 // Marks our block so the insert happens exactly once. The config file stays the user's.
 const ESLINT_IGNORE_MARKER = 'battlestack:fetched-skills'
@@ -190,7 +191,7 @@ async function applyNuxtIgnore(projectDir: string): Promise<void> {
 export const gitignoreFeature: Feature = {
     id: 'nuxt4:gitignore',
     // 1.4.0: owns the ESLint formatting and stylistic rules.
-    version: '1.5.0',
+    version: '1.5.1',
     label: 'Enforce ignore patterns (git, Nuxt, ESLint)',
     frameworks: ['nuxt4'],
     stage: STAGE.GITIGNORE,
