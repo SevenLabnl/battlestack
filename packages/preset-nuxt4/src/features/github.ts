@@ -13,7 +13,7 @@ const FEATURE_ID = 'shared:github'
 export const githubFeature: Feature = {
     id: 'shared:github',
     // 3.0.0: SonarQube left this feature; `lint-test-sonarqube.yml` is now `lint-test.yml`.
-    version: '3.0.1',
+    version: '3.0.2',
     label: 'GitHub Actions workflows',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,
@@ -31,7 +31,7 @@ export const githubFeature: Feature = {
                     '',
                     'Dependency scanning comes in two layers. `' + audit + '` runs on every push as an **advisory** step: it never fails the build, and its counts are written to the job summary so a non-blocking result is still visible without expanding a log. On pull requests, `dependency-review-action` is the **blocking** gate: it diffs the PR against its base and refuses anything the PR newly introduces at high severity or above.',
                     '',
-                    'Know the limits of that blocking claim before you rely on it. `dependency-review-action` is free on public repositories but needs GitHub Advanced Security on private ones, and it only runs on `pull_request` events. **A private scaffold, or a push straight to a branch with no open PR, therefore has no blocking dependency gate at all**, only the advisory audit. If that matters to you, add `--audit-level=critical` to the audit step and remove its `continue-on-error`.',
+                    'Know the limits of that blocking claim before you rely on it. `dependency-review-action` is free on public repositories but needs GitHub Advanced Security on private ones, where it fails every pull request on a licence the repo does not have. The step is therefore gated on `github.event.repository.visibility == \'public\'` and skips itself on a private repo. It also only runs on `pull_request` events. **A private scaffold, or a push straight to a branch with no open PR, therefore has no blocking dependency gate at all**, only the advisory audit. If that matters to you, either buy Advanced Security and drop the visibility condition, or add `--audit-level=critical` to the audit step and remove its `continue-on-error`.',
                     '',
                     'A freshly scaffolded project\'s `' + audit + '` will report findings in transitive dependencies of the AI and framework stack. That is the npm-ecosystem baseline for an unpinned dependency tree, not a defect the scaffold introduced, and not something this project can unilaterally clear. The CI gate is shaped around that fact: `dependency-review-action` blocks vulnerabilities your changes *introduce*, while the audit step reports the standing baseline without failing the build.',
                     '',
