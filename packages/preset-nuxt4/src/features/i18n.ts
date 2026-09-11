@@ -6,13 +6,31 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
 /** @nuxtjs/i18n with per-locale namespace JSONs under `i18n/locales/<lang>/<ns>.json`. */
 export const i18nFeature: Feature = {
     id: 'nuxt4:i18n',
-    version: '1.1.0',
+    version: '1.1.1',
     label: 'i18n (Dutch + English)',
     frameworks: ['nuxt4'],
     stage: STAGE.I18N,
 
     collectModules() {
         return ['@nuxtjs/i18n']
+    },
+
+    collectDocs() {
+        return [
+            {
+                heading: 'i18n namespaces',
+                body: [
+                    'Every `i18n/locales/<code>/<name>.json` is a namespace, registered automatically by',
+                    '`modules/i18n-auto-namespaces/index.ts`. Adding a namespace means adding the file; there',
+                    'is no list to update, and none of it is declared in `nuxt.config.ts`.',
+                    '',
+                    'Registration goes through the `i18n:registerModule` hook, which is not wired into',
+                    '@nuxtjs/i18n\'s Vite HMR. Editing a namespace JSON therefore **restarts** the dev server',
+                    'instead of hot-reloading; until it comes back the page shows raw keys.',
+                ].join('\n'),
+                targets: ['agents'],
+            },
+        ]
     },
 
     async execute(ctx) {

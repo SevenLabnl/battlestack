@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { existsSync } from 'node:fs'
 import {
     isFeatureEnabled,
     writeFileEnsured,
@@ -18,7 +19,7 @@ export const docsFeature: Feature = {
     // 1.0.11: extensions docs from `nuxt4:database` 1.6.0 and `nuxt4:rag`.
     // 1.0.14: favicon/app-icon docs from `nuxt4:essentials` 1.1.0 and `nuxt4:pwa` 1.1.0.
     // 1.0.15: clarified when `pull` first writes the user-owned icon paths.
-    version: '1.0.15',
+    version: '1.0.18',
     label: 'Generate AGENTS.md + CLAUDE.md + README.md',
     frameworks: ['nuxt4'],
     stage: STAGE.DOCS,
@@ -35,6 +36,8 @@ export const docsFeature: Feature = {
                 ].join('\n'),
                 targets: ['agents'],
             },
+            buildOwnershipSection(),
+            buildBareCommandsSection(ctx),
             buildServerStateSection(ctx),
             buildRuntimeConfigSection(ctx),
         ]
@@ -45,29 +48,127 @@ export const docsFeature: Feature = {
         const modulesSection = collectModulesSection(ctx)
         if (modulesSection) sections.unshift(modulesSection)
 
-        const readme = renderReadme(ctx, sections)
+        const readme = renderReadme(ctx)
         const agentsMd = renderAgentsMd(ctx, sections)
         const claudeMd = renderClaudePointer()
 
         await writeRecorded(ctx, 'README.md', readme)
         await writeRecorded(ctx, 'AGENTS.md', agentsMd)
         await writeRecorded(ctx, 'CLAUDE.md', claudeMd)
+        await writeProjectClaudeStub(ctx)
     },
 
     async update(ctx, prev) {
         await this.execute(ctx)
         return {
-            written: ['README.md', 'AGENTS.md', 'CLAUDE.md'],
+            written: ['README.md', 'AGENTS.md', 'CLAUDE.md', PROJECT_CLAUDE],
             skipped: [],
             notes: prev ? ['regenerated from current feature set'] : [],
         }
     },
 }
 
+/** Imported by CLAUDE.md, deliberately absent from `files`: agents write here without drift. */
+const PROJECT_CLAUDE = 'CLAUDE.project.md'
+
+async function writeProjectClaudeStub(ctx: RunContext): Promise<void> {
+    const dest = path.join(ctx.projectDir, PROJECT_CLAUDE)
+    if (existsSync(dest)) return
+    await writeFileEnsured(dest, [
+        `# ${ctx.projectName} project instructions`,
+        '',
+        'Project-specific instructions for AI agents. `battlestack` never rewrites this file, so',
+        'anything here survives `battlestack pull`. `CLAUDE.md` and `AGENTS.md` are generated and',
+        'will not.',
+        '',
+    ].join('\n'))
+}
+
 async function writeRecorded(ctx: RunContext, relPath: string, content: string): Promise<void> {
     const dest = path.join(ctx.projectDir, relPath)
     await writeFileEnsured(dest, content)
     recordFile(ctx, 'nuxt4:docs', relPath, await hashFile(dest))
+}
+
+/** What `pull` will overwrite, and the two ways out. Ordered first: it gates every later edit. */
+function buildOwnershipSection(): DocSection {
+    return {
+        heading: 'battlestack owns most files: check before editing',
+        order: -2,
+        body: [
+            'Every path under `files` in `.battlestack/manifest.json` is hash-tracked. Editing one is',
+            'drift: `battlestack pull` restores the upstream version and the edit is gone. A scaffold',
+            'tracks a few hundred paths, including `AGENTS.md`, `CLAUDE.md`, `README.md`, `Dockerfile`',
+            'and everything under `.claude/`.',
+            '',
+            '`nuxt.config.ts` and `package.json` are **not** tracked; edit them freely. Paths under',
+            '`ownedByUser` in the manifest are written once at scaffold and never again (the icons and',
+            'the app-shell files you are expected to replace).',
+            '',
+            '`battlestack doctor` lists drift without changing anything. Before editing a tracked file,',
+            'pick one:',
+            '',
+            '1. Add a sibling file that layers on top of the tracked one and leave the original',
+            '   alone, so `pull` keeps updating the original and your file survives.',
+            '2. `battlestack own <path...>` to claim it. `pull` then skips it, and it stops receiving',
+            '   upstream fixes. `battlestack disown <path...>` hands it back.',
+            '',
+            'Project-specific agent instructions belong in `CLAUDE.project.md`, which is untracked and',
+            'imported by `CLAUDE.md`. Put them there rather than editing `CLAUDE.md` or `AGENTS.md`.',
+        ].join('\n'),
+        targets: ['agents'],
+    }
+}
+
+/**
+ * Every `battlestack` task wraps a `package.json` script. CI and agents that do not have the
+ * binary on PATH need the scripts by name.
+ */
+function buildBareCommandsSection(ctx: RunContext): DocSection {
+    const lines = [
+        'docker compose up -d                    # postgres and friends (the prod profile stays off)',
+        'pnpm dev                                # nuxt dev on NUXT_PORT from .env',
+        'pnpm run lint                           # eslint, check only (`pnpm format` fixes)',
+        'pnpm run typecheck                      # nuxi typecheck; NOT part of lint, and CI runs it',
+    ]
+    if (isFeatureEnabled(ctx, 'nuxt4:vitest')) {
+        lines.push(
+            'pnpm test                               # every vitest project: unit, nuxt, e2e',
+            'pnpm test test/unit/health.test.ts      # a single file',
+            'pnpm test --project unit                # a single project (unit | nuxt | e2e)',
+        )
+    }
+    if (isFeatureEnabled(ctx, 'nuxt4:mastra')) {
+        lines.push(
+            'pnpm run mastra:studio                  # Mastra Studio on the port in that script',
+        )
+    }
+
+    const body = [
+        'Every `battlestack` task wraps a `package.json` script or `docker-compose.yml`, so the',
+        'project is fully drivable without the binary:',
+        '',
+        '```bash',
+        ...lines,
+        '```',
+        '',
+        'The `db:*` tasks are listed with the database section below.',
+    ]
+    if (isFeatureEnabled(ctx, 'nuxt4:vitest')) {
+        body.push(
+            '',
+            'The e2e project needs a running dev server. `test/helpers/setup.ts` reads `.env` for',
+            '`NUXT_PORT` and `SEED_ADMIN_*`, and `TEST_BASE_URL` overrides the target. With the server',
+            'down every e2e block skips itself, so **a green run alone does not prove they ran**.',
+        )
+    }
+
+    return {
+        heading: 'Without `battlestack` on PATH',
+        order: -1,
+        body: body.join('\n'),
+        targets: ['agents'],
+    }
 }
 
 /** The "no authoritative module-level state" house rule. File citations are `ctx`-gated. */
@@ -172,7 +273,7 @@ function collectModulesSection(ctx: RunContext): DocSection | null {
         for (const m of mods ?? []) {
             if (seen.has(m)) continue
             seen.add(m)
-            lines.push(`- \`${m}\`: registered by \`${id}\``)
+            lines.push(`- \`${m}\`: registered by \`${feature.id}\``)
         }
     }
     if (lines.length === 0) return null
@@ -189,9 +290,9 @@ function collectModulesSection(ctx: RunContext): DocSection | null {
     }
 }
 
-function renderReadme(ctx: RunContext, sections: DocSection[]): string {
+function renderReadme(ctx: RunContext): string {
     const enabledList = [...ctx.enabledFeatures]
-        .map((id) => `- \`${id}\``)
+        .map((id) => `- \`${ctx.registries.features.get(id).id}\``)
         .join('\n')
 
     const out: string[] = [
@@ -221,12 +322,13 @@ function renderReadme(ctx: RunContext, sections: DocSection[]): string {
         '',
     ]
 
-    for (const s of sections) {
-        if (s.targets && !s.targets.includes('readme')) continue
-        out.push(`## ${s.heading}`, '', s.body, '')
-    }
-
     out.push(
+        '## Conventions and command reference',
+        '',
+        'In [AGENTS.md](./AGENTS.md): file ownership, the commands behind every `battlestack` task,',
+        'per-feature notes and the house rules. Generated from the same feature set as this file,',
+        'so it never disagrees with it.',
+        '',
         '## Updating',
         '',
         'Run `battlestack pull` (or `battlestack sync`) inside this project to pull',
@@ -251,7 +353,7 @@ function renderAgentsMd(ctx: RunContext, sections: DocSection[]): string {
     ]
     for (const id of ctx.enabledFeatures) {
         const f = ctx.registries.features.get(id)
-        out.push(`- \`${id}\` v${f.version}: ${f.label}`)
+        out.push(`- \`${f.id}\` v${f.version}: ${f.label}`)
     }
     out.push('')
 
@@ -269,6 +371,8 @@ function renderClaudePointer(): string {
         '# Claude Code instructions',
         '',
         '@AGENTS.md',
+        '',
+        `@${PROJECT_CLAUDE}`,
         '',
     ].join('\n')
 }
