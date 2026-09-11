@@ -177,6 +177,13 @@ jobs:
             exit 1
           fi
 
+      # The scaffold's own gates run Nitro in dev mode, where a package aliased under an
+      # `npm:` name still resolves. Only the image build proves the traced `.output` resolves,
+      # and its alias guard fails here rather than in a deployed container.
+      - name: Build the production image
+        working-directory: ${{ runner.temp }}/scaffold/ci-app
+        run: docker build -t ci-app:ci .
+
   # Native Windows is a supported target, not just WSL. Kept as its own job
   # rather than a matrix leg on `verify` so a Windows failure is legible at a
   # glance instead of hidden in a matrix cell.

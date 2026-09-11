@@ -28,7 +28,7 @@ export const dockerFeature: Feature = {
     id: 'shared:docker',
     // 1.1.0: stages server/database/extensions into /app/extensions so migrate.mjs and the
     // boot migrator can apply CREATE EXTENSION / CREATE SCHEMA before migrations.
-    version: '1.1.0',
+    version: '1.1.1',
     label: 'Production Dockerfile + prod commands',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,

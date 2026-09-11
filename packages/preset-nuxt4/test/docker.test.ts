@@ -112,3 +112,36 @@ describe('shared:docker (collectBuildSecrets)', () => {
         expect(docsWithout?.[0]?.body).not.toContain('build secret')
     })
 })
+
+/**
+ * `@mastra/core` reaches some packages only through an npm alias and changes which alias
+ * between minor versions, so the emitted Dockerfile must derive the aliases to copy from
+ * package.json rather than name them, and must fail the build on one it did not provide.
+ */
+describe('shared:docker (npm-aliased deps)', () => {
+    async function emitDockerfile(): Promise<string> {
+        const ctx = mockRunContext({
+            projectDir,
+            enabledFeatures: new Set(['shared:docker']),
+            state: { packageManager: 'pnpm' },
+            registries: registryWith([dockerFeature]),
+        })
+        await dockerFeature.execute(ctx)
+        return readFile(path.join(projectDir, 'Dockerfile'), 'utf8')
+    }
+
+    it('copies aliases read from package.json, naming none of them', async () => {
+        const dockerfile = await emitDockerfile()
+        expect(dockerfile).toContain('spec.startsWith("npm:")')
+        expect(dockerfile).toContain('.output/server/node_modules')
+        expect(dockerfile).toContain('dereference:true')
+        expect(dockerfile).not.toContain('provider-utils-v5')
+        expect(dockerfile).not.toContain('zod-from-json-schema-v3')
+    })
+
+    it('fails the build on an alias the output imports but no copy provided', async () => {
+        const dockerfile = await emitDockerfile()
+        expect(dockerfile).toContain('under an alias name that is not in the output')
+        expect(dockerfile).toContain('process.exit(1)')
+    })
+})

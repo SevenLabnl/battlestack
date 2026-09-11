@@ -29,7 +29,7 @@ import {
 /** Mastra AI runtime. Talks to an OpenAI-compatible AI gateway (sluis.ai preset, or any compatible URL) via `@ai-sdk/openai-compatible`. */
 export const mastraFeature: Feature = {
     id: 'nuxt4:mastra',
-    version: '2.0.0',
+    version: '2.0.1',
     label: 'Mastra AI runtime',
     frameworks: ['nuxt4'],
     stage: STAGE.AI_CORE,
@@ -49,7 +49,10 @@ export const mastraFeature: Feature = {
                 '@ai-sdk/vue',
                 'ai',
                 // Root aliases, forcing in npm-aliased deps Nitro's tracer cannot copy.
+                // Which alias Mastra imports moves between minor versions; the Dockerfile
+                // fails the build when the output imports one that is missing here.
                 '@ai-sdk/provider-utils-v5@npm:@ai-sdk/provider-utils@^3',
+                '@ai-sdk/provider-utils-v6@npm:@ai-sdk/provider-utils@^4',
                 'zod-from-json-schema-v3@npm:zod-from-json-schema@^0.0.5',
             ],
             // Dev-only: the `mastra` CLI ships Mastra Studio and is never imported by the build.
