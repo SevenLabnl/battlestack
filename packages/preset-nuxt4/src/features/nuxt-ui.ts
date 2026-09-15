@@ -1,11 +1,16 @@
-import { STAGE, type Feature, type RunContext } from '@battlestack/core'
+import { STAGE, isFeatureEnabled, type Feature, type RunContext } from '@battlestack/core'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
+import { importThemeCss } from './battlestack-theme.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
 
 /** Nuxt UI v4 + Tailwind v4. Registers `@nuxt/ui` module and wires `assets/css/main.css`. */
 export const nuxtUiFeature: Feature = {
     id: 'nuxt4:nuxt-ui',
-    version: '1.2.1',
+    // 1.2.2: token-placement doc corrected — overrides import after `@nuxt/ui`,
+    // matching where `nuxt4:battlestack-theme` splices its imports. update() also
+    // re-applies that splice: re-emitting `main.css` used to silently drop it.
+    // (1.2.1 was taken on main by the @tiptap peers doc while this branch was in review.)
+    version: '1.2.2',
     label: 'Nuxt UI v4 + Tailwind v4',
     frameworks: ['nuxt4'],
     stage: STAGE.STYLING,
@@ -21,7 +26,7 @@ export const nuxtUiFeature: Feature = {
                 body: [
                     'Component color aliases (`primary`, `secondary`, `neutral`, etc.) live in `app/app.config.ts` under `ui.colors`. This is the runtime-overridable variant: change a value and every component using that alias updates without rebuild.',
                     '',
-                    'Tailwind utilities + design CSS variables come from `app/assets/css/main.css` (`@import "tailwindcss"` + `@import "@nuxt/ui"`). Custom Tailwind tokens go above the `@nuxt/ui` import so they win precedence.',
+                    'Tailwind utilities + design CSS variables come from `app/assets/css/main.css` (`@import "tailwindcss"` + `@import "@nuxt/ui"`). Token overrides (`@theme` ramps, `--ui-*` re-values) are imported after `@nuxt/ui`, so the later declaration wins — this is where `nuxt4:battlestack-theme` splices its `tokens.css` and `brand.css` imports.',
                     '',
                     'Root layout wraps `<UApp>` in `app/app.vue`, which is required for `useToast()`, `<UTooltip>`, and other components that need a portal target.',
                     '',
@@ -44,6 +49,10 @@ export const nuxtUiFeature: Feature = {
     async update(ctx, prev) {
         const result = await emitTemplateUpdate(ctx, 'nuxt4:nuxt-ui', import.meta.url, 'nuxt-ui', prev)
         await configureNuxtConfig(ctx)
+        // Re-emitting `main.css` drops `nuxt4:battlestack-theme`'s spliced imports; the
+        // theme's own update() only runs when the theme itself is bumped, so restore
+        // them here (idempotent, and it re-baselines every tracking feature).
+        if (isFeatureEnabled(ctx, 'nuxt4:battlestack-theme')) await importThemeCss(ctx)
         return result
     },
 }

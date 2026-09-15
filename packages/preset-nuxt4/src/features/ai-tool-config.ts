@@ -17,7 +17,10 @@ const SUPPORTED: AiTool[] = ['claude-code', 'gemini-cli', 'cursor', 'codex']
 export const aiToolConfigFeature: Feature = {
     id: 'shared:ai-tool-config',
     // 1.1.6: `.mcp.json` gained its Playwright entry, plus corrected rule globs.
-    version: '1.1.8',
+    // 1.1.9: `battlestack-ui` skill (design system on Nuxt UI) + frontend-design audit
+    // pointers, gated on `nuxt4:battlestack-theme` being enabled. (1.1.8 was taken on
+    // main while this branch was in review.)
+    version: '1.1.9',
     label: 'AI coding tool config',
     stage: STAGE.AI_TOOL_CONFIG,
 
@@ -57,18 +60,28 @@ export const aiToolConfigFeature: Feature = {
         const tool = pickTool(ctx.state.aiTool)
         ctx.state.aiTool = tool
         const src = templatesDir(import.meta.url, '..', '..', 'templates', 'ai-tool-config', tool)
-        await copyTemplateDirRecorded(ctx, 'shared:ai-tool-config', src)
+        await copyTemplateDirRecorded(ctx, 'shared:ai-tool-config', src, { exclude: gatedSubtrees(ctx) })
         await emitMcpJson(ctx)
     },
 
     async update(ctx, prev) {
         const tool = pickTool(prev?.state?.aiTool ?? ctx.state.aiTool)
         const src = templatesDir(import.meta.url, '..', '..', 'templates', 'ai-tool-config', tool)
-        const report = await updateFromTemplateDir(ctx, 'shared:ai-tool-config', src, prev)
+        const report = await updateFromTemplateDir(ctx, 'shared:ai-tool-config', src, prev, { exclude: gatedSubtrees(ctx) })
         await emitMcpJson(ctx)
         report.written.push('.mcp.json')
         return report
     },
+}
+
+/**
+ * Feature-gated parts of the tool template. The `battlestack-ui` skill instructs
+ * agents to read `DESIGN_SYSTEM.md`/`brand.css` and treat `@battlestack/theme` as
+ * installed — confidently wrong context in a project without the theme feature.
+ */
+function gatedSubtrees(ctx: RunContext): (rel: string) => boolean {
+    const themed = isFeatureEnabled(ctx, 'nuxt4:battlestack-theme')
+    return (rel) => !themed && rel.includes(`skills${path.sep}battlestack-ui${path.sep}`)
 }
 
 function pickTool(raw: unknown): AiTool {
