@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.2.0 (2026-09-15)
+
+- fix(gitignore): don't emit a double comma when topping up a reflowed block (8bccb9a)
+- chore: rebump the three features #35 and #37 took to the same versions (9304a0f)
+- fix(gitignore): ignore `.claude/**` so scoped skill content is not linted (e88ceac)
+- fix(core): scope `skills add` to the configured agent, non-interactively (4323a9e)
+- fix(core): run `skills add` non-interactively (630c6c9)
+- fix: ignore .claude in eslint, gate dependency review, name a missing pm (c0270a8)
+- docs: narrow README to a pointer, explain the @tiptap peers (d7f9581)
+- docs(agents): correct the deploy claim, drop a private-plugin filename (9ed593d)
+- docs(agents): close the AGENTS.md gaps a first external scaffold hit (934ba0b)
+- fix(docker): resolve npm-aliased deps in the built image, guard the rest (d1f8f1d)
+- chore(deps): bump the dev-tooling group across 1 directory with 3 updates (a09f51c)
+- fix(core): probe both loopback families before calling a port free (702ec64)
+- fix(preflight): gate the pm the scaffold uses, and state the pnpm floor (dace016)
+- fix(preflight): fail on pnpm below the supported minimum (2bfa2e6)
+
+[Full changelog](https://github.com/SevenLabnl/battlestack/compare/v1.1.0...v1.2.0)
+
 ## v1.1.0 (2026-09-08)
 
 - core: addDefaultEnabledOptional on extendTemplate (#31) (e94eed5)

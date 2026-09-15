@@ -1,6 +1,6 @@
 {
     "name": "@battlestack/core",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Battlestack plugin SDK: types, registries, plugin loader.",
     "license": "MIT",
     "author": "SevenLab",
@@ -57,7 +57,7 @@
     },
     "dependencies": {
         "diff": "^9.0.0",
-        "magicast": "^0.5.4",
+        "magicast": "^0.5.5",
         "ora": "^9.4.1"
     },
     "devDependencies": {
