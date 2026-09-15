@@ -45,7 +45,7 @@ with `--pm`; pnpm is the default.
 
 | Package manager | Supported | Notes |
 | --- | --- | --- |
-| **pnpm** | Yes, and it is the default | What battlestack itself is developed and tested against. |
+| **pnpm** | Yes, and it is the default, 11.3 or newer | What battlestack itself is developed and tested against. |
 | **npm** | Yes | Comes with Node, so it is already there. Use `--pm npm`. |
 | **bun** | Yes | Use `--pm bun`. See the verified matrix in [CONTRIBUTING.md](../CONTRIBUTING.md). |
 | **yarn** | **No** | Some of the emitted scaffolding breaks under yarn classic. Do not use it. |
@@ -58,11 +58,15 @@ generated project is going to use pnpm, which is the default:
 npm i -g pnpm
 ```
 
-If pnpm is on your PATH but older than the version battlestack is tested
-against, preflight prints a warning rather than failing, and suggests
-`pnpm self-update`. Node 25 dropped bundled Corepack, so a freshly installed
-Node often has npm and nothing else. That is fine: scaffold with `npx` and pass
-`--pm npm`.
+pnpm 11.3 or newer is required. Preflight fails on anything older, before the
+scaffold starts, rather than part-way through the install. Above that floor but
+below the version battlestack is tested against, preflight prints a warning
+rather than failing, and suggests `pnpm self-update`. The blocking row points at
+`npm i -g` and at `--pm npm` instead, since neither needs the old pnpm to work.
+[Troubleshooting](troubleshooting.md) covers why the floor sits at 11.3.
+
+Node 25 dropped bundled Corepack, so a freshly installed Node often has npm and
+nothing else. That is fine: scaffold with `npx` and pass `--pm npm`.
 
 See [Configuration](configuration.md#package-manager) for what `--pm` does and
 does not change.

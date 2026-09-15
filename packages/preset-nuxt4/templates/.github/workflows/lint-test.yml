@@ -111,10 +111,10 @@ __PM_CACHE__
           '
           __PM_AUDIT__ || true
 
-      # Layer 2: blocking, pull requests only. Diffs the PR's base against its head, so it only ever objects to dependencies the PR itself introduces, never pre-existing ones.
-      # Free on public repos but needs GitHub Advanced Security on private ones; can't run on `push`, so a private repo or a push without an open PR has no blocking gate.
+      # Layer 2: blocking, public-repo pull requests only. Diffs the PR's base against its head, so it only ever objects to dependencies the PR itself introduces, never pre-existing ones.
+      # Gated on visibility because the action needs GitHub Advanced Security on private repos, where it would otherwise fail every PR on a licence the repo does not have. It also cannot run on `push`, so a private repo or a push without an open PR has no blocking gate; the advisory audit above still runs.
       - name: Dependency review
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.repository.visibility == 'public'
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high

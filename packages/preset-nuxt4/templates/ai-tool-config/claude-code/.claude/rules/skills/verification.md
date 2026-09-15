@@ -3,7 +3,7 @@
 Before claiming any task is done, gather evidence:
 
 1. **Tests pass**: `pnpm test`: all green, no skipped tests without justification
-2. **Type check**: `pnpm run lint`: zero TypeScript errors
+2. **Type check**: `pnpm run typecheck`: zero TypeScript errors. `pnpm run lint` is eslint and checks no types
 3. **Build** (if config changed): `pnpm run build`
 4. **Browser** (if UI changed): Navigate to the page, take screenshot, verify interactivity
 5. **Database** (if schema changed): Migration generated, applies cleanly, seed still works

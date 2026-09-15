@@ -126,12 +126,17 @@ export async function createCommand(context: CommandContext): Promise<void> {
         )
     }
 
-    // Preflight runs before the feature/pm/gateway prompts.
+    const pm = await promptPackageManager({
+        explicit: args.packageManager,
+        detected: await resolvePackageManager(args.packageManager),
+        yes: args.yes,
+    })
+
     ui.section('Preflight')
     ui.dim('  Verifying Node, package manager, and Docker before scaffolding.')
     enforcePreflight(
         await runEnvPreflight({
-            pm: await resolvePackageManager(args.packageManager),
+            pm,
             needsDocker: template.requiredFeatures.includes('nuxt4:database'),
         }),
     )
@@ -166,12 +171,6 @@ export async function createCommand(context: CommandContext): Promise<void> {
             )
         }
     }
-
-    const pm = await promptPackageManager({
-        explicit: args.packageManager,
-        detected: await resolvePackageManager(args.packageManager),
-        yes: args.yes,
-    })
 
     const gatewayEnabled = await promptGateway(args.gateway)
 
