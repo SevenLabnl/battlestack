@@ -25,7 +25,7 @@ Publishable packages:
 ## Cutting a stable release
 
 1. **Actions -> Prepare release -> Run workflow** from `main`, pick `patch`,
-   `minor` or `major`. It bumps all six `package.json` files, prepends a
+   `minor` or `major`. It bumps every publishable `package.json`, prepends a
    `CHANGELOG.md` stanza and opens a PR titled `release: v<version>`.
 2. Review and merge that PR. This is where the version number gets human
    approval. CI runs on it like any other PR, because the branch and the PR are
@@ -74,8 +74,8 @@ dist-tag.
 
 ```sh
 pnpm version:print              # the current lockstep version
-pnpm version:check              # all six agree, internal deps are workspace:*, a bin exists
-pnpm version:bump minor         # rewrite all six package.json files
+pnpm version:check              # all agree, internal deps are workspace:*, a bin exists
+pnpm version:bump minor         # rewrite every publishable package.json
 pnpm version:bump prerelease --preid next
 pnpm version:set 1.0.0
 pnpm version:changelog          # prepend a stanza for the current version
@@ -105,7 +105,7 @@ pnpm pack:smoke                 # build, pack, install the tarballs, run the bin
 **npm**
 
 Every package uses Trusted Publishing, so no `NPM_TOKEN` exists. On npmjs.com,
-for each of the six packages: Settings -> Trusted Publisher -> GitHub Actions,
+for each publishable package: Settings -> Trusted Publisher -> GitHub Actions,
 with repository `SevenLabnl/battlestack`, workflow `release.yml` and environment
 `release`.
 

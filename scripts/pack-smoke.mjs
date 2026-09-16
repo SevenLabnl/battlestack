@@ -77,12 +77,12 @@ for (const pkg of PACKAGES) {
 {
     const listing = run('tar', ['tzf', tarballs['@battlestack/theme']])
     const entries = new Set(listing.split('\n'))
-    for (const file of ['package/tokens.css', 'package/nuxt.config.ts']) {
+    for (const file of ['package/tokens.css', 'package/nuxt.config.ts', 'package/components/Logo.vue']) {
         if (!entries.has(file)) {
             throw new Error(`theme tarball is missing ${file}`)
         }
     }
-    log('theme tarball contains tokens.css and nuxt.config.ts')
+    log('theme tarball contains tokens.css, nuxt.config.ts and the Logo component')
 }
 
 // --- 3. install ONLY the tarballs into a fresh consumer project -------------

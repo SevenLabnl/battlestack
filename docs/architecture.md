@@ -378,8 +378,8 @@ Worth knowing about rather than discovering by surprise:
   (`remove` doesn't consult the catalog; it only requires the id to be
   recorded in the project manifest.) `preset-nuxt4` still lists one id it
   doesn't register, `nuxt4:fontawesome` — a feature that moved to a private
-  plugin — though that entry now only matters if the plugin stops extending
-  the templates.
+  plugin — though that entry is redundant for as long as the plugin extends
+  a template of this framework.
 - **The `supportedFeatures` catalog can also drift the other way.**
   `nuxt4:auth-verification` *is* registered by `preset-nuxt4` but is missing
   from the catalog, so `battlestack add nuxt4:auth-verification` is rejected
