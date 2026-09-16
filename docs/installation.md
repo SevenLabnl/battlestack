@@ -118,7 +118,7 @@ installed; you just lose the maintenance commands, and the underlying
 
 ## What gets installed where
 
-battlestack publishes as five packages, and installing the unscoped
+battlestack publishes as six packages, and installing the unscoped
 `battlestack` package pulls in the ones it needs:
 
 | Package | Role |
@@ -128,8 +128,9 @@ battlestack publishes as five packages, and installing the unscoped
 | `@battlestack/core` | The plugin SDK: types, registries, and the orchestrator. |
 | `@battlestack/preset-nuxt4` | The Nuxt 4 preset: one framework, three templates, 39 features. |
 | `@battlestack/tui` | Shared terminal UI. |
+| `@battlestack/theme` | The house design system (Nuxt layer). Not part of the CLI install: the theme feature adds it as a dependency of generated projects. |
 
-The five share one lockstep version. [architecture.md](architecture.md)
+The six share one lockstep version. [architecture.md](architecture.md)
 explains why the split exists.
 
 Third-party plugins are installed per machine into a plugin store rather than

@@ -155,7 +155,7 @@ scaffolding a real project rather than assumed. Local HTTPS hostnames need mkcer
 and are unavailable on WSL2; absence degrades to a localhost port rather than
 failing. Hosts-file automation covers macOS and Windows only.
 
-The five published packages share one lockstep version. Feature versions are
+The six published packages share one lockstep version. Feature versions are
 independent of it, and are content markers rather than release numbers.
 
 ## How we would know it is working

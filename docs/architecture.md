@@ -9,7 +9,7 @@ it only knows how to load plugins and run whatever they registered.
 This document describes what the code actually does. Where something is a
 known rough edge rather than a deliberate design, it says so.
 
-## 1. The five packages
+## 1. The six packages
 
 ```
 packages/
@@ -17,7 +17,8 @@ packages/
 ├── tui/              @battlestack/tui         terminal UI: banner, spinner, colors, prompts
 ├── preset-nuxt4/     @battlestack/preset-nuxt4  the Nuxt 4 framework preset (a plugin)
 ├── cli/              @battlestack/cli          the CLI engine (all command logic)
-└── battlestack/      battlestack               unscoped npx wrapper: owns the `battlestack`/`bstack` bins, imports @battlestack/cli
+├── battlestack/      battlestack               unscoped npx wrapper: owns the `battlestack`/`bstack` bins, imports @battlestack/cli
+└── theme/            @battlestack/theme        the house design system: a Nuxt layer with token values, brand assets and the Logo lockup
 ```
 
 The `battlestack` wrapper exists so `npx battlestack` resolves while every

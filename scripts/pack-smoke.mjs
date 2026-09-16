@@ -1,4 +1,4 @@
-// Proves the publish path actually works: pack all 5 workspace packages with
+// Proves the publish path actually works: pack every publishable workspace package with
 // `pnpm pack` (which rewrites `workspace:*` deps to real semver ranges, same
 // as a real `pnpm publish` would), install the tarballs — and ONLY the
 // tarballs, nothing from the workspace — into a fresh throwaway project, then
@@ -30,6 +30,7 @@ const PACKAGES = [
     { dir: 'packages/preset-nuxt4', name: '@battlestack/preset-nuxt4' },
     { dir: 'packages/cli', name: '@battlestack/cli' },
     { dir: 'packages/battlestack', name: 'battlestack' },
+    { dir: 'packages/theme', name: '@battlestack/theme' },
 ]
 
 function run(cmd, args, opts = {}) {
@@ -70,6 +71,18 @@ for (const pkg of PACKAGES) {
         throw new Error('preset-nuxt4 tarball has no package/templates/* entries')
     }
     log(`preset-nuxt4 tarball contains ${templateFiles.length} template files`)
+}
+
+// --- 2b. verify the theme tarball ships its exports --------------------------
+{
+    const listing = run('tar', ['tzf', tarballs['@battlestack/theme']])
+    const entries = new Set(listing.split('\n'))
+    for (const file of ['package/tokens.css', 'package/nuxt.config.ts']) {
+        if (!entries.has(file)) {
+            throw new Error(`theme tarball is missing ${file}`)
+        }
+    }
+    log('theme tarball contains tokens.css and nuxt.config.ts')
 }
 
 // --- 3. install ONLY the tarballs into a fresh consumer project -------------

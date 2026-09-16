@@ -90,7 +90,7 @@ jobs:
 
       # Replaces the old tag-versus-package comparison. There is no hand-written
       # tag to disagree with any more: the version comes from the workspace and
-      # this job is what proves all five packages state the same one.
+      # this job is what proves every publishable package states the same one.
       - name: Verify lockstep versions
         run: node scripts/release-version.mjs --check
 
