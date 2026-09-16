@@ -353,9 +353,13 @@ describe('finalizeRegistries', () => {
             apiVersion: 1,
             register(battlestack) {
                 battlestack.addFeature(feature('nuxt4:theme'))
+                battlestack.addFeature(feature('nuxt4:brand'))
+                battlestack.addFeature(feature('nuxt4:icons'))
                 battlestack.extendTemplate({
                     templateId: 'fullstack',
                     addOptionalFeatures: ['nuxt4:theme'],
+                    addFeatures: ['nuxt4:brand'],
+                    addDefaultEnabledOptional: ['nuxt4:icons'],
                 })
             },
         }), 'store', registries))
@@ -363,9 +367,15 @@ describe('finalizeRegistries', () => {
         const warnings = finalizeRegistries(registries, loaded.flatMap((p) => p.extensions))
         assert.deepEqual(warnings, [])
         const fw = registries.frameworks.get('nuxt')
+        // All three extension branches advertise, not just addOptionalFeatures.
         assert.ok(fw.supportedFeatures.includes('coa:nuxt4:theme'))
+        assert.ok(fw.supportedFeatures.includes('coa:nuxt4:brand'))
+        assert.ok(fw.supportedFeatures.includes('coa:nuxt4:icons'))
         // Same fqid spelling in both lists, the shape `add` compares.
-        assert.ok(registries.templates.get('fullstack').optionalFeatures.includes('coa:nuxt4:theme'))
+        const tpl = registries.templates.get('fullstack')
+        assert.ok(tpl.optionalFeatures.includes('coa:nuxt4:theme'))
+        assert.ok(tpl.requiredFeatures.includes('coa:nuxt4:brand'))
+        assert.ok(tpl.defaultEnabledOptional?.includes('coa:nuxt4:icons'))
     })
 
     it('keeps an advertised-but-unregistered supportedFeatures id verbatim, without warning', () => {
