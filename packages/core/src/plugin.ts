@@ -285,21 +285,40 @@ export function finalizeRegistries(
             )
             continue
         }
+        // `add` gates on the framework's `supportedFeatures`, a catalog the extending
+        // plugin cannot edit: without this, an extension feature scaffolds fine but is
+        // refused by `battlestack add` on every existing project. The catalog loop above
+        // already canonicalized it, so appending resolved fqids keeps it in one spelling.
+        let catalog: string[] | undefined
+        try {
+            catalog = registries.frameworks.get(template.framework).supportedFeatures
+        } catch {
+            // No (unique) framework behind the template: surfaced elsewhere, nothing to advertise in.
+        }
+        const advertise = (fqid: string): void => {
+            if (catalog && !catalog.includes(fqid)) catalog.push(fqid)
+        }
         for (const featureId of ext.addFeatures ?? []) {
             const fqid = resolveFeature(featureId, ext.requestedByPlugin, template.fqid)
-            if (fqid && !template.requiredFeatures.includes(fqid) && !template.optionalFeatures.includes(fqid)) {
+            if (!fqid) continue
+            advertise(fqid)
+            if (!template.requiredFeatures.includes(fqid) && !template.optionalFeatures.includes(fqid)) {
                 template.requiredFeatures.push(fqid)
             }
         }
         for (const featureId of ext.addOptionalFeatures ?? []) {
             const fqid = resolveFeature(featureId, ext.requestedByPlugin, template.fqid)
-            if (fqid && !template.requiredFeatures.includes(fqid) && !template.optionalFeatures.includes(fqid)) {
+            if (!fqid) continue
+            advertise(fqid)
+            if (!template.requiredFeatures.includes(fqid) && !template.optionalFeatures.includes(fqid)) {
                 template.optionalFeatures.push(fqid)
             }
         }
         for (const featureId of ext.addDefaultEnabledOptional ?? []) {
             const fqid = resolveFeature(featureId, ext.requestedByPlugin, template.fqid)
-            if (!fqid || template.requiredFeatures.includes(fqid)) continue
+            if (!fqid) continue
+            advertise(fqid)
+            if (template.requiredFeatures.includes(fqid)) continue
             if (!template.optionalFeatures.includes(fqid)) template.optionalFeatures.push(fqid)
             template.defaultEnabledOptional ??= []
             if (!template.defaultEnabledOptional.includes(fqid)) template.defaultEnabledOptional.push(fqid)

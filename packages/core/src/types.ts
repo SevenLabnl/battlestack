@@ -29,7 +29,11 @@ export * from './types/stage.js'
 export * from './types/template.js'
 export * from './types/update-report.js'
 
-/** A plugin's request to add features to a template it did not define. */
+/**
+ * A plugin's request to add features to a template it did not define. Every feature
+ * that lands is also advertised in the template's framework `supportedFeatures`, so
+ * `battlestack add` accepts it on existing projects of that framework.
+ */
 export interface TemplateExtension {
     /** Template id to extend. Skipped with a warning if no plugin defines it. */
     templateId: string

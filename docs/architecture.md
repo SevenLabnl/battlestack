@@ -365,22 +365,21 @@ breaking change to the `BattlestackPluginContext` surface.
 
 Worth knowing about rather than discovering by surprise:
 
-- **No `extendFramework`.** A plugin can add features and extend templates,
-  but it cannot add an id to a framework's `supportedFeatures` list — there
+- **No `extendFramework`, but `extendTemplate` advertises for you.** A
+  plugin cannot edit a framework's `supportedFeatures` list directly — there
   is no equivalent hook for frameworks. `supportedFeatures` is the catalog
   `battlestack add` validates a requested id against — after resolving it
   through the registry, `add` rejects anything the framework doesn't
-  advertise — so a plugin-contributed feature meant to be individually
-  addable (as opposed to arriving forced-on via `extendTemplate`'s
-  `addFeatures`) still depends on the framework's own package advertising
-  its id, even for a feature the framework's package doesn't itself
-  register. (`remove` doesn't consult the catalog; it only requires the id
-  to be recorded in the project manifest.) `preset-nuxt4` accommodates this
-  today for exactly one id, `nuxt4:fontawesome` — a feature that moved to a
-  private plugin and comes back optional: the id stays listed in
-  `supportedFeatures` even though nothing in `preset-nuxt4` registers it,
-  purely so `add` doesn't reject it when the plugin that does register it is
-  installed.
+  advertise. `finalizeRegistries` closes the gap for the common case: every
+  feature a `TemplateExtension` lands is also appended to the template's
+  framework catalog, so a plugin feature offered via `addOptionalFeatures`
+  is individually addable on existing projects. What remains impossible is
+  advertising an id *without* extending a template of that framework.
+  (`remove` doesn't consult the catalog; it only requires the id to be
+  recorded in the project manifest.) `preset-nuxt4` still lists one id it
+  doesn't register, `nuxt4:fontawesome` — a feature that moved to a private
+  plugin — though that entry now only matters if the plugin stops extending
+  the templates.
 - **The `supportedFeatures` catalog can also drift the other way.**
   `nuxt4:auth-verification` *is* registered by `preset-nuxt4` but is missing
   from the catalog, so `battlestack add nuxt4:auth-verification` is rejected

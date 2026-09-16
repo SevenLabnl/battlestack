@@ -328,6 +328,46 @@ describe('finalizeRegistries', () => {
         }
     })
 
+    // The framework author cannot enumerate third-party plugins, so the extension is
+    // the opt-in: without this, a plugin feature scaffolds fine but `battlestack add`
+    // refuses it on every existing project ("not advertised by framework").
+    it('advertises extension features in the template framework\'s supportedFeatures', () => {
+        const registries = new BattlestackRegistries()
+        const loaded: LoadedPlugin[] = []
+        loaded.push(applyPlugin(defineBattlestackPlugin({
+            name: '@battlestack/preset-nuxt',
+            apiVersion: 1,
+            register(battlestack) {
+                battlestack.addFeature(feature('nuxt4:auth'))
+                battlestack.addFeature(feature('shared:docker'))
+                battlestack.addFramework({
+                    id: 'nuxt',
+                    label: 'Nuxt',
+                    supportedFeatures: ['nuxt4:auth', 'shared:docker'],
+                })
+                battlestack.addTemplate(fullstack())
+            },
+        }), 'bundled', registries))
+        loaded.push(applyPlugin(defineBattlestackPlugin({
+            name: '@coa/battlestack-plugin',
+            apiVersion: 1,
+            register(battlestack) {
+                battlestack.addFeature(feature('nuxt4:theme'))
+                battlestack.extendTemplate({
+                    templateId: 'fullstack',
+                    addOptionalFeatures: ['nuxt4:theme'],
+                })
+            },
+        }), 'store', registries))
+
+        const warnings = finalizeRegistries(registries, loaded.flatMap((p) => p.extensions))
+        assert.deepEqual(warnings, [])
+        const fw = registries.frameworks.get('nuxt')
+        assert.ok(fw.supportedFeatures.includes('coa:nuxt4:theme'))
+        // Same fqid spelling in both lists, the shape `add` compares.
+        assert.ok(registries.templates.get('fullstack').optionalFeatures.includes('coa:nuxt4:theme'))
+    })
+
     it('keeps an advertised-but-unregistered supportedFeatures id verbatim, without warning', () => {
         const registries = new BattlestackRegistries()
         applyPlugin(defineBattlestackPlugin({
