@@ -15,7 +15,12 @@ import {
 /** Generates AGENTS.md, CLAUDE.md and README.md from `collectDocs()`. Always rewritten. */
 export const docsFeature: Feature = {
     id: 'nuxt4:docs',
-    version: '1.0.19',
+    // 1.0.8: redis-gated bullet. 1.0.9: corrected rule globs from `shared:ai-tool-config` 1.1.6.
+    // 1.0.11: extensions docs from `nuxt4:database` 1.6.0 and `nuxt4:rag`.
+    // 1.0.14: favicon/app-icon docs from `nuxt4:essentials` 1.1.0 and `nuxt4:pwa` 1.1.0.
+    // 1.0.15: clarified when `pull` first writes the user-owned icon paths.
+    // 1.0.20: design-system section from `nuxt4:battlestack-theme` 1.0.0.
+    version: '1.0.20',
     label: 'Generate AGENTS.md + CLAUDE.md + README.md',
     frameworks: ['nuxt4'],
     stage: STAGE.DOCS,

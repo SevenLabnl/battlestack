@@ -25,6 +25,21 @@ export class NuxtConfig {
         return defaultObject(this.mod)
     }
 
+    /**
+     * Adds a Nuxt layer to `extends`. The project's own `nuxt.config.ts` always outranks
+     * every layer, and among layers the earliest entry wins — so appending is the safe
+     * order: a layer added later never shadows one an earlier feature already relied on.
+     */
+    addExtends(layer: string): this {
+        // Nuxt accepts `extends` as a bare string (`extends: './layers/base'`); left
+        // as-is, `pushUnique` would call `.push` on it and throw. Modules/css are
+        // array-only in Nuxt, so extends is the one key needing this.
+        if (typeof this.config.extends === 'string') this.config.extends = [this.config.extends]
+        this.config.extends ||= []
+        pushUnique(this.config.extends, layer)
+        return this
+    }
+
     addModule(name: string): this {
         this.config.modules ||= []
         pushUnique(this.config.modules, name)

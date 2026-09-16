@@ -1,6 +1,17 @@
 import type { BattlestackPluginContext } from '@battlestack/core'
 
-/** No template hardcodes a private deploy feature. A private plugin adds one via `extendTemplate`. */
+/**
+ * No template hardcodes a private deploy feature. A private plugin adds one via `extendTemplate`.
+ *
+ * `nuxt4:battlestack-theme` is optional and default-OFF in all three templates.
+ * `@battlestack/theme` is not on a registry yet and this preset is published, so any
+ * path that pulls the dependency in by default — required *or* default-on — makes
+ * `battlestack create` fail at install time for everyone accepting the defaults.
+ * Opting in is a deliberate act by someone who can point the dependency at a local
+ * checkout. Revisit once the package is published: it is the house standard, so
+ * required is the right default then — the only reason it is not is distribution,
+ * not design.
+ */
 export function registerNuxtTemplates(battlestack: BattlestackPluginContext): void {
     battlestack.addTemplate({
         id: 'nuxt4-ai',
@@ -35,6 +46,7 @@ export function registerNuxtTemplates(battlestack: BattlestackPluginContext): vo
             'nuxt4:finalize',
         ],
         optionalFeatures: [
+            'nuxt4:battlestack-theme',
             'nuxt4:audit-log',
             'nuxt4:user-admin',
             'nuxt4:auth-passkeys',
@@ -97,6 +109,7 @@ export function registerNuxtTemplates(battlestack: BattlestackPluginContext): vo
             'nuxt4:finalize',
         ],
         optionalFeatures: [
+            'nuxt4:battlestack-theme',
             'nuxt4:audit-log',
             'nuxt4:user-admin',
             'nuxt4:auth-passkeys',
@@ -153,6 +166,7 @@ export function registerNuxtTemplates(battlestack: BattlestackPluginContext): vo
             'nuxt4:finalize',
         ],
         optionalFeatures: [
+            'nuxt4:battlestack-theme',
             'nuxt4:landing-shell',
             'nuxt4:pwa',
             'shared:ci',

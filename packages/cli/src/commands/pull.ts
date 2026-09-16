@@ -310,6 +310,16 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             },
         }, registries)
 
+        // Pre-primed like `battlestack add` (see add-remove.ts): each feature's update can
+        // then see which rels the OTHER installed features track — required both for
+        // re-baselining shared files it rewrites and for leaving alone a shared file whose
+        // final content belongs to a later-ordered feature (e.g. nuxt4:landing-shell's app
+        // shell over nuxt4:nuxt-ui's). Keyed bare, matching `ctx.state` conventions.
+        for (const f of manifest.features) {
+            if (!registries.features.has(f.id)) continue
+            ctx.state[`files:${registries.features.get(f.id).id}`] = { ...f.files }
+        }
+
         // `--skills-only`: skills only, skipping template updates, dep install and formatting.
         if (args.skillsOnly) {
             const { collectSkillSources, installSkills } = await import('@battlestack/core')
@@ -362,11 +372,19 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
                 const { formatProject } = await import('@battlestack/preset-nuxt4')
                 const { snapshotTrackedHashes, reconcilePostFormat } = await import('@battlestack/core')
                 // Snapshot precedes formatting: only pristine→reformatted files are re-recorded.
-                const tracked = manifest.features.map((record) => ({
-                    featureId: record.id,
-                    recorded: (ctx.state[`files:${record.id}`] as Record<string, string>) ?? record.files,
-                    owned: new Set(record.ownedByUser ?? []),
-                }))
+                // Keyed bare: `record.id` is the manifest fqid, but state maps (and
+                // `reconcilePostFormat`'s writes, which `writeManifest` reads back) key
+                // on the bare feature id.
+                const tracked = manifest.features
+                    .filter((record) => registries.features.has(record.id))
+                    .map((record) => {
+                        const bareId = registries.features.get(record.id).id
+                        return {
+                            featureId: bareId,
+                            recorded: (ctx.state[`files:${bareId}`] as Record<string, string>) ?? record.files,
+                            owned: new Set(record.ownedByUser ?? []),
+                        }
+                    })
                 const preHashes = await snapshotTrackedHashes(ctx, tracked)
                 await formatProject(ctx)
                 await reconcilePostFormat(ctx, tracked, preHashes)

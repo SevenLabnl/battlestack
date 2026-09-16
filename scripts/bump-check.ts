@@ -293,7 +293,12 @@ function refVersion(file: string, ref: string): string | null {
 }
 
 function latestReleaseTag(): string | null {
-    return git(['describe', '--tags', '--abbrev=0'])?.trim() || null
+    // The highest v* tag in the repo, NOT `git describe`: describe returns the
+    // nearest tag reachable from HEAD, so on a branch that predates the latest
+    // release it selects an old tag and blames the branch for every feature
+    // change merged to main since (seen on PR #12: v0.1.0 instead of v1.0.0).
+    const tags = git(['tag', '--list', 'v*', '--sort=-v:refname'])?.trim()
+    return tags?.split('\n')[0]?.trim() || null
 }
 
 function resolveRef(...candidates: string[]): string {
