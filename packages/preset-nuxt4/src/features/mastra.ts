@@ -29,7 +29,7 @@ import {
 /** Mastra AI runtime. Talks to an OpenAI-compatible AI gateway (sluis.ai preset, or any compatible URL) via `@ai-sdk/openai-compatible`. */
 export const mastraFeature: Feature = {
     id: 'nuxt4:mastra',
-    version: '2.0.1',
+    version: '2.0.2',
     label: 'Mastra AI runtime',
     frameworks: ['nuxt4'],
     stage: STAGE.AI_CORE,
