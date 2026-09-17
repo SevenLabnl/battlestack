@@ -250,6 +250,11 @@ An unknown `templateId` warns and is skipped rather than failing the run, so a
 plugin written against a template that later disappears degrades instead of
 breaking the CLI.
 
+Every feature an extension lands is also advertised in the template's framework
+`supportedFeatures` — the catalog that gates `battlestack add`, which a plugin
+cannot edit directly. So an optional extension feature is not just a scaffold-time
+checkbox: existing projects on that template can `battlestack add` it later.
+
 This is the mechanism that lets a private plugin extend a public install
 **without the public code referencing it**. The public preset defines
 `nuxt4-fullstack` and knows nothing about your additions; users without your

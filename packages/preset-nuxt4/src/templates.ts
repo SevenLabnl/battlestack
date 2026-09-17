@@ -8,9 +8,9 @@ import type { BattlestackPluginContext } from '@battlestack/core'
  * path that pulls the dependency in by default — required *or* default-on — makes
  * `battlestack create` fail at install time for everyone accepting the defaults.
  * Opting in is a deliberate act by someone who can point the dependency at a local
- * checkout. Revisit once the package is published: it is the house standard, so
- * required is the right default then — the only reason it is not is distribution,
- * not design.
+ * checkout. The package is publishable as of 1.2.0 and its first publish is manual;
+ * flip to required once it is on npm: it is the house standard, so required is the
+ * right default then — the only reason it is not is distribution, not design.
  */
 export function registerNuxtTemplates(battlestack: BattlestackPluginContext): void {
     battlestack.addTemplate({

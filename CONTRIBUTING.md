@@ -14,7 +14,7 @@ Two separate things get called "package manager support" here, and conflating
 them is how this section previously came to claim more than was true. They are
 verified independently:
 
-**As the tool that installs `battlestack` itself** — pack the five packages,
+**As the tool that installs `battlestack` itself** — pack the publishable packages,
 install *only* those tarballs into a fresh consumer, run the installed binary.
 `scripts/pack-smoke.mjs` covers pnpm; `scripts/pack-smoke-matrix.mjs` covers
 npm and bun. All three pass.
@@ -59,7 +59,7 @@ exactly what a scaffolded project gets.
 
 ## Package versions are separate from feature versions
 
-The five publishable packages share one lockstep version, checked in CI by
+The publishable packages share one lockstep version, checked in CI by
 `pnpm version:check`. A feature's `version` is unrelated to it and is not a
 release number. See [docs/releasing.md](docs/releasing.md) for how a release is cut:
 merging to `main` publishes nothing, a release is a manual dispatch plus an

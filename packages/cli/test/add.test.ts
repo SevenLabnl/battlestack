@@ -104,8 +104,8 @@ const dirs: string[] = []
  * Scaffold a project carrying only the template's required feature, via the real
  * `writeManifest`, so on-disk records hold fqids rather than whatever this file typed.
  */
-async function project(): Promise<Project> {
-    const { registries, warnings } = fixtures()
+async function project(fx = fixtures()): Promise<Project> {
+    const { registries, warnings } = fx
     const dir = await mkdtemp(path.join(os.tmpdir(), 'battlestack-add-test-'))
     dirs.push(dir)
 
@@ -260,6 +260,52 @@ describe('battlestack add: accepts the ids the CLI itself reports', () => {
         )
 
         expect((await p.manifest()).features.map((f) => f.id)).not.toContain(`${NS}:add:opt`)
+    })
+})
+
+/**
+ * The framework preset cannot enumerate third-party plugins in `supportedFeatures`,
+ * so `extendTemplate` doubles as the catalog opt-in (applied in `finalizeRegistries`).
+ * Without it, a plugin feature scaffolds fine but `add` refuses it on every existing
+ * project — the coa:nuxt4:theme case.
+ */
+describe('battlestack add: accepts plugin features injected via extendTemplate', () => {
+    function pluginFixtures() {
+        return buildRegistries(
+            {
+                namespace: NS,
+                frameworks: [{
+                    id: FW,
+                    label: FW,
+                    // Deliberately does NOT advertise the plugin's feature.
+                    supportedFeatures: ['add:base'],
+                }],
+                features: [feature('add:base')],
+                templates: [{
+                    id: TPL,
+                    label: TPL,
+                    framework: FW,
+                    requiredFeatures: ['add:base'],
+                    optionalFeatures: [],
+                }],
+            },
+            {
+                namespace: 'coa',
+                features: [feature('add:theme', { frameworks: [FW] })],
+                extensions: [{ templateId: TPL, addOptionalFeatures: ['add:theme'] }],
+            },
+        )
+    }
+
+    it('adds the plugin feature on an existing project, framework preset unchanged', async () => {
+        const p = await project(pluginFixtures())
+        expect(p.warnings).toEqual([])
+
+        await withCwd(p.dir, () => add('coa:add:theme')(p))
+
+        const ids = (await p.manifest()).features.map((f) => f.id)
+        expect(ids).toContain('coa:add:theme')
+        expect(await fileExists(p.dir, 'add-theme.txt')).toBe(true)
     })
 })
 

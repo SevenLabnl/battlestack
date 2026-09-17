@@ -9,7 +9,7 @@
 | `v<version>` tag | A version that npm accepted. Created after the publish succeeds, never before. |
 | `release/v<version>` branch | Machine-owned version bump branch, opened by Prepare release. |
 
-All five publishable packages share one version and cross-depend with
+All six publishable packages share one version and cross-depend with
 `workspace:*`, so there is exactly one number per release and one tag to match
 it. `pnpm version:check` is a CI gate that fails the build if they drift apart.
 
@@ -19,12 +19,13 @@ Publishable packages:
 - `@battlestack/cli`
 - `@battlestack/core`
 - `@battlestack/preset-nuxt4`
+- `@battlestack/theme`
 - `@battlestack/tui`
 
 ## Cutting a stable release
 
 1. **Actions -> Prepare release -> Run workflow** from `main`, pick `patch`,
-   `minor` or `major`. It bumps all five `package.json` files, prepends a
+   `minor` or `major`. It bumps every publishable `package.json`, prepends a
    `CHANGELOG.md` stanza and opens a PR titled `release: v<version>`.
 2. Review and merge that PR. This is where the version number gets human
    approval. CI runs on it like any other PR, because the branch and the PR are
@@ -73,8 +74,8 @@ dist-tag.
 
 ```sh
 pnpm version:print              # the current lockstep version
-pnpm version:check              # all five agree, internal deps are workspace:*, a bin exists
-pnpm version:bump minor         # rewrite all five package.json files
+pnpm version:check              # all agree, internal deps are workspace:*, a bin exists
+pnpm version:bump minor         # rewrite every publishable package.json
 pnpm version:bump prerelease --preid next
 pnpm version:set 1.0.0
 pnpm version:changelog          # prepend a stanza for the current version
@@ -104,7 +105,7 @@ pnpm pack:smoke                 # build, pack, install the tarballs, run the bin
 **npm**
 
 Every package uses Trusted Publishing, so no `NPM_TOKEN` exists. On npmjs.com,
-for each of the five packages: Settings -> Trusted Publisher -> GitHub Actions,
+for each publishable package: Settings -> Trusted Publisher -> GitHub Actions,
 with repository `SevenLabnl/battlestack`, workflow `release.yml` and environment
 `release`.
 
