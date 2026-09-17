@@ -1,0 +1,99 @@
+name: Keur
+
+# The admission check, asked in chapters. Quality on every push, security and legal on a
+# pull request, the whole rulebook on main — that last one is the only run that can write a
+# certificate, and the only one whose green means "may go to production".
+#
+# Shadow mode, everywhere: `fail-on-review: 'false'` and `continue-on-error: true`, so a
+# verdict is reported in the job summary and annotations and never fails the run. Nothing
+# turns red until the shadow period has shown what red would have meant. The model pass is
+# off (`model: 'false'`) until it earns its per-run price here.
+#
+# `vars.CI_RUNNER` selects the SevenLab ARC runner where the variable is set, and falls back
+# to a hosted runner so a stranger's fork can run this unmodified.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keur-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quality:
+    name: Keur — quality
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # Fallow attributes findings against the merge base
+      - uses: SevenLabnl/keur/quality@v0
+        continue-on-error: true
+        with:
+          fail-on-review: 'false'
+          model: 'false'
+
+  security:
+    name: Keur — security
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: SevenLabnl/keur/security@v0
+        env:
+          GITHUB_TOKEN: ${{ github.token }} # branch protection, for SCH-REPO-001/002
+        continue-on-error: true
+        with:
+          fail-on-review: 'false'
+          model: 'false'
+
+  legal:
+    name: Keur — legal
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: SevenLabnl/keur/legal@v0
+        continue-on-error: true
+        with:
+          fail-on-review: 'false'
+          model: 'false'
+
+  # The admission question, on main. Writes the certificate and signs it under this
+  # workflow's own OIDC identity; the bundle beside it is the record.
+  review:
+    name: Keur — review
+    if: github.event_name == 'push'
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: SevenLabnl/keur/review@v0
+        id: keur
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        continue-on-error: true
+        with:
+          fail-on-review: 'false'
+          model: 'false'
+          certificate: keur-certificate.json
+      - uses: sigstore/cosign-installer@v3
+      - name: Sign the certificate
+        env:
+          CERT: ${{ steps.keur.outputs.certificate }}
+        run: |
+          cosign sign-blob --yes --tlog-upload=false --new-bundle-format \
+            --timestamp-server-url https://timestamp.sigstore.dev/api/v1/timestamp \
+            --bundle "$CERT.sigstore.json" "$CERT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: keur-certificate
+          path: keur-certificate.json*
