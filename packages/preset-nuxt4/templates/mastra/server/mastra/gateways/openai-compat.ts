@@ -64,6 +64,10 @@ export class OpenAICompatGateway extends MastraModelGateway {
     /**
      * Return type is Mastra's `GatewayLanguageModel` union (`LanguageModelV2 | V3 | V4`), not a concrete `LanguageModelVn` from `@ai-sdk/provider`, on purpose.
      * Naming one version would go red the moment `@ai-sdk/openai-compatible` bumps generations while Mastra still supports it (this happened when openai-compatible 3.x moved to V4).
+     *
+     * The cast covers a second skew the union cannot: `@mastra/core` type-checks against a vendored snapshot of the provider types
+     * (`_types/@ai-sdk_provider-v7`), so a real `@ai-sdk/provider` newer than that snapshot yields two structurally different `LanguageModelV4`s.
+     * Provider 4.0.16 (2026-09-16) diverged on `LanguageModelV4Content`. Drop the cast once a Mastra release vendors a matching snapshot.
      */
     async resolveLanguageModel(args: {
         modelId: string
@@ -77,7 +81,7 @@ export class OpenAICompatGateway extends MastraModelGateway {
             apiKey: args.apiKey,
             baseURL: gatewayEndpoints().apiRoot,
             headers: { ...gatewayHeaders(), ...args.headers },
-        }).chatModel(upstreamId)
+        }).chatModel(upstreamId) as unknown as GatewayLanguageModel
     }
 
     private providerConfig(label: string, models: string[]): ProviderConfig {
