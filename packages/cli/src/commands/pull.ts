@@ -114,7 +114,7 @@ async function pullOneFeature(
     registries: BattlestackRegistries,
 ): Promise<void> {
     if (!registries.features.has(record.id)) {
-        ui.warn(`feature "${record.id}" no longer exists in the CLI, skipped`)
+        ui.warn(`feature "${record.id}" is not registered by any loaded plugin, skipped`)
         return
     }
     const feature = registries.features.get(record.id)
@@ -395,7 +395,14 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         if (orphans.length > 0) {
             ui.blank()
             for (const f of orphans) {
-                ui.warn(`feature "${f.id}" no longer exists in the CLI, removed from manifest`)
+                // Deliberately not "no longer exists": the commonest cause is a plugin that
+                // did not load, and a project's whole devops layer can hang off one such
+                // feature. Stating removal as an upstream fact invites the reader to accept
+                // it. `plugins` is the command that distinguishes the two.
+                ui.warn(
+                    `feature "${f.id}" is not registered by any loaded plugin, removed from manifest `
+                    + '(its files stay on disk). If a plugin failed to load, `battlestack plugins` says so',
+                )
             }
         }
 
