@@ -54,19 +54,30 @@ async function boot(): Promise<LoadResult> {
     return loadPlugins(sources)
 }
 
-/** Boots, runs one report, then surfaces load warnings once. */
+/** Boots, runs one report, then surfaces load issues once. */
 async function show(print: (result: LoadResult) => void): Promise<void> {
     const result = await boot()
     print(result)
+    printLoadIssues(result)
+}
+
+/**
+ * Every way a boot can go wrong, in one place: template-extension warnings, then plugins
+ * that did not load at all. The second list used to print from `printPlugins` only, so a
+ * broken plugin was invisible on every other command — and since its commands are then
+ * absent from the registry, running one falls through to "unknown command", which outside
+ * a project means the scaffold wizard treats it as a new project's name.
+ */
+function printLoadIssues(result: LoadResult): void {
     for (const w of result.warnings) console.log(`  ! ${w}`)
+    for (const s of result.skipped) {
+        console.log(`  ! plugin ${s.specifier} (via ${s.via}) failed to load; its commands, features and templates are unavailable: ${s.error}`)
+    }
 }
 
 function printPlugins(result: LoadResult): void {
     console.log('Loaded plugins:')
     for (const p of result.plugins) console.log(`  ${p.name}  (via ${p.via})`)
-    for (const s of result.skipped) {
-        console.log(`  ! skipped ${s.specifier} (via ${s.via}): ${s.error}`)
-    }
 }
 
 function printTemplates(result: LoadResult): void {
@@ -161,7 +172,7 @@ async function main(): Promise<void> {
     // Bare `battlestack help` mirrors `--help` outside a project.
     if (args.projectName === 'help') {
         const result = await boot()
-        for (const w of result.warnings) console.log(`  ! ${w}`)
+        printLoadIssues(result)
         const projectRoot = await findProjectRoot(process.cwd())
         ui.banner(VERSION)
         await printHelp(projectRoot ? 'project' : 'scaffold', result.registries, projectRoot ?? undefined)
@@ -169,7 +180,7 @@ async function main(): Promise<void> {
     }
 
     const result = await boot()
-    for (const w of result.warnings) console.log(`  ! ${w}`)
+    printLoadIssues(result)
     const registries = result.registries
 
     const loader = ui.spinner()

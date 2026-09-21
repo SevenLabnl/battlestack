@@ -102,7 +102,7 @@ async function resolveEntry(src: PluginSource): Promise<URL> {
 export interface LoadResult {
     registries: BattlestackRegistries
     plugins: LoadedPlugin[]
-    /** Discovered-but-broken plugins, reported by `battlestack doctor` / `battlestack plugins`. */
+    /** Discovered-but-broken plugins. Surfaced on every command, so a silently missing plugin cannot masquerade as an unknown command. */
     skipped: Array<{ specifier: string; via: string; error: string }>
     /** Non-fatal template-extension issues (unknown template / unregistered feature). */
     warnings: string[]
