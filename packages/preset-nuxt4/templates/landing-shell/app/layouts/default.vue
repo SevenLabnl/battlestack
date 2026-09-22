@@ -1,6 +1,8 @@
 <template>
-    <!-- Column layout so the footer sits at the bottom of a short page instead of under the fold of a long one. -->
     <div class="min-h-screen flex flex-col">
+        <!-- Column layout: the footer sits at the bottom of a short page instead of under the fold of a long one.
+             The comment lives inside the root element on purpose — `vue/no-multiple-template-root` counts one at
+             the template root as a second root node. -->
         <UHeader>
             <template #left>
                 <!-- `/`, not `/dashboard`: this feature emits `app/pages/index.vue`, so `/` always exists while `/dashboard` only exists
