@@ -1,5 +1,6 @@
 <template>
-    <div class="min-h-screen">
+    <!-- Column layout so the footer sits at the bottom of a short page instead of under the fold of a long one. -->
+    <div class="min-h-screen flex flex-col">
         <UHeader>
             <template #left>
                 <!-- `/`, not `/dashboard`: this feature emits `app/pages/index.vue`, so `/` always exists while `/dashboard` only exists
@@ -41,11 +42,19 @@
             </template>
         </UHeader>
 
-        <UMain class="p-4 sm:p-6">
+        <UMain class="flex-1 p-4 sm:p-6">
             <UContainer>
                 <slot />
             </UContainer>
         </UMain>
+
+        <!-- battlestack:build-info -->
+        <UFooter>
+            <template #left>
+                <AppBuildInfo />
+            </template>
+        </UFooter>
+        <!-- /battlestack:build-info -->
     </div>
 </template>
 

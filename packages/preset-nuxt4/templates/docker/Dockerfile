@@ -5,9 +5,6 @@
 FROM node:24-alpine AS build
 WORKDIR /app
 
-ARG BUILD_NUMBER=dev
-ENV BUILD_NUMBER=${BUILD_NUMBER}
-
 # pnpm-workspace.yaml carries the `allowBuilds:` approvals for native deps and MUST land before install,
 # or pnpm blocks those build scripts (ERR_PNPM_IGNORED_BUILDS). Globbed so non-pnpm managers don't break the COPY.
 COPY package.json __LOCKFILE__ pnpm-workspace.yaml* .npmrc* ./
@@ -118,6 +115,27 @@ __COPY_TOOLS_BLOCK__
 
 ENV PORT=3000
 ENV HOST=0.0.0.0
+
+# Build identity: the footer and `/api/health` read these back as `runtimeConfig.public`.
+# Declared in the RUNTIME stage on purpose. They change on every commit, and an ARG the
+# build stage read would invalidate the dependency install and the Nuxt build each time;
+# here only this last, tiny layer is rebuilt. Nitro reads NUXT_PUBLIC_* at server start,
+# so baking them as ENV is enough — nothing has to be inlined at build time, and a
+# deployment can still override any of them.
+ARG APP_VERSION=dev
+ARG GIT_SHA=""
+ARG BUILD_TIME=""
+ARG APP_REPO_URL=""
+ENV NUXT_PUBLIC_APP_VERSION=${APP_VERSION}
+ENV NUXT_PUBLIC_APP_COMMIT=${GIT_SHA}
+ENV NUXT_PUBLIC_APP_BUILT_AT=${BUILD_TIME}
+ENV NUXT_PUBLIC_APP_REPO_URL=${APP_REPO_URL}
+
+# The same three facts as image metadata, so `docker inspect` answers "which commit is
+# this?" without starting the container or reaching its HTTP port.
+LABEL org.opencontainers.image.version=${APP_VERSION}
+LABEL org.opencontainers.image.revision=${GIT_SHA}
+LABEL org.opencontainers.image.created=${BUILD_TIME}
 
 EXPOSE 3000
 

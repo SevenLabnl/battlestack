@@ -132,7 +132,10 @@ function buildComposeYml(ctx: RunContext): string {
         '        build:',
         '            context: .',
         '            args:',
-        '                BUILD_NUMBER: dev',
+        // Forwarded from the shell so `GIT_SHA=$(git rev-parse HEAD) battlestack prod`
+        // shows a real commit in the footer; unset, the image reports `dev` and no sha.
+        '                APP_VERSION: ${APP_VERSION:-dev}',
+        '                GIT_SHA: ${GIT_SHA:-}',
         `        image: ${ctx.projectName}:dev`,
         '        restart: unless-stopped',
         '        env_file: .env',
@@ -248,7 +251,7 @@ async function registerRuntimeConfig(projectDir: string): Promise<void> {
 /** PostgreSQL 18 in Docker, Drizzle ORM, users schema, seed script. */
 export const databaseFeature: Feature = {
     id: 'nuxt4:database',
-    version: '1.7.0',
+    version: '1.6.1',
     label: 'PostgreSQL + Drizzle ORM (Docker)',
     frameworks: ['nuxt4'],
     stage: STAGE.DATABASE,

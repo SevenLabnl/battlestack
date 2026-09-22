@@ -25,6 +25,18 @@ Two consequences worth knowing:
 The Dockerfile is correct for whichever package manager you scaffolded with, so
 `--pm npm` does not leave you with a pnpm-shaped image.
 
+### Build identity
+
+The runtime stage takes `APP_VERSION`, `GIT_SHA`, `BUILD_TIME` and
+`APP_REPO_URL` as build args and bakes them in as `NUXT_PUBLIC_APP_*` plus OCI
+image labels. That is what puts a version and a commit sha in the app's footer
+and on `/api/health`, so a deployed instance can say which commit it is without
+anyone opening the pipeline that put it there.
+
+Pass them from your deploy pipeline. Unset, an image honestly reports `dev` with
+no commit. [Versioning a project](versioning.md) covers the whole flow, from
+cutting the version to reading it back off a running container.
+
 ## Running the production stack locally
 
 The compose file has a **profile-gated `app` service**. It only activates under
@@ -64,7 +76,7 @@ project's `README.md` names the ones your feature set actually needs.
 GET /api/health
 ```
 
-Returns `{ status, version, checks }`, and it means something:
+Returns `{ status, version, commit, builtAt, checks }`, and it means something:
 
 - **200** when healthy.
 - **503** when degraded, provided `health.failOnDegraded` is on, which it is by

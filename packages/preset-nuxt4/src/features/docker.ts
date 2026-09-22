@@ -26,7 +26,7 @@ const PROFILE_FLAGS = ['--profile', 'prod']
 /** Production Dockerfile and `battlestack prod` commands, reusing the existing docker-compose.yml. */
 export const dockerFeature: Feature = {
     id: 'shared:docker',
-    version: '1.1.1',
+    version: '1.2.0',
     label: 'Production Dockerfile + prod commands',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,
@@ -42,6 +42,8 @@ export const dockerFeature: Feature = {
             'battlestack prod:logs    # tail app logs',
             'battlestack prod:down    # stop',
             '```',
+            '',
+            'The runtime stage takes `APP_VERSION`, `GIT_SHA`, `BUILD_TIME` and `APP_REPO_URL` build args and bakes them in as `NUXT_PUBLIC_APP_*` plus OCI image labels, which is what the footer and `/api/health` report. Unset, an image says `dev` with no commit. See the version-and-commit section.',
         ]
         const buildSecrets = collectBuildSecrets(ctx)
         if (buildSecrets.length > 0) {

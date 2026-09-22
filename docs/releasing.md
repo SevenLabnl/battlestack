@@ -1,5 +1,8 @@
 # Releasing
 
+How a **battlestack** release is cut. For how a project battlestack generated gets
+its own version number, see [Versioning a project](versioning.md).
+
 ## The model
 
 | Ref | Meaning |
