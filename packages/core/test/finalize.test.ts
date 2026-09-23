@@ -328,6 +328,56 @@ describe('finalizeRegistries', () => {
         }
     })
 
+    // The framework author cannot enumerate third-party plugins, so the extension is
+    // the opt-in: without this, a plugin feature scaffolds fine but `battlestack add`
+    // refuses it on every existing project ("not advertised by framework").
+    it('advertises extension features in the template framework\'s supportedFeatures', () => {
+        const registries = new BattlestackRegistries()
+        const loaded: LoadedPlugin[] = []
+        loaded.push(applyPlugin(defineBattlestackPlugin({
+            name: '@battlestack/preset-nuxt',
+            apiVersion: 1,
+            register(battlestack) {
+                battlestack.addFeature(feature('nuxt4:auth'))
+                battlestack.addFeature(feature('shared:docker'))
+                battlestack.addFramework({
+                    id: 'nuxt',
+                    label: 'Nuxt',
+                    supportedFeatures: ['nuxt4:auth', 'shared:docker'],
+                })
+                battlestack.addTemplate(fullstack())
+            },
+        }), 'bundled', registries))
+        loaded.push(applyPlugin(defineBattlestackPlugin({
+            name: '@coa/battlestack-plugin',
+            apiVersion: 1,
+            register(battlestack) {
+                battlestack.addFeature(feature('nuxt4:theme'))
+                battlestack.addFeature(feature('nuxt4:brand'))
+                battlestack.addFeature(feature('nuxt4:icons'))
+                battlestack.extendTemplate({
+                    templateId: 'fullstack',
+                    addOptionalFeatures: ['nuxt4:theme'],
+                    addFeatures: ['nuxt4:brand'],
+                    addDefaultEnabledOptional: ['nuxt4:icons'],
+                })
+            },
+        }), 'store', registries))
+
+        const warnings = finalizeRegistries(registries, loaded.flatMap((p) => p.extensions))
+        assert.deepEqual(warnings, [])
+        const fw = registries.frameworks.get('nuxt')
+        // All three extension branches advertise, not just addOptionalFeatures.
+        assert.ok(fw.supportedFeatures.includes('coa:nuxt4:theme'))
+        assert.ok(fw.supportedFeatures.includes('coa:nuxt4:brand'))
+        assert.ok(fw.supportedFeatures.includes('coa:nuxt4:icons'))
+        // Same fqid spelling in both lists, the shape `add` compares.
+        const tpl = registries.templates.get('fullstack')
+        assert.ok(tpl.optionalFeatures.includes('coa:nuxt4:theme'))
+        assert.ok(tpl.requiredFeatures.includes('coa:nuxt4:brand'))
+        assert.ok(tpl.defaultEnabledOptional?.includes('coa:nuxt4:icons'))
+    })
+
     it('keeps an advertised-but-unregistered supportedFeatures id verbatim, without warning', () => {
         const registries = new BattlestackRegistries()
         applyPlugin(defineBattlestackPlugin({

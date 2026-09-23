@@ -75,6 +75,7 @@ const PACKAGES = [
     { dir: 'packages/preset-nuxt4', name: '@battlestack/preset-nuxt4' },
     { dir: 'packages/cli', name: '@battlestack/cli' },
     { dir: 'packages/battlestack', name: 'battlestack' },
+    { dir: 'packages/theme', name: '@battlestack/theme' },
 ]
 
 /** The template both this and task #21's pnpm leg use, so results are comparable. */
