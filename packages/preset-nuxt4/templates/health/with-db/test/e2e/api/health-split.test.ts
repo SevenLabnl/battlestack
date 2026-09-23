@@ -10,6 +10,7 @@ interface LiveResponse {
 interface ReadyResponse {
     status: 'ok' | 'degraded'
     env: { ok: boolean; missing?: string[] }
+    boot?: { ok: boolean, pending?: string[], failed?: Record<string, string> }
     db?: { ok: boolean; latencyMs?: number; error?: string }
 }
 
@@ -37,10 +38,13 @@ describe('e2e: /api/health/ready (with-db)', () => {
         expect(data).toBeTruthy()
         expect(['ok', 'degraded']).toContain(data!.status)
         expect(typeof data!.env.ok).toBe('boolean')
-        if (data!.env.ok) {
-            // The db ping only runs once env passes.
+        if (data!.env.ok && data!.boot?.ok) {
+            // The db ping only runs once env passes and boot tasks have settled.
             expect(typeof data!.db?.ok).toBe('boolean')
             expect(data!.status === 'ok').toBe(data!.db!.ok)
+        } else if (data!.env.ok) {
+            expect(data!.status).toBe('degraded')
+            expect(data!.db).toBeUndefined()
         } else {
             expect(data!.status).toBe('degraded')
             expect(data!.db).toBeUndefined()

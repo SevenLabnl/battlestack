@@ -23,21 +23,12 @@ export interface TtlCache<T> {
     dropLocal: (key?: string) => void
 }
 
-/**
- * Every cache created by `createTtlCache`, keyed by namespace, so an incoming notification
- * can reach the right one. Rebound at module load only.
- */
+/** Every cache created by `createTtlCache`, keyed by namespace, for incoming notifications. */
 const registry = new Map<string, TtlCache<unknown>>()
 
 /**
- * A read-through cache whose entries expire after `ttlMs` and can be dropped across every
- * replica through `invalidate`. `namespace` must be unique per cache in the project.
- *
- * The TTL is the floor: it bounds staleness even when a notification is never delivered.
- *
- * Keys must come from a bounded set (config keys, not user or tenant ids). Entries are evicted
- * only when that same key is read again after expiry, so an unbounded keyspace grows for the
- * lifetime of the process.
+ * TTL cache droppable on every replica via `invalidate`; the TTL bounds staleness if a notification is lost.
+ * Keys must come from a bounded set: an entry is evicted only when its own key is read after expiry.
  */
 export function createTtlCache<T>(namespace: string, ttlMs: number): TtlCache<T> {
     const entries = new Map<string, Entry<T>>()
@@ -65,19 +56,15 @@ export function createTtlCache<T>(namespace: string, ttlMs: number): TtlCache<T>
         },
     }
 
-    // Overwrites rather than rejects a repeat namespace: under dev HMR a consumer module is
-    // re-evaluated while this one is not, and throwing there would break the dev server.
-    // The preset test suite is what catches two features sharing a namespace.
+    // Overwrites a repeat namespace: dev HMR re-evaluates consumers, not this module.
+    // Cross-feature collisions are caught by a static test instead.
     registry.set(namespace, cache as TtlCache<unknown>)
     return cache
 }
 
 /**
- * Drops a cache entry on this replica and broadcasts the drop to every other one.
- * Omit `key` to drop the whole namespace. Await it before returning from an admin write.
- *
- * A failed broadcast is logged, not thrown: the TTL still expires the entry, so the cost
- * is bounded staleness on other replicas, never a failed write or a wrong answer.
+ * Drops an entry here and broadcasts the drop; omit `key` for the whole namespace.
+ * A failed broadcast is only logged: the TTL still bounds staleness on the other replicas.
  */
 export async function invalidate(namespace: string, key?: string): Promise<void> {
     registry.get(namespace)?.dropLocal(key)
@@ -97,9 +84,7 @@ export function applyRemoteInvalidation(payload: string): void {
     } catch {
         return
     }
-    // `JSON.parse('null')` returns null, which the catch above never sees. Reading `.ns` off it
-    // throws, and postgres-js swallows a throw from this callback, so the invalidation would be
-    // dropped with nothing logged.
+    // Valid JSON can still be null; postgres-js swallows a throw from this callback.
     if (typeof parsed !== 'object' || parsed === null) return
     const { ns, key: rawKey } = parsed as { ns?: unknown, key?: unknown }
     if (typeof ns !== 'string') return

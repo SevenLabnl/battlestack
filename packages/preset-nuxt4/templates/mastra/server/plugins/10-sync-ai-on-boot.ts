@@ -5,6 +5,7 @@ import { getDefaultModelConfigs } from '#server/mastra/utils/model-configs'
 import { getAgentDefinition } from '#server/mastra/agents/registry'
 import { mastra } from '#server/mastra'
 import { ADVISORY_LOCK } from '#server/utils/advisory-locks'
+import { afterBootTask, runBootTask } from '#server/utils/boot-tasks'
 
 /**
  * Runs every boot so the `ai_model_configs`/`agents` rows always exist, unlike `db:seed`, which refuses to run in production.
@@ -12,9 +13,16 @@ import { ADVISORY_LOCK } from '#server/utils/advisory-locks'
  */
 const SYNC_ADVISORY_LOCK_KEY = ADVISORY_LOCK.SYNC_AI
 
-export default defineNitroPlugin(async () => {
+export default defineNitroPlugin(() => {
     const config = useRuntimeConfig()
-    const connectionString = String(config.databaseUrl ?? '')
+    // Waits for the migrator: its tables may be created by the migration this boot applies.
+    void runBootTask('sync-ai', async () => {
+        await afterBootTask('migrate')
+        await syncAiOnBoot(String(config.databaseUrl ?? ''))
+    })
+})
+
+async function syncAiOnBoot(connectionString: string): Promise<void> {
     if (!connectionString) {
         console.warn('[sync-ai-on-boot] no runtimeConfig.databaseUrl, skipping')
         return
@@ -32,7 +40,7 @@ export default defineNitroPlugin(async () => {
         // The `agents` table may not exist yet if the project pulled the schema but hasn't migrated; runtime resolvers fall back, so the app still works.
         console.error('[sync-ai-on-boot] failed:', err)
     }
-})
+}
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 

@@ -3,6 +3,7 @@ import { db } from '#server/database/client'
 import { prompts } from '#server/database/schema/prompts'
 import { getDefaultPrompts } from '#server/utils/prompts/defaults'
 import { ADVISORY_LOCK } from '#server/utils/advisory-locks'
+import { afterBootTask, runBootTask } from '#server/utils/boot-tasks'
 
 /**
  * Counterpart to `10-sync-ai-on-boot`: guarantees a row per registry prompt every boot, without the dev-only `db:seed`.
@@ -10,9 +11,17 @@ import { ADVISORY_LOCK } from '#server/utils/advisory-locks'
  */
 const SYNC_ADVISORY_LOCK_KEY = ADVISORY_LOCK.SYNC_PROMPTS
 
-export default defineNitroPlugin(async () => {
+export default defineNitroPlugin(() => {
     const config = useRuntimeConfig()
-    if (!String(config.databaseUrl ?? '')) {
+    // Waits for the migrator: its tables may be created by the migration this boot applies.
+    void runBootTask('sync-prompts', async () => {
+        await afterBootTask('migrate')
+        await syncPromptsOnBoot(String(config.databaseUrl ?? ''))
+    })
+})
+
+async function syncPromptsOnBoot(connectionString: string): Promise<void> {
+    if (!connectionString) {
         console.warn('[sync-prompts-on-boot] no runtimeConfig.databaseUrl, skipping')
         return
     }
@@ -52,4 +61,4 @@ export default defineNitroPlugin(async () => {
     } catch (err) {
         console.error('[sync-prompts-on-boot] failed:', err)
     }
-})
+}

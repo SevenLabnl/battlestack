@@ -5,12 +5,7 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
 /** `/api/health` + probe split (`/live`, `/ready`) + runtimeConfig knobs. Picks `with-db` or `env-only` variant at scaffold time. */
 export const healthFeature: Feature = {
     id: 'nuxt4:health',
-    // 1.2.0: the env check names NUXT_SESSION_PASSWORD and checks its length.
-    // 1.3.0: probe split — dependency-free `/api/health/live` for liveness,
-    // `/api/health/ready` for readiness. Both variants gate readiness on env config
-    // (with-db also pings Postgres), and only on APPLICABLE config: an absent
-    // `session` runtimeConfig means auth is not installed, not misconfigured.
-    version: '1.3.1',
+    version: '1.4.0',
     label: 'Health endpoints (/api/health, /live, /ready)',
     frameworks: ['nuxt4'],
     stage: STAGE.BASE_CONFIG,
@@ -24,6 +19,7 @@ export const healthFeature: Feature = {
                     '',
                     '- `GET /api/health/live` — liveness + startup probes. Checks nothing but the process; failing means the pod is restarted. Never add a dependency check here (a test guards this).',
                     '- `GET /api/health/ready` — readiness probe. Checks env config, plus a Postgres ping with `nuxt4:database`; failing takes the pod out of the Service and reverses on its own. Only applicable config gates: the session password is checked only when `nuxt4:auth` is installed.',
+                    '  With `nuxt4:database` it also answers 503 until every boot task in `server/utils/boot-tasks.ts` has settled (migrate-on-boot and the boot-time syncs), and keeps answering 503 if the migration failed. Nitro starts serving before async plugins finish, so this is what keeps a new pod out of the Service while it migrates. Register your own boot work with `runBootTask` rather than an unawaited async plugin.',
                     '- `GET /api/health` — humans and monitoring. Returns `{ status, version, checks }`; wired to no probe.',
                     '',
                     '- `/api/health` answers 200 when ok; 503 when degraded AND `runtimeConfig.health.failOnDegraded` is true (default).',

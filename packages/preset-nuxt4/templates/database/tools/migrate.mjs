@@ -136,7 +136,7 @@ async function baselineMigrations(sql, files) {
 
 async function applyMigrations(sql, applied, files) {
     let applied_count = 0
-    for (const { name, absPath } of files) {
+    for (const { name, absPath, when } of files) {
         const body = await readFile(absPath, 'utf8')
         const hash = createHash('sha256').update(body).digest('hex')
         if (applied.has(hash)) continue
@@ -145,7 +145,8 @@ async function applyMigrations(sql, applied, files) {
             for (const stmt of splitDrizzleSql(body)) {
                 if (stmt.trim().length > 0) await tx.unsafe(stmt)
             }
-            await tx`INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES (${hash}, ${Date.now()})`
+            // The journal's `when`, not now: the boot migrator skips any migration older than the newest `created_at`.
+            await tx`INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES (${hash}, ${when ?? Date.now()})`
         })
         applied_count++
     }

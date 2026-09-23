@@ -5,8 +5,7 @@ import { saveFeatureState, STAGE, type Feature, type ChatTransport } from '@batt
 /** Streaming chat on Mastra's default agent. Transport from `state.chatTransport`. */
 export const chatFeature: Feature = {
     id: 'nuxt4:chat',
-    // 1.1.3: re-emitted for the now-async `rateLimit()`.
-    version: '1.2.0',
+    version: '1.2.1',
     label: 'Streaming chat (Mastra)',
     description: 'WebSocket streaming chat UI backed by the Mastra default agent.',
     frameworks: ['nuxt4'],

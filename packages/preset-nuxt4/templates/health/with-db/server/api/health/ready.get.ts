@@ -2,6 +2,7 @@ import type { H3Event } from 'h3'
 import { db } from '#server/database/client'
 import { sql } from 'drizzle-orm'
 import { checkEnvVars, sessionPasswordFrom } from '#server/utils/health-checks'
+import { bootState } from '#server/utils/boot-tasks'
 
 /**
  * Readiness: can this instance serve traffic right now? Failing takes the pod out of
@@ -9,7 +10,8 @@ import { checkEnvVars, sessionPasswordFrom } from '#server/utils/health-checks'
  * liveness. Config gates readiness too, same rule as the env-only variant: a restart
  * cannot fix missing env (so it must never fail liveness), but a pod that cannot seal
  * sessions should not join the Service either. Same timeout knob as `/api/health`,
- * which stays as the richer endpoint for humans and monitoring.
+ * which stays as the richer endpoint for humans and monitoring. Boot tasks gate it too: Nitro
+ * serves before async plugins finish, so without this a new pod joins the Service mid-migration.
  */
 export default defineEventHandler(async (event: H3Event) => {
     const config = useRuntimeConfig(event)
@@ -22,6 +24,16 @@ export default defineEventHandler(async (event: H3Event) => {
         return {
             status: 'degraded' as const,
             env: { ok: false, missing: missingEnv },
+        }
+    }
+
+    const boot = bootState()
+    if (!boot.ready) {
+        setResponseStatus(event, 503)
+        return {
+            status: 'degraded' as const,
+            env: { ok: true },
+            boot: { ok: false, pending: boot.pending, failed: boot.failed },
         }
     }
 
@@ -41,6 +53,7 @@ export default defineEventHandler(async (event: H3Event) => {
         return {
             status: 'degraded' as const,
             env: { ok: true },
+            boot: { ok: true },
             db: { ok: false, error: err instanceof Error ? err.message : 'db check failed' },
         }
     } finally {
@@ -50,6 +63,7 @@ export default defineEventHandler(async (event: H3Event) => {
     return {
         status: 'ok' as const,
         env: { ok: true },
+        boot: { ok: true },
         db: { ok: true, latencyMs: Date.now() - started },
     }
 })

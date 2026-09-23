@@ -6,16 +6,11 @@ import {
 } from '#server/utils/cache-bus'
 
 /**
- * Subscribes this replica to cross-replica cache invalidations. Without it each replica
- * serves its own caches until they expire, so an admin edit on one is invisible on the rest
- * for up to the cache TTL.
- *
- * postgres-js keeps a dedicated connection for listeners and re-issues LISTEN after a drop,
- * so the third callback fires on the first connect and on every reconnect.
+ * Subscribes this replica to cache invalidations. postgres-js re-issues LISTEN after a drop,
+ * so the third callback fires on every (re)connect and clears what was missed meanwhile.
  */
 export default defineNitroPlugin(() => {
-    // Not awaited: boot must not block on the listener connecting. Until it does, and again
-    // if it drops, caches fall back to expiring on their TTL.
+    // Not awaited: until the listener connects, caches fall back to their TTL.
     void sql
         .listen(
             CACHE_INVALIDATION_CHANNEL,

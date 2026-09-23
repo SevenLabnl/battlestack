@@ -4,16 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Advisory keys share ONE namespace per database, across every feature. Two call sites that
- * pick the same number block each other even when they have nothing to do with each other.
- *
- * `server/utils/advisory-locks.ts` is the registry that makes a collision visible. The two
- * standalone tools cannot import it (they run outside the Nuxt build), so they repeat their
- * values as literals and this file is what keeps those literals honest.
- *
- * An earlier version of this test only read the `database` template. `10-sync-ai-on-boot.ts`
- * in the `mastra` template had silently taken the seed key, and nothing noticed. Hence the
- * tree-wide sweep at the bottom: scope the guard to the whole payload, not to one feature.
+ * Advisory keys share one namespace per database, so two unrelated call sites on the same number
+ * block each other. The two standalone tools cannot import the registry and repeat its values.
  */
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -106,18 +98,15 @@ describe('advisory-lock keys', () => {
     })
 
     it('no template outside the two standalone tools hardcodes a lock key', async () => {
-        // The sweep that the database-only version of this test was missing. A feature that
-        // declares its own literal is invisible to the registry, which is how the collision
-        // between `10-sync-ai-on-boot.ts` and `tools/seed.mjs` survived.
         const allowed = new Set([STANDALONE, SEEDER, REGISTRY])
         const offenders: string[] = []
         for (const file of await walk(templates)) {
             if (allowed.has(file)) continue
             const src = await readFile(file, 'utf8')
             if (!/pg_advisory/.test(src)) continue
-            if (/ADVISORY_LOCK_KEY\s*=\s*[0-9_]+/.test(src)) {
-                offenders.push(path.relative(templates, file))
-            }
+            const inlineLiteral = /pg_advisory\w*\(\s*[0-9]/.test(src)
+            const numericConst = /const\s+\w*LOCK\w*\s*=\s*[0-9]/.test(src)
+            if (inlineLiteral || numericConst) offenders.push(path.relative(templates, file))
         }
         expect(offenders).toEqual([])
     })
@@ -125,9 +114,7 @@ describe('advisory-lock keys', () => {
 
 describe('cache-bus namespaces', () => {
     it('no two templates claim the same cache namespace', async () => {
-        // `createTtlCache` overwrites a repeat namespace rather than throwing, so dev HMR keeps
-        // working. That trade moves the collision check here: two features sharing a namespace
-        // would silently invalidate each other's entries, with nothing failing at runtime.
+        // `createTtlCache` overwrites a repeat namespace (dev HMR), so a collision is only caught here.
         const claims = new Map<string, string[]>()
         for (const file of await walk(templates)) {
             const src = await readFile(file, 'utf8')
