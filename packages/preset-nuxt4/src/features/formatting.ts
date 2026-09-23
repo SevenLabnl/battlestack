@@ -7,7 +7,6 @@ import { STAGE } from '@battlestack/core/constants/stages.js'
 /** Shared formatting files: `.editorconfig`, `.dockerignore`. Always-on. No Prettier. */
 export const formattingFeature: Feature = {
     id: 'shared:formatting',
-    // 1.1.0: dropped Prettier. `format` and `format:check` now run ESLint.
     version: '1.1.0',
     label: 'Formatting + .dockerignore',
     stage: STAGE.GITIGNORE,

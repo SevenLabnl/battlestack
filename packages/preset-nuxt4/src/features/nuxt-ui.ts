@@ -6,10 +6,6 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
 /** Nuxt UI v4 + Tailwind v4. Registers `@nuxt/ui` module and wires `assets/css/main.css`. */
 export const nuxtUiFeature: Feature = {
     id: 'nuxt4:nuxt-ui',
-    // 1.2.2: token-placement doc corrected — overrides import after `@nuxt/ui`,
-    // matching where `nuxt4:battlestack-theme` splices its imports. update() also
-    // re-applies that splice: re-emitting `main.css` used to silently drop it.
-    // (1.2.1 was taken on main by the @tiptap peers doc while this branch was in review.)
     version: '1.2.2',
     label: 'Nuxt UI v4 + Tailwind v4',
     frameworks: ['nuxt4'],

@@ -5,7 +5,7 @@
     "scripts": {
         "battlestack": "tsx packages/cli/src/index.ts",
         "demo": "tsx scripts/demo.ts",
-        "tsc": "tsc --noEmit",
+        "tsc": "tsc --noEmit && tsc --noEmit -p scripts",
         "bump": "tsx scripts/bump-check.ts",
         "bump:check": "tsx scripts/bump-check.ts --check",
         "check:contrast": "pnpm --filter @battlestack/theme check:contrast",
@@ -26,10 +26,11 @@
         "race:replicas": "node scripts/replica-race.mjs"
     },
     "devDependencies": {
+        "@types/node": "^26.6.2",
         "tsx": "^4.23.13",
         "typescript": "^7.0.2",
-        "vitest": "^5.0.1",
-        "@types/node": "^26.6.2"
+        "vite": "^8.1.2",
+        "vitest": "^5.0.1"
     },
     "engines": {
         "node": ">=24"

@@ -26,7 +26,7 @@
             "@battlestack/preset-nuxt4": ["./packages/preset-nuxt4/src/index.ts"]
         }
     },
-    "include": ["packages/**/src/**/*.ts", "packages/**/test/**/*.ts", "scripts/**/*.ts"],
+    "include": ["packages/**/src/**/*.ts", "packages/**/test/**/*.ts"],
     // Template trees are scaffold PAYLOAD, not part of this repo's compilation:
     // they reference the generated project's Nuxt aliases (`~~/`, `#imports`, …)
     // and its installed deps, none of which resolve here. `**/test/**` in

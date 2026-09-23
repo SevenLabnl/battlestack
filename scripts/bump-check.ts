@@ -7,7 +7,7 @@
  *   pnpm bump <id> <level>      rewrite one version (patch|minor|major)
  *
  * Status markers:
- *   ! changed   owned files differ from base, version identical
+ *   ! changed   owned files differ from base, version identical (comment-only feature-file edits excluded)
  *   ^ bumped    version differs from base
  *   + new       feature file absent at base
  *   . clean     no change
@@ -17,10 +17,11 @@
  * feature that writes the aggregated file, listed in WRITERS.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { stripComments } from './strip-comments'
 
 type Level = 'patch' | 'minor' | 'major'
 type Status = 'changed' | 'bumped' | 'new' | 'clean'
@@ -251,7 +252,19 @@ function classify(file: string, version: string, ownedPaths: string[], changed: 
     const base = refVersion(file, ref)
     if (base === null) return 'new'
     if (base !== version) return 'bumped'
-    return ownedPaths.some((p) => isPathChanged(p, changed)) ? 'changed' : 'clean'
+    const isChanged = (p: string) => (p === file ? isCodeChanged(file, changed, ref) : isPathChanged(p, changed))
+    return ownedPaths.some(isChanged) ? 'changed' : 'clean'
+}
+
+/**
+ * A comment-only edit to the feature file emits nothing new, so it needs no bump. Templates are
+ * not exempt: their comments are copied into every scaffolded project.
+ */
+function isCodeChanged(file: string, changed: Set<string>, ref: string): boolean {
+    if (!changed.has(file)) return false
+    const now = stripComments(readFileSync(file, 'utf8'))
+    const then = stripComments(gitShow(file, ref) ?? '')
+    return now === null || then === null || now !== then
 }
 
 function isPathChanged(p: string, changed: Set<string>): boolean {

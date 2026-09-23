@@ -17,7 +17,6 @@ const FILES = ['lefthook.yml'] as const
 /** Lefthook git hooks: pre-commit eslint. Typecheck runs in CI, not on push. */
 export const ciFeature: Feature = {
     id: 'shared:ci',
-    // 1.1.0: dropped the Prettier pre-commit hook.
     version: '1.1.1',
     label: 'Git hooks (lefthook)',
     description: 'Pre-commit eslint on staged files via lefthook.',
