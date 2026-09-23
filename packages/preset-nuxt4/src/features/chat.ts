@@ -10,7 +10,8 @@ export const chatFeature: Feature = {
     description: 'WebSocket streaming chat UI backed by the Mastra default agent.',
     frameworks: ['nuxt4'],
     stage: STAGE.CHAT,
-    requires: ['nuxt4:mastra'],
+    // Both transports authenticate through `nuxt4:auth`'s session and rate limiter.
+    requires: ['nuxt4:mastra', 'nuxt4:auth'],
     failureIsNonFatal: true,
 
     collectDocs() {
@@ -22,7 +23,7 @@ export const chatFeature: Feature = {
                     '',
                     '- Page: `/chat`',
                     '- Composable: `useChatAgent()`',
-                    '- Transport (default): `ws-nitro`, a Nitro `defineWebSocketHandler` at `/_ws` (currently behind `nitro.experimental.websocket = true` on Nuxt 4).',
+                    '- Transport (default): `ws-nitro`, a Nitro `defineWebSocketHandler` at `/_ws` (currently behind `nitro.experimental.websocket = true` on Nuxt 4). The upgrade is refused unless the request comes from `NUXT_ALLOWED_ORIGINS` and carries a live DB session; every message re-checks that session (a revoked one closes the socket with code 4401) and draws on the same per-user `CHAT_MESSAGE` rate limit as the HTTP route.',
                     '- Transport `http` (Vercel AI SDK chunked-stream) is shipped but WARNING: **not supported in production today**. Cloudflare\'s edge buffers it. Manual opt-in only; never auto-selected.',
                     '',
                     'Transport is fixed at scaffold time via `state.chatTransport` and reflected in the manifest. To switch, re-run `battlestack pull` with a new value; current files become `.battlestack.patch` artefacts if user-modified.',
