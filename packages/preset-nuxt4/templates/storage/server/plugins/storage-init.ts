@@ -1,4 +1,5 @@
 import { S3Client, HeadBucketCommand, CreateBucketCommand } from '@aws-sdk/client-s3'
+import { usePathStyle } from '#server/utils/storage'
 
 /** Cold-boot bucket bootstrap: create the bucket if it doesn't exist. Idempotent. */
 export default defineNitroPlugin(async () => {
@@ -10,11 +11,10 @@ export default defineNitroPlugin(async () => {
 
     if (!endpoint || !bucketName || !accessKeyId || !secretAccessKey) return
 
-    const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/.test(endpoint)
     const client = new S3Client({
         region: String(cfg.s3Region ?? 'us-east-1'),
         endpoint,
-        forcePathStyle: isLocal,
+        forcePathStyle: usePathStyle(endpoint, cfg.s3ForcePathStyle),
         credentials: { accessKeyId, secretAccessKey },
     })
 
