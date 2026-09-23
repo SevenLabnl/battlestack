@@ -1,5 +1,8 @@
 packages:
   - packages/*
+# Hold new releases back 3 days; fall back to a younger one only when nothing older satisfies a range.
+minimumReleaseAge: 4320
+minimumReleaseAgeStrict: false
 allowBuilds:
   esbuild: true
 overrides:

@@ -331,13 +331,10 @@ or something that worked under Vite and not under Nitro.
 
 ### A dependency bump was held back
 
-Deliberate. The supply-chain release-age policy holds very fresh releases back,
-because a package published minutes ago is the one most likely to be
-compromised.
-
-```bash
-battlestack policy:status
-```
+Deliberate. The supply-chain release-age policy holds releases younger than 3
+days back, because a package published minutes ago is the one most likely to be
+compromised. For a one-off exception, pass the package manager's
+`--no-minimum-release-age` (or equivalent).
 
 ## Cleaning up
 

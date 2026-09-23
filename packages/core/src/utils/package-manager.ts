@@ -112,18 +112,26 @@ export async function ensureWorkspaceMarker(projectDir: string): Promise<void> {
     await fs.writeFile(target, renderSeededWorkspaceYaml(), 'utf8')
 }
 
-/** Sets or replaces `minimumReleaseAge` in `pnpm-workspace.yaml`. Never hash-recorded. */
+/**
+ * Sets or replaces `minimumReleaseAge` and `minimumReleaseAgeStrict` in `pnpm-workspace.yaml`.
+ * Never hash-recorded. Strict is written off because pnpm turns it on for any explicit age,
+ * which aborts a non-interactive install that can only resolve a younger release.
+ */
 export async function writeWorkspaceReleaseAge(projectDir: string, days: number): Promise<void> {
     await ensureWorkspaceMarker(projectDir)
     const fs = await import('node:fs/promises')
     const path = await import('node:path')
     const target = path.join(projectDir, 'pnpm-workspace.yaml')
-    const existing = await fs.readFile(target, 'utf8')
-    const minutes = days * 24 * 60
-    const line = `minimumReleaseAge: ${minutes} # ${days} day(s), managed by battlestack`
-    const out = /^minimumReleaseAge:.*$/m.test(existing)
-        ? existing.replace(/^minimumReleaseAge:.*$/m, line)
-        : existing + (existing.endsWith('\n') || existing === '' ? '' : '\n') + line + '\n'
+    let out = await fs.readFile(target, 'utf8')
+    const lines: Array<[RegExp, string]> = [
+        [/^minimumReleaseAge:.*$/m, `minimumReleaseAge: ${days * 24 * 60} # ${days} day(s), managed by battlestack`],
+        [/^minimumReleaseAgeStrict:.*$/m, 'minimumReleaseAgeStrict: false # managed by battlestack'],
+    ]
+    for (const [pattern, line] of lines) {
+        out = pattern.test(out)
+            ? out.replace(pattern, line)
+            : out + (out.endsWith('\n') || out === '' ? '' : '\n') + line + '\n'
+    }
     await fs.writeFile(target, out, 'utf8')
 }
 

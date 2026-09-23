@@ -53,6 +53,8 @@ export const mastraFeature: Feature = {
                 // fails the build when the output imports one that is missing here.
                 '@ai-sdk/provider-utils-v5@npm:@ai-sdk/provider-utils@^3',
                 '@ai-sdk/provider-utils-v6@npm:@ai-sdk/provider-utils@^4',
+                '@ai-sdk/provider-utils-v7@npm:@ai-sdk/provider-utils@^5',
+                '@ai-sdk/provider-v7@npm:@ai-sdk/provider@^4',
                 'zod-from-json-schema-v3@npm:zod-from-json-schema@^0.0.5',
             ],
             // Dev-only: the `mastra` CLI ships Mastra Studio and is never imported by the build.

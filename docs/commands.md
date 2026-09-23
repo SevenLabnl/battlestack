@@ -203,13 +203,6 @@ See [Deployment](deployment.md).
 | --- | --- |
 | `battlestack mastra:studio` | Start Mastra Studio. Dev only. |
 
-### Supply chain, from `shared:package-policy`
-
-| Command | What it does |
-| --- | --- |
-| `battlestack policy:status` | Show release-age policy status. |
-| `battlestack policy:tick` | Force a release-age ramp check. |
-
 ## Plugin commands
 
 A plugin can contribute its own commands, and they appear in `--help` grouped

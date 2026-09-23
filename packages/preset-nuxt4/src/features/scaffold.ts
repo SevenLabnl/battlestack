@@ -24,7 +24,7 @@ import {
     parseIgnoredBuilds,
     resolveSpawn,
     writeWorkspaceReleaseAge,
-    RELEASE_AGE_SCAFFOLD_DAYS,
+    RELEASE_AGE_DAYS,
     STAGE,
     type Feature,
     type PackageManager,
@@ -42,7 +42,7 @@ import { isDatabaseSeeded, markDatabaseSeeded } from './database.js'
 /** Single-shot `nuxi init` with the union of every enabled feature's modules. */
 export const scaffoldFeature: Feature = {
     id: 'nuxt4:scaffold',
-    version: '1.2.1',
+    version: '1.3.0',
     label: 'Scaffold Nuxt project',
     frameworks: ['nuxt4'],
     stage: STAGE.SCAFFOLD,
@@ -191,9 +191,9 @@ export const scaffoldFeature: Feature = {
             '--no-gitInit',
             '--modules=',
         ]
-        // An explicit release-age policy of 0, seeded before nuxi's embedded install.
+        // Seeded before nuxi's embedded install, so its first resolution already holds back new releases.
         if (pm === 'pnpm') {
-            await writeWorkspaceReleaseAge(ctx.projectDir, RELEASE_AGE_SCAFFOLD_DAYS)
+            await writeWorkspaceReleaseAge(ctx.projectDir, RELEASE_AGE_DAYS)
         }
 
         const dlxBin = dlxBinary(pm)
