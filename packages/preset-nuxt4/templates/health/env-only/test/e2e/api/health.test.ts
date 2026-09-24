@@ -6,6 +6,8 @@ const serverUp = await isServerUp()
 interface HealthResponse {
     status: 'ok' | 'degraded'
     version: string
+    commit: string
+    builtAt: string
     checks: {
         env: { ok: boolean; missing?: string[] }
     }
@@ -18,6 +20,10 @@ describe('e2e: /api/health (env-only)', () => {
         expect(data).toBeTruthy()
         expect(['ok', 'degraded']).toContain(data!.status)
         expect(typeof data!.version).toBe('string')
+        // Present as a key even when the build supplied nothing: an absent field and an
+        // unknown commit are different answers, and monitoring has to tell them apart.
+        expect(typeof data!.commit).toBe('string')
+        expect(typeof data!.builtAt).toBe('string')
         expect(typeof data!.checks.env).toBe('object')
     })
 

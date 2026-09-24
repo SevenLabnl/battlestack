@@ -1,0 +1,7 @@
+{
+    "build": {
+        "version": "Version {version}",
+        "commit": "Commit {commit}",
+        "builtAt": "Built at {date}"
+    }
+}

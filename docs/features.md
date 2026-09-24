@@ -101,6 +101,7 @@ the system prompt, model and tools live.
 | Feature | What it gives you |
 | --- | --- |
 | `nuxt4:health` | A real `/api/health`: database ping plus required-config checks, bounded by a timeout. |
+| `nuxt4:build-info` | Version and commit sha in the footer and on `/api/health`, from the image's build args. |
 | `nuxt4:vitest` | Vitest configuration and scripts. |
 | `shared:playwright` | Playwright MCP for AI browser testing, plus test utilities. |
 | `shared:ci` | Pre-commit ESLint on staged files, via lefthook. |

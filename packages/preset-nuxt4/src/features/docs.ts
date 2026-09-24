@@ -15,7 +15,7 @@ import {
 /** Generates AGENTS.md, CLAUDE.md and README.md from `collectDocs()`. Always rewritten. */
 export const docsFeature: Feature = {
     id: 'nuxt4:docs',
-    version: '1.0.22',
+    version: '1.0.23',
     label: 'Generate AGENTS.md + CLAUDE.md + README.md',
     frameworks: ['nuxt4'],
     stage: STAGE.DOCS,

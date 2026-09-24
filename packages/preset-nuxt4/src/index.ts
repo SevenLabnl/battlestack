@@ -13,6 +13,7 @@ import { namingFeature } from './features/naming.js'
 import { gitignoreFeature } from './features/gitignore.js'
 import { essentialsFeature } from './features/essentials.js'
 import { healthFeature } from './features/health.js'
+import { buildInfoFeature } from './features/build-info.js'
 import { finalizeFeature } from './features/finalize.js'
 import { scaffoldFeature } from './features/scaffold.js'
 import { databaseFeature } from './features/database.js'
@@ -79,6 +80,7 @@ export default defineBattlestackPlugin({
                 'nuxt4:mastra',
                 'nuxt4:chat',
                 'nuxt4:health',
+                'nuxt4:build-info',
                 'nuxt4:pinia',
                 'nuxt4:storage',
                 'nuxt4:redis',
@@ -119,6 +121,7 @@ export default defineBattlestackPlugin({
         battlestack.addFeature(gitignoreFeature)
         battlestack.addFeature(essentialsFeature)
         battlestack.addFeature(healthFeature)
+        battlestack.addFeature(buildInfoFeature)
         battlestack.addFeature(databaseFeature)
         battlestack.addFeature(authFeature)
         battlestack.addFeature(authVerificationFeature)

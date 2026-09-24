@@ -1,0 +1,7 @@
+{
+    "build": {
+        "version": "Versie {version}",
+        "commit": "Commit {commit}",
+        "builtAt": "Gebouwd op {date}"
+    }
+}

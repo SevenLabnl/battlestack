@@ -178,10 +178,28 @@ describe('githubFeature', () => {
         })
     })
 
-    it('update() reports the workflow as written', async () => {
+    it('update() reports both workflows as written', async () => {
         const report = await githubFeature.update!(ctx(), null)
-        expect(report.written).toEqual(['.github/workflows/lint-test.yml'])
+        expect(report.written).toEqual([
+            '.github/workflows/lint-test.yml',
+            '.github/workflows/release.yml',
+        ])
         expect(await exists('.github/workflows/lint-test.yml')).toBe(true)
+        expect(await exists('.github/workflows/release.yml')).toBe(true)
+    })
+
+    /**
+     * `release.yml` is dispatch-only by design: the version number is a human decision, and
+     * a `push:` or `pull_request:` trigger sneaking in would start minting versions per merge.
+     */
+    it('emits a release workflow that only ever runs on a manual dispatch', async () => {
+        await githubFeature.execute!(ctx())
+        const workflow = await readFile(path.join(projectDir, '.github/workflows/release.yml'), 'utf8')
+
+        expect(workflow).toContain('workflow_dispatch:')
+        expect(workflow).not.toMatch(/^\s{2}push:/m)
+        expect(workflow).not.toMatch(/^\s{2}pull_request:/m)
+        expect(workflow).not.toMatch(/^\s{2}schedule:/m)
     })
 
     it('collectDocs documents the quality gate under a single GitHub Actions heading', () => {
@@ -189,6 +207,7 @@ describe('githubFeature', () => {
         expect(docs).toHaveLength(1)
         expect(docs?.[0].heading).toBe('GitHub Actions')
         expect(docs?.[0].body).toContain('lint-test.yml')
+        expect(docs?.[0].body).toContain('release.yml')
         expect(docs?.[0].body).toContain('CI_RUNNER')
         expect(docs?.[0].body).toContain('CI_RUNNER_APT_PACKAGES')
         expect(docs?.[0].targets).toEqual(['readme', 'agents'])

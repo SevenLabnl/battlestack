@@ -1,0 +1,119 @@
+name: Release
+
+# Cuts a version number. A human owns that number: you dispatch this workflow and say how
+# big the change is. Nothing here bumps anything on its own, and no push or merge runs it.
+#
+# It writes no commit and opens no pull request. The version lives in the annotated `v*`
+# tag, and the deploy pipeline derives it from there with `git describe` — so there is no
+# release commit to merge, and no `package.json` field that can fall out of step with the
+# tag. A commit past the last tag builds as `1.4.2-5-gabc1234`, which reads as "not a
+# release" at a glance, because it isn't one.
+
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: How big is this release?
+        type: choice
+        options: [patch, minor, major]
+        required: true
+        default: patch
+
+# Two dispatches at once would compute the same next version from the same tag list, and
+# the loser would only find out at push time, after the winner had published its notes.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Tag a ${{ inputs.level }} release
+    # Defaults to a GitHub-hosted runner so this works with zero configuration.
+    # Set the repo/org variable `CI_RUNNER` to a self-hosted runner label to point this job at your own fleet, no template edit needed.
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Tags *are* the version history here, and a shallow clone fetches none of them.
+          fetch-depth: 0
+
+      - name: Warn when releasing off the default branch
+        if: github.ref_name != github.event.repository.default_branch
+        # Via env, not `${{ }}` in the script: a branch name may contain `$(...)`.
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: echo "::warning::${REF_NAME} is not the default branch — this tag will point at code that may never be merged"
+
+      - name: Work out the next version
+        id: version
+        env:
+          LEVEL: ${{ inputs.level }}
+        run: |
+          set -euo pipefail
+
+          # Refuse a second number for a commit that already carries one, lightweight tags
+          # included, or two dispatches ship two versions of identical code.
+          if existing=$(git describe --tags --exact-match --match 'v[0-9]*' HEAD 2>/dev/null); then
+            echo "::error::${GITHUB_SHA} is already released as ${existing}"
+            exit 1
+          fi
+
+          # Only plain vMAJOR.MINOR.PATCH tags count. A glob also admits `v1.3.0-rc.1`, which
+          # version-sorts above `v1.3.0` and would otherwise be taken as the latest release.
+          latest=$(git tag --list 'v[0-9]*' --sort=-v:refname | awk '/^v[0-9]+\.[0-9]+\.[0-9]+$/ && !found { print; found = 1 }')
+          current=${latest#v}
+          : "${current:=0.0.0}"
+
+          IFS=. read -r major minor patch <<< "$current"
+          case "$LEVEL" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+            *) echo "::error::unknown level ${LEVEL}"; exit 1 ;;
+          esac
+
+          tag="v${major}.${minor}.${patch}"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "::error::${tag} already exists but is not the newest tag — the tag history is not linear"
+            exit 1
+          fi
+
+          echo "previous=${latest:-none}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Tag it and publish the notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Annotated, not lightweight: `git describe` prefers annotated tags, and the
+          # tagger date is what dates the release when someone reads the history later.
+          git tag -a "$TAG" -m "$TAG"
+          git push origin "refs/tags/${TAG}"
+          gh release create "$TAG" --title "$TAG" --generate-notes --target "$GITHUB_SHA"
+
+      - name: Say what shipped
+        if: always() && steps.version.outputs.tag != ''
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          PREVIOUS: ${{ steps.version.outputs.previous }}
+        run: |
+          {
+            echo "## ${TAG}"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Previous | \`${PREVIOUS}\` |"
+            echo "| Commit | \`${GITHUB_SHA}\` |"
+            echo "| Branch | \`${GITHUB_REF_NAME}\` |"
+            echo
+            echo "Tagging does not deploy. Once this commit is deployed, the pipeline reads"
+            echo "the tag with \`git describe\`, bakes it into the image, and the app's footer"
+            echo "and \`/api/health\` report it."
+          } >> "$GITHUB_STEP_SUMMARY"

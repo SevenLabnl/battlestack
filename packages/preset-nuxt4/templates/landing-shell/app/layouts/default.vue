@@ -1,5 +1,8 @@
 <template>
-    <div class="min-h-screen">
+    <div class="min-h-screen flex flex-col">
+        <!-- Column layout: the footer sits at the bottom of a short page instead of under the fold of a long one.
+             The comment lives inside the root element on purpose — `vue/no-multiple-template-root` counts one at
+             the template root as a second root node. -->
         <UHeader>
             <template #left>
                 <!-- `/`, not `/dashboard`: this feature emits `app/pages/index.vue`, so `/` always exists while `/dashboard` only exists
@@ -41,11 +44,19 @@
             </template>
         </UHeader>
 
-        <UMain class="p-4 sm:p-6">
+        <UMain class="flex-1 p-4 sm:p-6">
             <UContainer>
                 <slot />
             </UContainer>
         </UMain>
+
+        <!-- battlestack:build-info -->
+        <UFooter>
+            <template #left>
+                <AppBuildInfo />
+            </template>
+        </UFooter>
+        <!-- /battlestack:build-info -->
     </div>
 </template>
 

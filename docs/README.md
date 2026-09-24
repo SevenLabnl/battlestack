@@ -34,6 +34,7 @@ New here? Read [Requirements](requirements.md), then
 | --- | --- |
 | [Keeping a project current](keeping-projects-current.md) | `pull`, `bump`, `sync`, `doctor`, drift, and file ownership. |
 | [Deployment](deployment.md) | The production image, the compose stack, and the health endpoint. |
+| [Versioning a project](versioning.md) | Cutting a version for a generated app, and seeing which commit is live. |
 | [Troubleshooting](troubleshooting.md) | Symptoms, causes, fixes. |
 
 ## Internals and contributing

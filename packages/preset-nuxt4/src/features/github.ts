@@ -12,7 +12,7 @@ const FEATURE_ID = 'shared:github'
 /** GitHub Actions gate: lint, typecheck, coverage, dependency audit. `<pm> audit` is advisory. */
 export const githubFeature: Feature = {
     id: 'shared:github',
-    version: '3.0.2',
+    version: '3.1.0',
     label: 'GitHub Actions workflows',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,
@@ -25,6 +25,10 @@ export const githubFeature: Feature = {
                 heading: 'GitHub Actions',
                 body: [
                     '`.github/workflows/lint-test.yml` runs lint, typecheck, test coverage and a dependency audit on pushes/PRs (plus a weekly scheduled run). Runs on `ubuntu-latest` by default, so it needs no self-hosted runner.',
+                    '',
+                    '`.github/workflows/release.yml` cuts a version number: **Actions → Release → Run workflow**, pick `patch`, `minor` or `major`. It reads the highest `v*` tag, bumps it, pushes the new annotated tag and publishes a GitHub release with generated notes. Dispatch-only — no push or merge triggers it, because the number is a human decision.',
+                    '',
+                    'It writes no commit and opens no pull request, so it needs no PAT and never argues with a protected branch. The version is a property of the tagged commit; the deploy pipeline derives it with `git describe` and bakes it into the image. Tagging does not deploy.',
                     '',
                     'Every step needs no configuration: they pass on a fresh clone or a fork. Nothing in this workflow talks to a service the repo cannot provide.',
                     '',
@@ -81,6 +85,17 @@ async function emit(ctx: RunContext): Promise<string[]> {
         ),
     )
     written.push(workflowRel)
+
+    // Copied verbatim: it runs git and gh, never the project's package manager, so there is
+    // nothing in it to render per manager.
+    const releaseRel = '.github/workflows/release.yml'
+    await writeRecorded(
+        ctx,
+        FEATURE_ID,
+        releaseRel,
+        await readFile(path.join(workflowsDir, 'release.yml'), 'utf8'),
+    )
+    written.push(releaseRel)
 
     return written
 }
