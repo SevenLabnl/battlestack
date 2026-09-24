@@ -5,7 +5,7 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
 /** `/api/health` + probe split (`/live`, `/ready`) + runtimeConfig knobs. Picks `with-db` or `env-only` variant at scaffold time. */
 export const healthFeature: Feature = {
     id: 'nuxt4:health',
-    version: '1.4.0',
+    version: '1.5.0',
     label: 'Health endpoints (/api/health, /live, /ready)',
     frameworks: ['nuxt4'],
     stage: STAGE.BASE_CONFIG,
