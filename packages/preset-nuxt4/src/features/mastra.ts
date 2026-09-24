@@ -29,7 +29,7 @@ import {
 /** Mastra AI runtime. Talks to an OpenAI-compatible AI gateway (sluis.ai preset, or any compatible URL) via `@ai-sdk/openai-compatible`. */
 export const mastraFeature: Feature = {
     id: 'nuxt4:mastra',
-    version: '2.1.0',
+    version: '2.1.1',
     label: 'Mastra AI runtime',
     frameworks: ['nuxt4'],
     stage: STAGE.AI_CORE,
@@ -255,6 +255,8 @@ export const mastraFeature: Feature = {
                     'The `agents` table links each agent to a model config and (optionally) a prompt BY KEY: `model_config_key` → `ai_model_configs.key`, `prompt_key` → `prompts.key` (nullable: an agent can have no prompt, and a prompt can have no agent). Agents resolve both per-call via `getAgentModelId(key)` / `getAgentInstructions(key)` (`server/mastra/utils/agent-runtime.ts`), falling back to env / code defaults when a row, prompt, or the prompts table is absent. Admins repoint the model or swap the prompt from `/dashboard/settings/ai` (`/api/ai/agents` + `PUT /api/ai/agents/:id`). Declare agent metadata (name, default model config + prompt) in `server/mastra/agents/registry.ts`.',
                     '',
                     'Chat and RAG features both build on this runtime. Their endpoints call `mastra.getAgent(...)` rather than instantiating their own clients.',
+                    '',
+                    '**One system prompt per call.** Mastra adds the agent\'s `instructions` first and then *appends* anything passed as `system` (the `generate`/`stream` option, or a `role: \'system\'` message) as an extra system message; it does not replace them. To override the prompt for one call (a prompt tester, a per-tenant prompt), pass `{ instructions: prompt }`, which does replace them. Never pass a DB prompt as `system`, and never accept `system` messages from a client: the chat endpoints only take `user` and `assistant`.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },

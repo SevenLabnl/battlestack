@@ -9,7 +9,8 @@ const chatSchema = z.object({
     messages: z
         .array(
             z.object({
-                role: z.enum(['system', 'user', 'assistant']),
+                // No `system`: Mastra appends it after the agent's DB-managed instructions.
+                role: z.enum(['user', 'assistant']),
                 content: z.string().min(1).max(32_000),
             }),
         )
