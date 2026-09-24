@@ -4,16 +4,25 @@ import { aiModelConfigs, agents } from '#server/database/schema/ai'
 import { getDefaultModelConfigs } from '#server/mastra/utils/model-configs'
 import { getAgentDefinition } from '#server/mastra/agents/registry'
 import { mastra } from '#server/mastra'
+import { ADVISORY_LOCK } from '#server/utils/advisory-locks'
+import { afterBootTask, runBootTask } from '#server/utils/boot-tasks'
 
 /**
  * Runs every boot so the `ai_model_configs`/`agents` rows always exist, unlike `db:seed`, which refuses to run in production.
  * Insert-if-missing only, never update or delete, so admin edits survive; the advisory lock serialises replicas during a rollout.
  */
-const SYNC_ADVISORY_LOCK_KEY = 6_154_321_001_001_002
+const SYNC_ADVISORY_LOCK_KEY = ADVISORY_LOCK.SYNC_AI
 
-export default defineNitroPlugin(async () => {
+export default defineNitroPlugin(() => {
     const config = useRuntimeConfig()
-    const connectionString = String(config.databaseUrl ?? '')
+    // Waits for the migrator: its tables may be created by the migration this boot applies.
+    void runBootTask('sync-ai', async () => {
+        await afterBootTask('migrate')
+        await syncAiOnBoot(String(config.databaseUrl ?? ''))
+    })
+})
+
+async function syncAiOnBoot(connectionString: string): Promise<void> {
     if (!connectionString) {
         console.warn('[sync-ai-on-boot] no runtimeConfig.databaseUrl, skipping')
         return
@@ -31,7 +40,7 @@ export default defineNitroPlugin(async () => {
         // The `agents` table may not exist yet if the project pulled the schema but hasn't migrated; runtime resolvers fall back, so the app still works.
         console.error('[sync-ai-on-boot] failed:', err)
     }
-})
+}
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -43,7 +52,7 @@ async function ensureModelConfigs(tx: Tx): Promise<void> {
             .where(eq(aiModelConfigs.key, cfg.key))
             .limit(1)
         if (existing) continue
-        await tx.insert(aiModelConfigs).values(cfg)
+        await tx.insert(aiModelConfigs).values(cfg).onConflictDoNothing()
         console.log(`[sync-ai-on-boot] ai_model_config registered: ${cfg.key}`)
     }
 }
@@ -64,7 +73,7 @@ async function registerAgents(tx: Tx): Promise<void> {
             modelConfigKey: def.modelConfigKey,
             // null → agent registered without a prompt; link one later in admin
             promptKey: def.promptKey,
-        })
+        }).onConflictDoNothing()
         console.log(`[sync-ai-on-boot] agent registered: ${def.key}`)
     }
 }

@@ -6,9 +6,27 @@ import {
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { randomBytes } from 'node:crypto'
+import { isIP } from 'node:net'
 import { createError } from 'h3'
 
 let client: S3Client | null = null
+
+/**
+ * Path-style addressing unless the endpoint can serve `<bucket>.<host>`: localhost, an IP or a
+ * single-label service name (`http://rustfs:9000`) cannot. `NUXT_S3_FORCE_PATH_STYLE` overrides.
+ */
+export function usePathStyle(endpoint: string, override?: unknown): boolean {
+    const forced = String(override ?? '').trim().toLowerCase()
+    if (forced === 'true') return true
+    if (forced === 'false') return false
+    let host: string
+    try {
+        host = new URL(endpoint).hostname.replace(/^\[|\]$/g, '')
+    } catch {
+        return false
+    }
+    return !host.includes('.') || isIP(host) !== 0
+}
 
 export function getClient(): S3Client {
     if (client) return client
@@ -17,11 +35,10 @@ export function getClient(): S3Client {
         throw createError({ statusCode: 500, statusMessage: 'Object storage not configured' })
     }
     const endpoint = String(cfg.s3Endpoint)
-    const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/.test(endpoint)
     client = new S3Client({
         region: String(cfg.s3Region) || 'us-east-1',
         endpoint,
-        forcePathStyle: isLocal,
+        forcePathStyle: usePathStyle(endpoint, cfg.s3ForcePathStyle),
         credentials: {
             accessKeyId: String(cfg.s3AccessKeyId),
             secretAccessKey: String(cfg.s3SecretAccessKey),

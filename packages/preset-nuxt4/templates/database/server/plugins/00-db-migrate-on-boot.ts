@@ -5,14 +5,21 @@ import path from 'node:path'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate as runMigrate } from 'drizzle-orm/postgres-js/migrator'
 import postgres from 'postgres'
+import { ADVISORY_LOCK } from '#server/utils/advisory-locks'
+import { runBootTask } from '#server/utils/boot-tasks'
 
 /**
  * The single migration path, identical under `nuxt dev` and in the container, so no manual or initContainer step exists to forget.
  * The advisory lock is what makes multi-replica rollouts safe: the other replicas block, then no-op. Disable via `NUXT_DISABLE_DB_MIGRATE_ON_BOOT`.
+ * Runs as a fatal boot task: until it settles readiness fails, and a failed migration keeps it failing.
  */
-const MIGRATE_ADVISORY_LOCK_KEY = 6_154_321_001_001_001
+const MIGRATE_ADVISORY_LOCK_KEY = ADVISORY_LOCK.MIGRATE
 
-export default defineNitroPlugin(async () => {
+export default defineNitroPlugin(() => {
+    void runBootTask('migrate', migrateOnBoot, { fatal: true })
+})
+
+async function migrateOnBoot(): Promise<void> {
     const config = useRuntimeConfig()
     if (config.disableDbMigrateOnBoot === true || String(config.disableDbMigrateOnBoot) === 'true') {
         console.log('[db-migrate-on-boot] disabled via runtimeConfig.disableDbMigrateOnBoot')
@@ -44,9 +51,6 @@ export default defineNitroPlugin(async () => {
             const ms = Date.now() - t0
             if (ms > 50) console.log(`[db-migrate-on-boot] migrations up to date (${ms}ms)`)
         }
-    } catch (err) {
-        // Deliberately not rethrown: crash-looping the pod hides the logs. Stale schema surfaces as clearer per-query errors downstream.
-        console.error('[db-migrate-on-boot] migration failed:', err)
     } finally {
         try {
             await client`SELECT pg_advisory_unlock(${MIGRATE_ADVISORY_LOCK_KEY})`
@@ -55,7 +59,7 @@ export default defineNitroPlugin(async () => {
         }
         await client.end({ timeout: 5 }).catch(() => undefined)
     }
-})
+}
 
 /**
  * Runs `extensions/*.sql` (CREATE EXTENSION / CREATE SCHEMA) before migrating: drizzle's generated

@@ -107,13 +107,14 @@ the system prompt, model and tools live.
 | `shared:github` | GitHub Actions workflows. |
 | `shared:docker` | Production Dockerfile plus the `prod:*` command family. |
 | `shared:security` | Security headers, via nuxt-security. |
-| `shared:package-policy` | Supply-chain release-age policy for dependencies, with `policy:status` and `policy:tick`. |
+| `shared:package-policy` | Supply-chain release-age policy for dependencies: new releases are held back 3 days. |
 | `shared:ai-tool-config` | Generated AI coding-tool config: `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, `.claude/rules/`. |
 
 `shared:package-policy` deserves a word. A dependency published minutes ago is
-the one most likely to be compromised, so the policy holds brand-new releases
-back for a short window and ramps in. `battlestack policy:status` shows where a
-project sits.
+the one most likely to be compromised, so the policy holds new releases back
+for 3 days. It is written into `pnpm-workspace.yaml`, `.npmrc` or `bunfig.toml`
+for whichever package manager the project uses, since npm does not hold releases
+back by default.
 
 ## Plumbing
 

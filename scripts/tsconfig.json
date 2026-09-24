@@ -1,0 +1,10 @@
+{
+    // Scripts run through tsx and vitest, which resolve extensionless TypeScript imports.
+    "extends": "../tsconfig.base.json",
+    "compilerOptions": {
+        "noEmit": true,
+        "module": "ESNext",
+        "moduleResolution": "Bundler"
+    },
+    "include": ["**/*.ts"]
+}

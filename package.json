@@ -5,7 +5,7 @@
     "scripts": {
         "battlestack": "tsx packages/cli/src/index.ts",
         "demo": "tsx scripts/demo.ts",
-        "tsc": "tsc --noEmit",
+        "tsc": "tsc --noEmit && tsc --noEmit -p scripts",
         "bump": "tsx scripts/bump-check.ts",
         "bump:check": "tsx scripts/bump-check.ts --check",
         "check:contrast": "pnpm --filter @battlestack/theme check:contrast",
@@ -22,16 +22,18 @@
         "build:clean": "tsc -b tsconfig.build.json --clean",
         "pack:smoke": "pnpm build && node scripts/pack-smoke.mjs",
         "pack:smoke:matrix": "pnpm build && node scripts/pack-smoke-matrix.mjs",
-        "race:migrate-lock": "node scripts/migrate-lock-race.mjs"
+        "race:migrate-lock": "node scripts/migrate-lock-race.mjs",
+        "race:replicas": "node scripts/replica-race.mjs"
     },
     "devDependencies": {
-        "tsx": "^4.23.13",
+        "@types/node": "^26.6.2",
+        "tsx": "^4.23.15",
         "typescript": "^7.0.2",
-        "vitest": "^5.0.1",
-        "@types/node": "^26.6.2"
+        "vite": "^8.3.0",
+        "vitest": "^5.0.1"
     },
     "engines": {
         "node": ">=24"
     },
-    "packageManager": "pnpm@11.8.0"
+    "packageManager": "pnpm@12.5.1"
 }

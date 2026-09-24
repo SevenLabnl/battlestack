@@ -16,10 +16,6 @@ const SUPPORTED: AiTool[] = ['claude-code', 'gemini-cli', 'cursor', 'codex']
 /** AI coding tool rules + MCP server scaffolding. Selection via `state.aiTool` (default: `claude-code`). */
 export const aiToolConfigFeature: Feature = {
     id: 'shared:ai-tool-config',
-    // 1.1.6: `.mcp.json` gained its Playwright entry, plus corrected rule globs.
-    // 1.1.9: `battlestack-ui` skill (design system on Nuxt UI) + frontend-design audit
-    // pointers, gated on `nuxt4:battlestack-theme` being enabled. (1.1.8 was taken on
-    // main while this branch was in review.)
     version: '1.1.9',
     label: 'AI coding tool config',
     stage: STAGE.AI_TOOL_CONFIG,

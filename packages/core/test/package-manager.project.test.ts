@@ -62,6 +62,14 @@ describe('writeWorkspaceReleaseAge', () => {
         const yaml = await readFile(path.join(projectDir, 'pnpm-workspace.yaml'), 'utf8')
         expect(yaml).toContain('minimumReleaseAge: 1440')
     })
+
+    it('turns strict off once, since pnpm makes any explicit age strict', async () => {
+        await writeWorkspaceReleaseAge(projectDir, 3)
+        await writeWorkspaceReleaseAge(projectDir, 3)
+        const yaml = await readFile(path.join(projectDir, 'pnpm-workspace.yaml'), 'utf8')
+        expect(yaml.match(/^minimumReleaseAgeStrict: false /gm)).toHaveLength(1)
+        expect(yaml.match(/^minimumReleaseAge: 4320 /gm)).toHaveLength(1)
+    })
 })
 
 describe('resolveProjectPM', () => {

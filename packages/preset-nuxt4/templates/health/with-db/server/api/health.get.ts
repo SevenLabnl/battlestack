@@ -2,6 +2,7 @@ import type { H3Event } from 'h3'
 import { db } from '#server/database/client'
 import { sql } from 'drizzle-orm'
 import { checkEnvVars, sessionPasswordFrom } from '#server/utils/health-checks'
+import { bootState } from '#server/utils/boot-tasks'
 
 type HealthBody = {
     status: 'ok' | 'degraded'
@@ -52,12 +53,15 @@ export default defineEventHandler(async (event) => {
         clearTimeout(timer)
     }
 
+    const boot = bootState()
+    const bootCheck = boot.ready ? { ok: true } : { ok: false, pending: boot.pending, failed: boot.failed }
+
     return respond(
         event,
         {
-            status: dbCheck.ok ? 'ok' : 'degraded',
+            status: dbCheck.ok && boot.ready ? 'ok' : 'degraded',
             version,
-            checks: { env: { ok: true }, db: dbCheck },
+            checks: { env: { ok: true }, boot: bootCheck, db: dbCheck },
         },
         failOnDegraded,
     )

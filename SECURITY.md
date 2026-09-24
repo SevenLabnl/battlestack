@@ -77,9 +77,9 @@ bug in your project. For example:
 Worth stating, since it shapes what counts as a finding.
 
 Generated projects carry a release-age policy for dependencies: a package
-published minutes ago is the one most likely to be compromised, so brand-new
-releases are held back briefly and ramp in. `battlestack policy:status` shows
-where a project sits, and `battlestack bump` respects it.
+published minutes ago is the one most likely to be compromised, so new
+releases are held back for 3 days before a project installs them, under pnpm,
+npm and bun alike. `battlestack bump` respects it.
 
 `battlestack self-update` under pnpm respects the same gate. `--force` opts out
 deliberately.

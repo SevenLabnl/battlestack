@@ -60,7 +60,7 @@ describe('pnpmVersionChecks', () => {
     })
 
     it('only warns between PNPM_MIN and the tested pin', () => {
-        for (const usable of [PNPM_MIN, '11.5.0', '11.7.9']) {
+        for (const usable of [PNPM_MIN, '11.7.9', '12.5.0']) {
             const checks = pnpmVersionChecks(usable)
             expect(checks).toHaveLength(1)
             expect(checks[0]?.state).toBe('warn')
@@ -70,7 +70,7 @@ describe('pnpmVersionChecks', () => {
 
     it('is silent at or above the tested pin', () => {
         expect(pnpmVersionChecks(PNPM_PIN_VERSION)).toEqual([])
-        expect(pnpmVersionChecks('12.2.1')).toEqual([])
+        expect(pnpmVersionChecks('13.0.0')).toEqual([])
     })
 
     it('says nothing when the version could not be read', () => {

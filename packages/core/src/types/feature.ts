@@ -102,7 +102,6 @@ export interface FeatureState {
     adminPassword?: string
     aiTool?: string
     chatTransport?: ChatTransport
-    minReleaseAgeDays?: number
     policies?: ProjectManifest['policies']
     storageRegion?: string
 

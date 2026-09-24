@@ -6,19 +6,18 @@ import { agents } from '../../database/schema/ai'
 import { getActiveModelId } from './ai-model'
 import { getDefaultPrompts } from '../../utils/prompts/defaults'
 import { getAgentDefinition } from '../agents/registry'
+import { createTtlCache, invalidate } from '../../utils/cache-bus'
 
 interface AgentLink {
     modelConfigKey: string
     promptKey: string | null
 }
 
-interface CacheEntry {
-    value: AgentLink
-    expires: number
-}
-
-const cache = new Map<string, CacheEntry>()
+const CACHE_NAMESPACE = 'agent-runtime'
+/** Ceiling on how long an admin edit can stay invisible if its NOTIFY is never delivered. */
 const TTL_MS = 30_000
+
+const cache = createTtlCache<AgentLink>(CACHE_NAMESPACE, TTL_MS)
 
 /**
  * Read an agent's DB row (the admin-editable link); returns null when the row is absent or the `agents` table doesn't exist yet (schema pulled but not migrated).
@@ -26,7 +25,9 @@ const TTL_MS = 30_000
  */
 async function readAgentLink(agentKey: string): Promise<AgentLink | null> {
     const cached = cache.get(agentKey)
-    if (cached && cached.expires > Date.now()) return cached.value
+    if (cached !== undefined) return cached
+    // Captured before the query; see `ai-model.ts`.
+    const generation = cache.generation()
     try {
         const [row] = await db
             .select({ modelConfigKey: agents.modelConfigKey, promptKey: agents.promptKey })
@@ -35,7 +36,7 @@ async function readAgentLink(agentKey: string): Promise<AgentLink | null> {
             .limit(1)
         if (!row) return null
         const value: AgentLink = { modelConfigKey: row.modelConfigKey, promptKey: row.promptKey }
-        cache.set(agentKey, { value, expires: Date.now() + TTL_MS })
+        cache.set(agentKey, value, generation)
         return value
     } catch {
         return null
@@ -88,8 +89,10 @@ async function resolvePromptContent(promptKey: string): Promise<string | null> {
     return def ? def.defaultContent : null
 }
 
-/** Drop cached agent links so the next resolve re-reads the DB (admin PUT). */
-export function invalidateAgentCache(agentKey?: string): void {
-    if (agentKey) cache.delete(agentKey)
-    else cache.clear()
+/**
+ * Drops an agent link from the cache on every replica so the next resolve re-reads the DB.
+ * Call it after any write to `agents`, and await it before responding.
+ */
+export async function invalidateAgentCache(agentKey?: string): Promise<void> {
+    await invalidate(CACHE_NAMESPACE, agentKey)
 }

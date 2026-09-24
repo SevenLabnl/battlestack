@@ -62,6 +62,18 @@ export function useChatAgent() {
             status.value = 'idle'
             error.value = { kind: 'generic', message: 'WebSocket connection failed.' }
         })
+        // A replica shutting down or scaling away closes the socket mid-reply; without this the
+        // composable stays `streaming` and refuses every later send. The next send reconnects.
+        const opened = socket
+        opened.addEventListener('close', () => {
+            if (socket !== opened) return
+            socket = null
+            if (status.value !== 'streaming') return
+            status.value = 'idle'
+            error.value = { kind: 'generic', message: 'The connection was interrupted. Please send your message again.' }
+            const last = messages.value.at(-1)
+            if (last && last.id === assistantId && last.content === '') messages.value.pop()
+        })
         return socket
     }
 

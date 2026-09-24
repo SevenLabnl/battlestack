@@ -57,8 +57,7 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 404, statusMessage: 'Agent not found' })
     }
 
-    // Drop the cached link so the next agent call picks up the new model/prompt.
-    invalidateAgentCache(updated.key)
+    await invalidateAgentCache(updated.key)
 
     await tryLogAudit(event, 'ai.agent.updated', null, {
         agentId: updated.id,

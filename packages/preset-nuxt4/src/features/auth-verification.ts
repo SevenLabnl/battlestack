@@ -7,7 +7,6 @@ import { STAGE } from '@battlestack/core'
 /** Email verification: a signup token verified via a one-time link, optionally blocking login. */
 export const authVerificationFeature: Feature = {
     id: 'nuxt4:auth-verification',
-    // 1.0.2: re-emitted for the now-async `rateLimit()`.
     version: '1.0.2',
     label: 'Email verification',
     frameworks: ['nuxt4'],

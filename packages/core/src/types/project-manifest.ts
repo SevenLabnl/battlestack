@@ -19,15 +19,5 @@ export interface ProjectManifest {
     /** Feature ids removed via `battlestack remove`. Pull never rehydrates these. */
     optedOut?: string[]
     /** Cross-cutting policy state (top-level, multi-feature). */
-    policies?: {
-        releaseAge?: {
-            /** ISO timestamp when the policy was first installed. */
-            startedAt: string
-            /** Target days. Defaults to 7. */
-            targetDays: number
-            /** Current ramp value (days). Bumped by preCheck as the project ages. */
-            currentDays: number
-        }
-        [key: string]: unknown
-    }
+    policies?: Record<string, unknown>
 }

@@ -8,8 +8,12 @@ if (!url) {
     throw new Error('NUXT_DATABASE_URL is not set in `.env`.')
 }
 
-const client = postgres(url, { max: 10 })
+// Per replica, so the database sees replicas x this, plus one LISTEN connection each.
+const client = postgres(url, { max: Number(process.env.NUXT_DATABASE_POOL_MAX) || 10 })
 export const db = drizzle(client)
+
+/** Raw postgres-js client, for LISTEN/NOTIFY and other statements drizzle doesn't model. */
+export { client as sql }
 
 export async function closeDb(): Promise<void> {
     await client.end({ timeout: 5 })

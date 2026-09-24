@@ -126,12 +126,9 @@ Separate from `pull` on purpose. `pull` is about what battlestack generates;
 you will often want one without the other.
 
 `bump` respects the supply-chain release-age policy: a package published minutes
-ago is the one most likely to be compromised, so brand-new releases are held
-back briefly. Check where a project sits with:
-
-```bash
-battlestack policy:status
-```
+ago is the one most likely to be compromised, so new releases are held back for
+3 days. When nothing older satisfies a range, pnpm installs the newer release
+rather than failing.
 
 ## Doing it all at once
 

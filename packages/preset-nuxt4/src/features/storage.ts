@@ -10,7 +10,7 @@ import { allocatePort, STAGE, type EnvVar, type Feature } from '@battlestack/cor
  */
 export const storageFeature: Feature = {
     id: 'nuxt4:storage',
-    version: '1.2.3',
+    version: '1.3.0',
     label: 'Object storage (RustFS dev / S3 prod)',
     description: 'File uploads and presigned downloads; RustFS locally, S3-compatible provider in prod.',
     frameworks: ['nuxt4'],
@@ -37,6 +37,7 @@ export const storageFeature: Feature = {
                     'Dev backend: **RustFS** (`rustfs/rustfs`) shipped in the project\'s `docker-compose.yml`. `battlestack up` starts it; the built-in web console is on `http://localhost:$S3_CONSOLE_PORT` (port allocated per project).',
                     '',
                     'Prod backend: any S3-compatible provider (Scaleway by default). Set `NUXT_S3_ENDPOINT` + credentials in the prod env.',
+                    'Buckets are addressed path-style (`<endpoint>/<bucket>`) when the endpoint host is localhost, an IP or a single-label service name such as `http://rustfs:9000`, and virtual-host style (`<bucket>.<host>`) otherwise. Set `NUXT_S3_FORCE_PATH_STYLE=true` or `false` to override.',
                     '',
                     '- `POST /api/files/upload-url` accepts `multipart/form-data` with a `file` field, uploads to S3, returns `{ key, size, mime }`',
                     '- `POST /api/files` records a `files` row once the object has landed (HEAD-checked against the bucket; refuses to record an absent object)',
@@ -146,6 +147,7 @@ async function addRuntimeConfig(projectDir: string): Promise<void> {
             s3AccessKeyId: '',
             s3SecretAccessKey: '',
             s3PublicBaseUrl: '',
+            s3ForcePathStyle: '',
         }),
     )
 }
