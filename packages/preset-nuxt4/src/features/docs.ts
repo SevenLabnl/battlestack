@@ -15,7 +15,7 @@ import {
 /** Generates AGENTS.md, CLAUDE.md and README.md from `collectDocs()`. Always rewritten. */
 export const docsFeature: Feature = {
     id: 'nuxt4:docs',
-    version: '1.0.23',
+    version: '1.0.24',
     label: 'Generate AGENTS.md + CLAUDE.md + README.md',
     frameworks: ['nuxt4'],
     stage: STAGE.DOCS,
@@ -86,16 +86,21 @@ async function writeRecorded(ctx: RunContext, relPath: string, content: string):
     recordFile(ctx, 'nuxt4:docs', relPath, await hashFile(dest))
 }
 
-/** What `pull` will overwrite, and the two ways out. Ordered first: it gates every later edit. */
+/** What `pull` does to an edited file, and the ways around it. Ordered first: it gates every later edit. */
 function buildOwnershipSection(): DocSection {
     return {
         heading: 'battlestack owns most files: check before editing',
         order: -2,
         body: [
-            'Every path under `files` in `.battlestack/manifest.json` is hash-tracked. Editing one is',
-            'drift: `battlestack pull` restores the upstream version and the edit is gone. A scaffold',
+            'Every path under `files` in `.battlestack/manifest.json` is hash-tracked. A scaffold',
             'tracks a few hundred paths, including `AGENTS.md`, `CLAUDE.md`, `README.md`, `Dockerfile`',
             'and everything under `.claude/`.',
+            '',
+            '`README.md`, `AGENTS.md` and `CLAUDE.md` are regenerated on every `battlestack pull`, so an',
+            'edit to them is lost. Editing any other tracked file is drift, and `pull` keeps your',
+            'version: it stages the upstream one under `.battlestack/pull/` (`<path>.new` and',
+            '`<path>.patch`) for you to merge, and that file stops receiving upstream changes until you',
+            'do. `battlestack pull --force` takes upstream instead and saves yours as `<path>.bak`.',
             '',
             '`nuxt.config.ts` and `package.json` are **not** tracked; edit them freely. Paths under',
             '`ownedByUser` in the manifest are written once at scaffold and never again (the icons and',
@@ -106,8 +111,9 @@ function buildOwnershipSection(): DocSection {
             '',
             '1. Add a sibling file that layers on top of the tracked one and leave the original',
             '   alone, so `pull` keeps updating the original and your file survives.',
-            '2. `battlestack own <path...>` to claim it. `pull` then skips it, and it stops receiving',
-            '   upstream fixes. `battlestack disown <path...>` hands it back.',
+            '2. Edit it and merge what `pull` stages, when the change is small and upstream rarely moves.',
+            '3. `battlestack own <path...>` to claim it. `pull` then skips it without staging anything,',
+            '   and it stops receiving upstream fixes. `battlestack disown <path...>` hands it back.',
             '',
             'Project-specific agent instructions belong in `CLAUDE.project.md`, which is untracked and',
             'imported by `CLAUDE.md`. Put them there rather than editing `CLAUDE.md` or `AGENTS.md`.',
