@@ -24,6 +24,7 @@ import {
 } from '@battlestack/core'
 import { applyEnv, collectEnvForFeature } from '@battlestack/preset-nuxt4'
 import { ui } from '@battlestack/tui'
+import { formatAndReconcile } from './format-project.js'
 
 /** Static metadata only. `run` is built per-dispatch in `project.ts`. */
 export const addReservedMeta: Omit<ReservedCommand, 'run'> = {
@@ -137,6 +138,7 @@ export async function addCommand(args: ParsedArgs, loader: Ora, registries: Batt
     ctx.enabledFeatures = new Set(manifest.features.map((f) => f.id))
     // Adding clears any prior opt-out.
     ctx.state.optedOut = (manifest.optedOut ?? []).filter((id) => id !== fqid)
+    if (args.format) await formatAndReconcile(ctx, manifest, registries)
     await writeManifest(ctx)
 
     ui.blank()

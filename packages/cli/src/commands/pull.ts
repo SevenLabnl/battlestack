@@ -1,6 +1,7 @@
 import pc from 'picocolors'
 import type { Ora } from 'ora'
 import { confirmOverwriteOwned, ui } from '@battlestack/tui'
+import { formatAndReconcile } from './format-project.js'
 import {
     acquireProjectLock,
     buildRunContext,
@@ -369,25 +370,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         if (!ctx.dryRun) {
             // `--no-format` skips the format pass and its drift re-baseline.
             if (args.format) {
-                const { formatProject } = await import('@battlestack/preset-nuxt4')
-                const { snapshotTrackedHashes, reconcilePostFormat } = await import('@battlestack/core')
-                // Snapshot precedes formatting: only pristine→reformatted files are re-recorded.
-                // Keyed bare: `record.id` is the manifest fqid, but state maps (and
-                // `reconcilePostFormat`'s writes, which `writeManifest` reads back) key
-                // on the bare feature id.
-                const tracked = manifest.features
-                    .filter((record) => registries.features.has(record.id))
-                    .map((record) => {
-                        const bareId = registries.features.get(record.id).id
-                        return {
-                            featureId: bareId,
-                            recorded: (ctx.state[`files:${bareId}`] as Record<string, string>) ?? record.files,
-                            owned: new Set(record.ownedByUser ?? []),
-                        }
-                    })
-                const preHashes = await snapshotTrackedHashes(ctx, tracked)
-                await formatProject(ctx)
-                await reconcilePostFormat(ctx, tracked, preHashes)
+                await formatAndReconcile(ctx, manifest, registries)
             }
             await writeManifest(ctx)
         }
