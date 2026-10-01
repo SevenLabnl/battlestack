@@ -1,3 +1,5 @@
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import type { BattlestackRegistries } from '../registry.js'
 import { run } from './run.js'
 import { dlxArgs, dlxBinary, resolveProjectPM } from './package-manager.js'
@@ -36,6 +38,30 @@ function skillsAgent(ctx: RunContext): string {
     return typeof tool === 'string' && SKILLS_AGENTS.includes(tool) ? tool : 'claude-code'
 }
 
+// ssh asks on the inherited TTY to trust an unknown host key, and the `skills` spinner paints over
+// the question, so the run hangs on input nobody can see. BatchMode makes that a failure instead.
+// Appended to the ssh command git would use anyway, so a custom binary keeps working.
+export async function nonInteractiveGitEnv(
+    cwd: string,
+    env: NodeJS.ProcessEnv = process.env,
+): Promise<Record<string, string>> {
+    const out: Record<string, string> = { GIT_TERMINAL_PROMPT: '0' }
+    // GIT_SSH names a binary that may not be OpenSSH (plink); its options are not ours to guess.
+    if (env.GIT_SSH) return out
+    const configured = env.GIT_SSH_COMMAND || (await gitConfig(cwd, 'core.sshCommand', env))
+    out.GIT_SSH_COMMAND = `${configured || 'ssh'} -o BatchMode=yes`
+    return out
+}
+
+async function gitConfig(cwd: string, key: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
+    try {
+        const { stdout } = await promisify(execFile)('git', ['config', '--get', key], { cwd, env, timeout: 5000 })
+        return stdout.trim() || undefined
+    } catch {
+        return undefined
+    }
+}
+
 /** Installs or refreshes skill sources via the project's PM `dlx`. Failures warn, never throw. */
 export async function installSkills(ctx: RunContext, sources: readonly string[]): Promise<void> {
     // `--no-skills` sets state.skipSkills. `--skip-install` and dry-run also skip.
@@ -49,6 +75,7 @@ export async function installSkills(ctx: RunContext, sources: readonly string[])
     })
 
     const agent = skillsAgent(ctx)
+    const env = await nonInteractiveGitEnv(ctx.projectDir)
 
     for (const source of unique) {
         try {
@@ -57,6 +84,7 @@ export async function installSkills(ctx: RunContext, sources: readonly string[])
             ]), {
                 cwd: ctx.projectDir,
                 inherit: true,
+                env,
             })
         } catch (err) {
             getUiPort().warn(

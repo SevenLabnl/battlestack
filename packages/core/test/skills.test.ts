@@ -15,7 +15,7 @@ vi.mock('../src/utils/package-manager.js', async (importOriginal) => {
     return { ...actual, resolveProjectPM: vi.fn(async (o: { fallback?: string }) => o?.fallback ?? 'pnpm') }
 })
 
-const { installSkills, collectSkillSources } = await import('../src/utils/skills.js')
+const { installSkills, collectSkillSources, nonInteractiveGitEnv } = await import('../src/utils/skills.js')
 const { BattlestackRegistries } = await import('../src/registry.js')
 const { STAGE } = await import('../src/constants/stages.js')
 
@@ -54,8 +54,16 @@ describe('installSkills', () => {
         expect(runMock).toHaveBeenCalledWith(
             dlxBinary('bun'),
             dlxArgs('bun', ['skills', 'add', 'mastra-ai/skills', '--yes', '--agent', 'claude-code']),
-            { cwd: projectDir, inherit: true },
+            { cwd: projectDir, inherit: true, env: expect.objectContaining({ GIT_TERMINAL_PROMPT: '0' }) },
         )
+    })
+
+    // An unknown github.com host key or a credential prompt otherwise hangs the scaffold behind the spinner.
+    it('runs `skills add` with git and ssh unable to prompt', async () => {
+        await installSkills(ctx(), ['owner/repo'])
+        const options = (runMock.mock.calls[0] as unknown[])[2] as { env: Record<string, string> }
+        expect(options.env.GIT_TERMINAL_PROMPT).toBe('0')
+        expect(options.env.GIT_SSH_COMMAND).toMatch(/ -o BatchMode=yes$/)
     })
 
     // Without `--agent` the installer writes to every agent it detects, so third-party skill code
@@ -140,5 +148,37 @@ describe('collectSkillSources', () => {
         registries.features.register(FAKE as never, origin)
         expect(collectSkillSources(ctx({}, ['test:skilled']), registries)).toEqual(['acme/widget'])
         expect(collectSkillSources(ctx({}, []), registries)).toEqual([])
+    })
+})
+
+describe('nonInteractiveGitEnv', () => {
+    // Isolated from the developer's own git config: an empty global config, no system config.
+    async function gitEnv(extra: Record<string, string>, globalConfig = ''): Promise<NodeJS.ProcessEnv> {
+        const config = path.join(projectDir, 'gitconfig')
+        await writeFile(config, globalConfig, 'utf8')
+        return { PATH: process.env.PATH, HOME: projectDir, GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: '1', ...extra }
+    }
+
+    it('defaults to plain ssh in batch mode, the binary git would pick anyway', async () => {
+        const env = await nonInteractiveGitEnv(projectDir, await gitEnv({}))
+        expect(env).toEqual({ GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -o BatchMode=yes' })
+    })
+
+    it('appends to GIT_SSH_COMMAND instead of replacing it', async () => {
+        const env = await nonInteractiveGitEnv(projectDir, await gitEnv({ GIT_SSH_COMMAND: 'ssh -i ~/.ssh/deploy' }))
+        expect(env.GIT_SSH_COMMAND).toBe('ssh -i ~/.ssh/deploy -o BatchMode=yes')
+    })
+
+    it('appends to core.sshCommand, e.g. a 1Password or Windows OpenSSH binary', async () => {
+        const env = await nonInteractiveGitEnv(
+            projectDir,
+            await gitEnv({}, '[core]\n\tsshCommand = C:/Windows/System32/OpenSSH/ssh.exe\n'),
+        )
+        expect(env.GIT_SSH_COMMAND).toBe('C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes')
+    })
+
+    it('leaves GIT_SSH (plink and friends) alone', async () => {
+        const env = await nonInteractiveGitEnv(projectDir, await gitEnv({ GIT_SSH: 'plink.exe' }))
+        expect(env).toEqual({ GIT_TERMINAL_PROMPT: '0' })
     })
 })
