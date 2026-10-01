@@ -103,6 +103,45 @@ battlestack plugin add ../my-plugin
 Because the store is per machine and not per project, adding a plugin does not
 add a dependency to the app you ship.
 
+## Keeping plugins up to date
+
+```bash
+battlestack plugin list                  # installed versions
+battlestack plugin outdated              # what has a newer version; exits 1 if anything does
+battlestack plugin update                # update every registry-installed plugin
+battlestack plugin update <pkg> --force  # one plugin, skipping the release-age window
+```
+
+`plugin update` installs the newest version that is at least three days old,
+the same protection against compromised releases that battlestack writes into
+generated projects. `--force` installs the true latest. The installed version is
+pinned exactly in the store, and linked (`file:`) plugins are skipped.
+
+After installing, the new version is loaded once. If it fails, for example
+because it targets a different `apiVersion`, the previous version is restored
+and the command exits non-zero.
+
+### Automatic updates
+
+Once a day, after a command finishes, battlestack checks the registry for newer
+plugin versions. What happens next depends on the policy:
+
+| Policy | Behaviour |
+| --- | --- |
+| `notify` (default) | Prints the available updates and how to install them. |
+| `apply` | Installs them at the start of the next command, before plugins load. |
+| `off` | No check. |
+
+```bash
+battlestack plugin auto-update apply
+```
+
+The policy is stored in `~/.battlestack/config.json`. A version that failed to
+load is not retried automatically. The check is skipped in CI and when
+`BATTLESTACK_NO_UPDATE_CHECK` is set, and an unreachable registry is ignored.
+Plugins loaded through `BATTLESTACK_PLUGINS` or a project's `plugins` array are
+never auto-updated.
+
 ## Where plugins are loaded from
 
 Four sources, in this precedence order. The first occurrence of a package name
