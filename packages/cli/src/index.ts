@@ -24,7 +24,21 @@ import { doctorCommand } from './commands/doctor.js'
 import { gatewayUp, registerProject } from './commands/gateway.js'
 import { projectCommand } from './commands/project.js'
 import { selfUpdateCommand } from './commands/self-update.js'
-import { pluginAdd, pluginList, pluginRemove } from './plugin-store.js'
+import {
+    pluginAdd,
+    pluginList,
+    pluginOutdated,
+    pluginRemove,
+    pluginUpdate,
+    storePluginLoadError,
+} from './plugin-store.js'
+import {
+    applyPendingPluginUpdates,
+    notifyOutdatedPlugins,
+    recordRejectedVersion,
+    resetPluginUpdateCheck,
+    setAutoUpdatePolicy,
+} from './plugin-auto-update.js'
 
 const BATTLESTACK_HOME = process.env.BATTLESTACK_HOME ?? path.join(os.homedir(), '.battlestack')
 
@@ -141,6 +155,7 @@ async function main(): Promise<void> {
                 tag: args.template,
                 force: args.force,
             })
+            await resetPluginUpdateCheck(BATTLESTACK_HOME)
         } catch (error) {
             const cliError
                 = error instanceof CLIError ? error : wrapError(error, ErrorCode.SCAFFOLD_FAILED)
@@ -156,11 +171,36 @@ async function main(): Promise<void> {
 
     // Plugin-store management, project-agnostic.
     if (args.projectName === 'plugin') {
-        const [sub, spec] = args.positionals.slice(1)
-        if (sub === 'add' && spec) await pluginAdd(BATTLESTACK_HOME, spec)
-        else if (sub === 'remove' && spec) await pluginRemove(BATTLESTACK_HOME, spec)
-        else if (sub === 'list') await pluginList(BATTLESTACK_HOME)
-        else console.error('usage: battlestack plugin <add|remove> <package> | battlestack plugin list')
+        try {
+            const [sub, spec, ...rest] = args.positionals.slice(1)
+            if (sub === 'add' && spec) await pluginAdd(BATTLESTACK_HOME, spec)
+            else if (sub === 'remove' && spec) await pluginRemove(BATTLESTACK_HOME, spec)
+            else if (sub === 'list') await pluginList(BATTLESTACK_HOME)
+            else if (sub === 'update') {
+                const ok = await pluginUpdate(BATTLESTACK_HOME, spec ? [spec, ...rest] : [], {
+                    force: args.force,
+                    verify: async (name) => storePluginLoadError(await discoverPlugins({
+                        bundled: BUNDLED,
+                        bundledBasedir: path.dirname(fileURLToPath(import.meta.url)),
+                        battlestackHome: BATTLESTACK_HOME,
+                        env: {},
+                    }), name),
+                    onRejected: (name, version) => recordRejectedVersion(BATTLESTACK_HOME, name, version),
+                })
+                if (!ok) process.exitCode = 1
+            } else if (sub === 'outdated') {
+                if (await pluginOutdated(BATTLESTACK_HOME) > 0) process.exitCode = 1
+            } else if (sub === 'auto-update' && spec) await setAutoUpdatePolicy(BATTLESTACK_HOME, spec)
+            else {
+                console.error('usage: battlestack plugin <add|remove> <package>')
+                console.error('       battlestack plugin update [package...] [--force]')
+                console.error('       battlestack plugin list | outdated')
+                console.error('       battlestack plugin auto-update <off|notify|apply>')
+            }
+        } catch (error) {
+            ui.printError((error as Error).message ?? String(error), undefined, args.debug ? String((error as Error).stack) : undefined)
+            process.exitCode = 1
+        }
         return
     }
 
@@ -179,6 +219,7 @@ async function main(): Promise<void> {
         return
     }
 
+    await applyPendingPluginUpdates(BATTLESTACK_HOME)
     const result = await boot()
     printLoadIssues(result)
     const registries = result.registries
@@ -238,6 +279,7 @@ async function main(): Promise<void> {
 
         // Best-effort, cached daily.
         await notifyIfOutdated(VERSION)
+        await notifyOutdatedPlugins(BATTLESTACK_HOME)
     } catch (error) {
         const cliError
             = error instanceof CLIError ? error : wrapError(error, ErrorCode.SCAFFOLD_FAILED)

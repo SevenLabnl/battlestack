@@ -72,7 +72,10 @@ These work anywhere, project or not:
 | `battlestack self-update` | Update the globally-installed CLI. `--force` bypasses the release-age gate. |
 | `battlestack plugin add <pkg>` | Install a plugin into the per-machine plugin store. Accepts a local path. |
 | `battlestack plugin remove <pkg>` | Remove one. |
-| `battlestack plugin list` | List what is in the store. |
+| `battlestack plugin list` | List what is in the store, with installed versions. |
+| `battlestack plugin outdated` | List plugins with a newer version. Exits 1 if any. |
+| `battlestack plugin update [pkg...]` | Update store plugins. `--force` bypasses the release-age window. |
+| `battlestack plugin auto-update <off\|notify\|apply>` | Set what the daily plugin update check does. |
 
 ## Project mode
 
