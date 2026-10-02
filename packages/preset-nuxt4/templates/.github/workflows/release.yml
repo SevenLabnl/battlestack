@@ -96,7 +96,16 @@ jobs:
           # tagger date is what dates the release when someone reads the history later.
           git tag -a "$TAG" -m "$TAG"
           git push origin "refs/tags/${TAG}"
-          gh release create "$TAG" --title "$TAG" --generate-notes --target "$GITHUB_SHA"
+          # The REST API, not `gh release create`: a self-hosted runner set through
+          # `CI_RUNNER` cannot be assumed to ship the GitHub CLI; curl is near universal.
+          # TAG is vMAJOR.MINOR.PATCH and GITHUB_SHA is hex, so printf builds safe JSON.
+          curl --fail-with-body --silent --show-error \
+            -X POST "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/releases" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            -d "$(printf '{"tag_name":"%s","name":"%s","target_commitish":"%s","generate_release_notes":true}' "$TAG" "$TAG" "$GITHUB_SHA")" \
+            > /dev/null
 
       - name: Say what shipped
         if: always() && steps.version.outputs.tag != ''
