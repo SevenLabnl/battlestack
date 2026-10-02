@@ -12,7 +12,7 @@ const FEATURE_ID = 'shared:github'
 /** GitHub Actions gate: lint, typecheck, coverage, dependency audit. `<pm> audit` is advisory. */
 export const githubFeature: Feature = {
     id: 'shared:github',
-    version: '3.1.0',
+    version: '3.1.1',
     label: 'GitHub Actions workflows',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,
