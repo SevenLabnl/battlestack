@@ -1,0 +1,66 @@
+# What this application is — keur's declaration, which every scan judges the release against.
+#
+# Written by hand rather than by `keur init`, because init drafts at the strictest answer
+# and battlestack is genuinely not that: a command-line tool that writes files into a
+# directory the user chose. No server, no database, no users of its own.
+#
+# Every line here is a claim someone can disagree with in review. That is the point of the
+# file living in the repository rather than in a dashboard.
+
+version: 1
+
+classification:
+  # Published on npm and run by anyone who types `npx battlestack`. Nothing here is behind a
+  # login, because there is nothing to log in to.
+  audience: public
+
+  # It reads prompts and templates and writes a project. It holds nothing about anyone: the
+  # manifest it leaves behind records feature versions, not people.
+  data:
+    - none
+
+  # A bad release ships a bad scaffold to every new project that week, and `battlestack
+  # pull` propagates upstream fixes — and upstream mistakes — into projects already
+  # generated. That reach is what makes this medium rather than low.
+  criticality: medium
+
+# No HTTP surface at all. An empty list means "we looked and there are none".
+public_routes: []
+
+# No database of its own either: battlestack writes migrations into the projects it scaffolds
+# and never holds a schema. The sixteen database controls are not applicable, not unanswered.
+database: none
+
+# Which tools are part of this repository's standard. A workflow that skips one of these
+# produces `inconclusive` for everything that tool feeds, with the command that would have
+# produced the report — a forgotten step can never look like a clean one.
+tools:
+  - trivy
+  - gitleaks
+  - fallow
+
+legal:
+  licenses:
+    # MIT-licensed and published, so nothing copyleft may ship in the tree.
+    deny: [AGPL-3.0, GPL-2.0, GPL-3.0, LGPL-2.1, LGPL-3.0, SSPL-1.0]
+  # No vendor SDK in the shipping tree processes anybody's data on battlestack's behalf.
+  # SCH-LEG-003 says so when that stops being true.
+  processors: []
+
+# Accepted risks. Each one is a person saying "yes, and not yet", with a date on it. An
+# acceptance removes a finding from the verdict; the report still shows it.
+risk_acceptances:
+  - control: SCH-SEC-002
+    expires: 2027-09-16
+    because: >
+      Every match is a placeholder in something battlestack writes for the user: the
+      `postgres:postgres@db` compose example, `us-east-1` read as an API key, the localhost
+      URL a test asserts against. None is a credential to anything. Reviewed 2026-09-16 on
+      the first keur run; the annual expiry is the re-read.
+    subjects:
+      - .github/workflows/ci.yml
+      - packages/core/test/dotenv.test.ts
+      - packages/preset-nuxt4/src/features/database.ts
+      - packages/preset-nuxt4/src/features/storage.ts
+      - packages/preset-nuxt4/templates/health/with-db/test/unit/health.test.ts
+      - scripts/migrate-lock-race.mjs
