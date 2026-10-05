@@ -26,7 +26,7 @@ const PROFILE_FLAGS = ['--profile', 'prod']
 /** Production Dockerfile and `battlestack prod` commands, reusing the existing docker-compose.yml. */
 export const dockerFeature: Feature = {
     id: 'shared:docker',
-    version: '1.2.0',
+    version: '1.2.1',
     label: 'Production Dockerfile + prod commands',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,

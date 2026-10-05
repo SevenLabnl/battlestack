@@ -2,11 +2,12 @@ import path from 'node:path'
 import { run } from './run.js'
 import { exists, readJson } from './fs.js'
 import type { PackageManager } from '../types/package-manager.js'
-import { BOILERPLATE_ALLOWED_BUILDS, DEFAULT_PM_PRIORITY, SUPPORTED_PMS } from '../constants/package-manager.js'
+import { BOILERPLATE_ALLOWED_BUILDS, DEFAULT_PM_PRIORITY, PNPM_PIN_MAJOR, SUPPORTED_PMS } from '../constants/package-manager.js'
 
-/** Shell commands installing the PM globally on a clean Node image. Unpinned. */
+/** Shell commands installing the PM globally on a clean Node image. pnpm is pinned to a major, bun is not. */
 export function pmInstallGlobalCommands(pm: PackageManager): string[] {
     if (pm === 'npm') return []
+    if (pm === 'pnpm') return [`npm install -g pnpm@${PNPM_PIN_MAJOR}`]
     return [`npm install -g ${pm}`]
 }
 
