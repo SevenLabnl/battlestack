@@ -35,6 +35,12 @@ jobs:
     # Set the repo/org variable `CI_RUNNER` to a self-hosted runner label to point this job at your own fleet, no template edit needed.
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
+      # Same knob as lint-test.yml: a minimal self-hosted image may lack git or curl.
+      # Before checkout: without git it downloads a tarball with no tags.
+      - name: Install extra runner packages
+        if: vars.CI_RUNNER_APT_PACKAGES != ''
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ${{ vars.CI_RUNNER_APT_PACKAGES }}
+
       - uses: actions/checkout@v7
         with:
           # Tags *are* the version history here, and a shallow clone fetches none of them.
@@ -96,16 +102,20 @@ jobs:
           # tagger date is what dates the release when someone reads the history later.
           git tag -a "$TAG" -m "$TAG"
           git push origin "refs/tags/${TAG}"
-          # The REST API, not `gh release create`: a self-hosted runner set through
-          # `CI_RUNNER` cannot be assumed to ship the GitHub CLI; curl is near universal.
+          # curl, not gh: a self-hosted `CI_RUNNER` image may lack the GitHub CLI.
           # TAG is vMAJOR.MINOR.PATCH and GITHUB_SHA is hex, so printf builds safe JSON.
-          curl --fail-with-body --silent --show-error \
+          body="${RUNNER_TEMP}/release.json"
+          status=$(curl --silent --show-error --retry 3 -o "$body" -w '%{http_code}' \
             -X POST "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/releases" \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H 'Accept: application/vnd.github+json' \
             -H 'X-GitHub-Api-Version: 2022-11-28' \
-            -d "$(printf '{"tag_name":"%s","name":"%s","target_commitish":"%s","generate_release_notes":true}' "$TAG" "$TAG" "$GITHUB_SHA")" \
-            > /dev/null
+            -d "$(printf '{"tag_name":"%s","name":"%s","target_commitish":"%s","generate_release_notes":true}' "$TAG" "$TAG" "$GITHUB_SHA")")
+          if [ "$status" != 201 ]; then
+            echo "::error::creating the ${TAG} release returned HTTP ${status}; the tag is pushed, create the release from it by hand"
+            cat "$body"
+            exit 1
+          fi
 
       - name: Say what shipped
         if: always() && steps.version.outputs.tag != ''

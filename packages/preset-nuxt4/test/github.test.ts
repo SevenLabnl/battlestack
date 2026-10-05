@@ -202,20 +202,17 @@ describe('githubFeature', () => {
         expect(workflow).not.toMatch(/^\s{2}schedule:/m)
     })
 
-    /**
-     * The job runs on `CI_RUNNER` when set, and a self-hosted image cannot be assumed to ship the
-     * GitHub CLI: a run there pushed the tag, then died at `gh release create`, leaving a tag
-     * without a release. Publishing goes through the REST API with curl, so the only tools the
-     * job needs are git and curl, on GitHub-hosted and self-hosted runners alike.
-     */
+    /** A self-hosted `CI_RUNNER` image may lack the GitHub CLI. */
     it('publishes the release through the REST API, never the gh CLI', async () => {
         await githubFeature.execute!(ctx())
         const workflow = await readFile(path.join(projectDir, '.github/workflows/release.yml'), 'utf8')
         const commands = workflow.split('\n').filter((line) => !line.trim().startsWith('#'))
 
-        expect(commands.some((line) => /(^|\s|\$\()gh\s/.test(line))).toBe(false)
+        expect(commands.some((line) => /\bgh\b/.test(line))).toBe(false)
         expect(workflow).toContain('${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/releases')
-        expect(workflow).toContain('"generate_release_notes":true')
+        expect(workflow).toContain(
+            `'{"tag_name":"%s","name":"%s","target_commitish":"%s","generate_release_notes":true}' "$TAG" "$TAG" "$GITHUB_SHA"`,
+        )
     })
 
     it('collectDocs documents the quality gate under a single GitHub Actions heading', () => {

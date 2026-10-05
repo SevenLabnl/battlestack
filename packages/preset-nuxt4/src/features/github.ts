@@ -86,8 +86,8 @@ async function emit(ctx: RunContext): Promise<string[]> {
     )
     written.push(workflowRel)
 
-    // Copied verbatim: it runs git and gh, never the project's package manager, so there is
-    // nothing in it to render per manager.
+    // Copied verbatim: it never runs the project's package manager, so there is nothing in it
+    // to render per manager.
     const releaseRel = '.github/workflows/release.yml'
     await writeRecorded(
         ctx,
