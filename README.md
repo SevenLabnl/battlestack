@@ -1,5 +1,11 @@
 # battlestack
 
+[![npm version](https://img.shields.io/npm/v/battlestack?logo=npm)](https://www.npmjs.com/package/battlestack)
+[![npm downloads](https://img.shields.io/npm/dm/battlestack)](https://www.npmjs.com/package/battlestack)
+[![CI](https://github.com/SevenLabnl/battlestack/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SevenLabnl/battlestack/actions/workflows/ci.yml)
+[![node](https://img.shields.io/node/v/battlestack)](https://nodejs.org)
+[![license](https://img.shields.io/npm/l/battlestack)](LICENSE)
+
 A scaffolding CLI for Nuxt 4. Answer a few prompts and it hands you a running
 app, not a folder of TODOs you still have to wire together.
 
@@ -278,14 +284,16 @@ placeholders left in it for you to find later.
 
 ## Parts and components
 
-battlestack is a small plugin system, not a monolith. Four packages:
+battlestack is a small plugin system, not a monolith. Six packages:
 
-| Package | What it is |
-| --- | --- |
-| `battlestack` | The CLI binary you run. Thin: arg parsing, plugin loading, command dispatch. |
-| `@battlestack/core` | The plugin SDK — types, registries, and the orchestrator that turns enabled features into an execution plan. |
-| `@battlestack/preset-nuxt4` | The Nuxt 4 preset: one framework, three templates and 39 features. It uses the same plugin API a third-party plugin would. |
-| `@battlestack/tui` | Shared terminal UI (prompts, spinners, banner). |
+| Package | Version | What it is |
+| --- | --- | --- |
+| [`battlestack`](https://www.npmjs.com/package/battlestack) | [![npm](https://img.shields.io/npm/v/battlestack?label=)](https://www.npmjs.com/package/battlestack) | The `npx battlestack` entry point. A thin wrapper around `@battlestack/cli`. |
+| [`@battlestack/cli`](https://www.npmjs.com/package/@battlestack/cli) | [![npm](https://img.shields.io/npm/v/@battlestack/cli?label=)](https://www.npmjs.com/package/@battlestack/cli) | The CLI engine: arg parsing, plugin loading, command dispatch. |
+| [`@battlestack/core`](https://www.npmjs.com/package/@battlestack/core) | [![npm](https://img.shields.io/npm/v/@battlestack/core?label=)](https://www.npmjs.com/package/@battlestack/core) | The plugin SDK — types, registries, and the orchestrator that turns enabled features into an execution plan. |
+| [`@battlestack/preset-nuxt4`](https://www.npmjs.com/package/@battlestack/preset-nuxt4) | [![npm](https://img.shields.io/npm/v/@battlestack/preset-nuxt4?label=)](https://www.npmjs.com/package/@battlestack/preset-nuxt4) | The Nuxt 4 preset: one framework, three templates and 39 features. It uses the same plugin API a third-party plugin would. |
+| [`@battlestack/tui`](https://www.npmjs.com/package/@battlestack/tui) | [![npm](https://img.shields.io/npm/v/@battlestack/tui?label=)](https://www.npmjs.com/package/@battlestack/tui) | Shared terminal UI (prompts, spinners, banner). |
+| [`@battlestack/theme`](https://www.npmjs.com/package/@battlestack/theme) | [![npm](https://img.shields.io/npm/v/@battlestack/theme?label=)](https://www.npmjs.com/package/@battlestack/theme) | The Nuxt UI theme generated projects use: light and dark tokens, brand assets and the logo. |
 
 The units compose as **framework → template → feature**: a template is a
 curated list of features, and a feature is a versioned unit that contributes
