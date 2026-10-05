@@ -212,6 +212,21 @@ Under pnpm this respects the minimum release age, so a release published a few
 minutes ago is held back for a while. `--force` installs the latest right away.
 If you only use `npx battlestack@latest`, there's nothing to update.
 
+**Updating plugins.** Plugins you installed with `battlestack plugin add` can
+be updated the same way:
+
+```bash
+battlestack plugin outdated            # list plugins with a newer version
+battlestack plugin update              # update all of them (or name one)
+battlestack plugin auto-update apply   # off, notify (default) or apply
+```
+
+Updates respect the same minimum release age; `--force` skips it. If a new
+version fails to load, it is rolled back. By default battlestack checks once a
+day and tells you when updates are available. With `apply`, it installs them at
+the start of your next command. [`docs/plugins.md`](docs/plugins.md#keeping-plugins-up-to-date)
+has the details.
+
 **Updating a project.** You can keep pulling changes into a project after you
 scaffold it:
 
