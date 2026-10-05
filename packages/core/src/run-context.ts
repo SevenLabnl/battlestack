@@ -1,10 +1,10 @@
-import path from 'node:path'
 import type { Ora } from 'ora'
 import type { BattlestackRegistries } from './registry.js'
 import type { RunContext } from './types/run-context.js'
 import type { ProjectManifest } from './types/project-manifest.js'
 import type { FeatureState } from './types/feature.js'
 import type { PackageManager } from './types/package-manager.js'
+import { resolveProjectName } from './project-name.js'
 
 /** No-op `Ora` stand-in for callers that need a loader-shaped object but no spinner. */
 export function silentLoader(): Ora {
@@ -38,7 +38,7 @@ interface BuildOpts {
 /** Builds a `RunContext` from a project manifest. `registries` is stashed on the result. */
 export function buildRunContext(opts: BuildOpts, registries: BattlestackRegistries): RunContext {
     return {
-        projectName: path.basename(opts.projectDir),
+        projectName: resolveProjectName(opts.projectDir, opts.manifest),
         projectDir: opts.projectDir,
         framework: registries.frameworks.get(opts.manifest.framework),
         template: registries.templates.get(opts.manifest.template),

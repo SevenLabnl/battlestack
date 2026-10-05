@@ -16,6 +16,7 @@ import {
     type ParsedArgs,
     type PortKind,
     type ReservedCommand,
+    resolveProjectName,
 } from '@battlestack/core'
 
 export const describeReservedMeta: Omit<ReservedCommand, 'run'> = {
@@ -53,7 +54,7 @@ export async function describeCommand(
             `No manifest at ${projectDir}/.battlestack/manifest.json`,
         )
     }
-    const projectName = path.basename(projectDir)
+    const projectName = resolveProjectName(projectDir, manifest)
     const enabled = new Set(manifest.features.map((f) => f.id))
     const local = await readLocalState(projectDir)
     const envExists = await exists(path.join(projectDir, '.env'))

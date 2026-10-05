@@ -10,6 +10,7 @@ import type { RunContext } from './types/run-context.js'
 import type { BattlestackRegistries } from './registry.js'
 import { getUiPort } from './ui-port.js'
 import { migrateStateDir, STATE_DIR } from './utils/state-dir.js'
+import { isLinkedWorktree, resolveProjectName } from './project-name.js'
 
 export const MANIFEST_PATH = `${STATE_DIR}/manifest.json`
 
@@ -181,7 +182,7 @@ export async function writeManifest(
         framework: ctx.framework.id,
         template: ctx.template.id,
         packageManager: String(ctx.state.packageManager ?? 'pnpm'),
-        projectName: path.basename(ctx.projectDir),
+        projectName: resolveProjectName(ctx.projectDir, previous),
         ...(previous?.previousNames?.length ? { previousNames: previous.previousNames } : {}),
         createdAt: previous?.createdAt ?? new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -196,7 +197,7 @@ export async function writeManifest(
     await writeJson(target, manifest)
 }
 
-/** Restamps `projectName` after a directory rename. Returns the previous name, or null. */
+/** Restamps `projectName` after a directory rename. Returns the previous name, or null. A linked worktree is never a rename. */
 export async function reconcileProjectName(
     projectDir: string,
     manifest: ProjectManifest,
@@ -204,6 +205,7 @@ export async function reconcileProjectName(
     const current = path.basename(projectDir)
     const recorded = manifest.projectName
     if (recorded === current) return null
+    if (recorded && isLinkedWorktree(projectDir)) return null
     manifest.projectName = current
     if (recorded) {
         const prev = new Set(manifest.previousNames ?? [])
