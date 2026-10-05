@@ -111,8 +111,18 @@ jobs:
             -H @- <<< "Authorization: Bearer ${GH_TOKEN}" \
             -H 'Accept: application/vnd.github+json' \
             -H 'X-GitHub-Api-Version: 2022-11-28' \
-            -d "$(printf '{"tag_name":"%s","name":"%s","target_commitish":"%s","generate_release_notes":true}' "$TAG" "$TAG" "$GITHUB_SHA")") || status=000
+            -d "$(printf '{"tag_name":"%s","name":"%s","target_commitish":"%s","generate_release_notes":true}' "$TAG" "$TAG" "$GITHUB_SHA")") || true
           if [ "$status" != 201 ]; then
+            # A retried POST fails with 422 when the first attempt already created the release.
+            exists=$(curl --silent --retry 3 -o /dev/null -w '%{http_code}' \
+              -H @- <<< "Authorization: Bearer ${GH_TOKEN}" \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}") || true
+            if [ "$exists" = 200 ]; then
+              echo "::warning::creating the ${TAG} release returned HTTP ${status}, but the release exists"
+              exit 0
+            fi
             echo "::error::creating the ${TAG} release returned HTTP ${status}; the tag is pushed, so if the release is missing, create it from the tag by hand"
             cat "$body" 2>/dev/null
             exit 1
