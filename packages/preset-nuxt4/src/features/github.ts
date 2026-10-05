@@ -38,7 +38,7 @@ export const githubFeature: Feature = {
                     '',
                     'A freshly scaffolded project\'s `' + audit + '` will report findings in transitive dependencies of the AI and framework stack. That is the npm-ecosystem baseline for an unpinned dependency tree, not a defect the scaffold introduced, and not something this project can unilaterally clear. The CI gate is shaped around that fact: `dependency-review-action` blocks vulnerabilities your changes *introduce*, while the audit step reports the standing baseline without failing the build.',
                     '',
-                    'To run it on a self-hosted runner instead, set the repo/org variable `CI_RUNNER` to your runner\'s label; no template edit needed. If that runner\'s image is missing packages `ubuntu-latest` already has, set `CI_RUNNER_APT_PACKAGES` (space-separated) to have the workflow `apt-get install` them first; leave it unset to skip that step entirely.',
+                    'To run it on a self-hosted runner instead, set the repo/org variable `CI_RUNNER` to your runner\'s label; no template edit needed. If that runner\'s image is missing packages `ubuntu-latest` already has, set `CI_RUNNER_APT_PACKAGES` (space-separated) to have both workflows `apt-get install` them first; leave it unset to skip that step entirely.',
                     '',
                     'Secrets: any Docker build secrets declared by enabled features (see the Docker section for the exact env var names). This workflow itself needs none.',
                     '',
