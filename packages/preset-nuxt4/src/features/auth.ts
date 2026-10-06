@@ -29,7 +29,7 @@ function titleCase(slug: string): string {
 /** Session auth on `nuxt-auth-utils`. The sealed cookie carries an opaque sessionId. */
 export const authFeature: Feature = {
     id: 'nuxt4:auth',
-    version: '1.10.0',
+    version: '1.10.1',
     label: 'Session-based auth (argon2id)',
     frameworks: ['nuxt4'],
     stage: STAGE.AUTH,
@@ -58,9 +58,9 @@ export const authFeature: Feature = {
                     '- Composable: `useAuth()` (`login`, `logout`, `loggedIn`, `user`)',
                     '- Global middleware redirects unauthenticated visitors to `/login`',
                     '',
-                    '**Sessions are DB-backed.** The cookie is just a sealed pointer to a `sessions` row (id, userId, expiresAt, lastSeenAt, userAgent, ip). The Nitro plugin at `server/plugins/session.ts` validates the row on every request and refreshes `lastSeenAt`. Revoke any session by `DELETE FROM sessions WHERE id = ...`; the cookie becomes immediately invalid.',
+                    '**Sessions are DB-backed.** The cookie is just a sealed pointer to a `sessions` row (id, userId, expiresAt, lastSeenAt, userAgent, ip). `server/middleware/02.session-revocation.ts` checks the row on every request that carries a session cookie and clears the session when the row is gone or expired; the Nitro plugin at `server/plugins/session.ts` refreshes the user and `lastSeenAt` on the client\'s session fetch. Revoke any session by `DELETE FROM sessions WHERE id = ...`; the cookie becomes immediately invalid.',
                     '',
-                    'Other login flows (passkey, oauth, 2fa challenge) all call `createDbSession(userId, event)` from `server/utils/auth.ts` and pass the returned id as `secure.sessionId` to `setUserSession`. Skipping that step results in a cookie-only session that the fetch hook ignores.',
+                    'Other login flows (passkey, oauth, 2fa challenge) all call `createDbSession(userId, event)` from `server/utils/auth.ts` and pass the returned id as `secure.sessionId` to `setUserSession`. Skipping that step results in a cookie-only session that `02.session-revocation.ts` clears on the next request.',
                     '',
                     '### Dev login shortcut',
                     '',

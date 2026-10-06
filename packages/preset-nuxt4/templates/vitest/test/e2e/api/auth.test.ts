@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { apiGet, apiPost, isServerUp, loginAsAdmin, BASE_URL } from '~~/test/helpers/setup'
+import { apiDelete, apiGet, apiPost, isServerUp, loginAsAdmin, BASE_URL } from '~~/test/helpers/setup'
 
 // Headless / no-server-up runs skip the suite entirely. Run `pnpm dev` in
 // another terminal to exercise these locally.
@@ -55,6 +55,19 @@ describe('e2e: auth flow', () => {
         const cookie = await loginAsAdmin()
         const logout = await apiPost('/api/auth/logout', {}, cookie)
         expect(logout.status).toBeLessThan(400)
+        // The sealed cookie outlives its `sessions` row, so the server must refuse it, not just the client forget it.
+        expect((await apiGet('/api/auth/sessions', cookie)).status).toBe(401)
+    })
+
+    it.skipIf(!serverUp)('a session revoked from another device stops authenticating', async () => {
+        const revoked = await loginAsAdmin()
+        const other = await loginAsAdmin()
+        const list = await apiGet<{ rows: { id: string, current: boolean }[] }>('/api/auth/sessions', revoked)
+        const current = list.data?.rows.find((r) => r.current)
+        expect(current).toBeTruthy()
+        expect((await apiDelete(`/api/auth/sessions/${current!.id}`, other)).status).toBeLessThan(400)
+        expect((await apiGet('/api/auth/sessions', revoked)).status).toBe(401)
+        expect((await apiGet('/api/auth/sessions', other)).status).toBe(200)
     })
 
     if (!serverUp) {

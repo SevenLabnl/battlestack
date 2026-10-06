@@ -19,7 +19,7 @@ import { ui } from '@battlestack/tui'
 /** Vitest config, a sample unit test and `test` scripts. Three projects: unit, nuxt, e2e. */
 export const vitestFeature: Feature = {
     id: 'nuxt4:vitest',
-    version: '1.0.6',
+    version: '1.0.7',
     label: 'Vitest config + scripts',
     frameworks: ['nuxt4'],
     stage: STAGE.NAMING, // run after naming so package.json exists
