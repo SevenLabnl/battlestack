@@ -14,6 +14,9 @@ if (!databaseUrl) {
     throw new Error('NUXT_DATABASE_URL is not set in `.env`.')
 }
 
+// Mastra sends usage telemetry to PostHog (US) unless told not to; opt back in with `MASTRA_TELEMETRY_DISABLED=false`.
+process.env.MASTRA_TELEMETRY_DISABLED ??= 'true'
+
 const storage = new PostgresStore({
     id: 'mastra-storage',
     connectionString: databaseUrl,
