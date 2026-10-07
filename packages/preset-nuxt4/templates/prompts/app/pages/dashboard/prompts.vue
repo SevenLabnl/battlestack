@@ -23,7 +23,7 @@ const { t } = useI18n()
 const headers = useRequestHeaders(['cookie'])
 const toast = useToast()
 const { data, pending, refresh } = await useAsyncData<PromptList>('prompts-admin-list', () =>
-    $fetch('/api/prompts', { headers }),
+    $fetch<PromptList>('/api/prompts', { headers }),
 )
 
 const editing = ref<Record<string, string>>({})
