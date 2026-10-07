@@ -5,11 +5,14 @@ export const SUPPORTED_PMS: PackageManager[] = ['pnpm', 'bun', 'npm']
 /** Order of preference when nothing is specified. */
 export const DEFAULT_PM_PRIORITY: PackageManager[] = ['pnpm', 'bun', 'npm']
 
-/** The pnpm version this repo develops and tests against. Not injected into generated projects. */
+/** The pnpm version this repo develops and tests against. Only its major reaches generated projects, via `PNPM_PIN_MAJOR`. */
 export const PNPM_PIN = 'pnpm@12.5.1'
 
 /** `PNPM_PIN` without the `pnpm@` prefix. */
 export const PNPM_PIN_VERSION = PNPM_PIN.slice(PNPM_PIN.indexOf('@') + 1)
+
+/** The pnpm major a generated project's Dockerfile installs: patches flow in, a new major cannot break the image build. */
+export const PNPM_PIN_MAJOR = PNPM_PIN_VERSION.split('.')[0]
 
 /**
  * Oldest pnpm battlestack supports. Preflight fails below it.
