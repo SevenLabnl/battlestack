@@ -55,8 +55,9 @@ describe('securityFeature', () => {
     it('CSP allows unsafe-inline for styles only', async () => {
         await securityFeature.execute(ctx())
         const cfg = await readFile(path.join(projectDir, 'nuxt.config.ts'), 'utf8')
-        // style-src includes unsafe-inline
-        expect(cfg).toMatch(/['"]style-src['"][^\]]*'unsafe-inline'/s)
+        // style-src includes unsafe-inline. Printed in the project's single-quote style, so the
+        // CSP keyword's own quotes come out escaped: '\'unsafe-inline\''.
+        expect(cfg).toMatch(/['"]style-src['"][^\]]*\\?'unsafe-inline\\?'/s)
         // script-src does NOT: only 'self'
         const scriptSrcMatch = cfg.match(/['"]script-src['"]\s*:\s*\[([^\]]+)\]/)
         expect(scriptSrcMatch).toBeTruthy()
