@@ -12,7 +12,7 @@ const FEATURE_ID = 'shared:github'
 /** GitHub Actions gate: lint, typecheck, coverage, dependency audit. `<pm> audit` is advisory. */
 export const githubFeature: Feature = {
     id: 'shared:github',
-    version: '3.1.0',
+    version: '3.1.1',
     label: 'GitHub Actions workflows',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,
@@ -38,7 +38,7 @@ export const githubFeature: Feature = {
                     '',
                     'A freshly scaffolded project\'s `' + audit + '` will report findings in transitive dependencies of the AI and framework stack. That is the npm-ecosystem baseline for an unpinned dependency tree, not a defect the scaffold introduced, and not something this project can unilaterally clear. The CI gate is shaped around that fact: `dependency-review-action` blocks vulnerabilities your changes *introduce*, while the audit step reports the standing baseline without failing the build.',
                     '',
-                    'To run it on a self-hosted runner instead, set the repo/org variable `CI_RUNNER` to your runner\'s label; no template edit needed. If that runner\'s image is missing packages `ubuntu-latest` already has, set `CI_RUNNER_APT_PACKAGES` (space-separated) to have the workflow `apt-get install` them first; leave it unset to skip that step entirely.',
+                    'To run it on a self-hosted runner instead, set the repo/org variable `CI_RUNNER` to your runner\'s label; no template edit needed. If that runner\'s image is missing packages `ubuntu-latest` already has, set `CI_RUNNER_APT_PACKAGES` (space-separated) to have both workflows `apt-get install` them first; leave it unset to skip that step entirely.',
                     '',
                     'Secrets: any Docker build secrets declared by enabled features (see the Docker section for the exact env var names). This workflow itself needs none.',
                     '',
@@ -86,8 +86,8 @@ async function emit(ctx: RunContext): Promise<string[]> {
     )
     written.push(workflowRel)
 
-    // Copied verbatim: it runs git and gh, never the project's package manager, so there is
-    // nothing in it to render per manager.
+    // Copied verbatim: it never runs the project's package manager, so there is nothing in it
+    // to render per manager.
     const releaseRel = '.github/workflows/release.yml'
     await writeRecorded(
         ctx,

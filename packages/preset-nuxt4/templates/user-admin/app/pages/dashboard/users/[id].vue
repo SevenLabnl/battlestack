@@ -20,7 +20,7 @@ const headers = useRequestHeaders(['cookie'])
 
 const { data: user, refresh } = await useAsyncData<UserRow>(
     () => `user-${userId.value}`,
-    () => $fetch(`/api/users/${userId.value}`, { headers }),
+    () => $fetch<UserRow>(`/api/users/${userId.value}`, { headers }),
 )
 
 const form = reactive({

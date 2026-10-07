@@ -27,7 +27,7 @@ const headers = useRequestHeaders(['cookie'])
 const { data, status, refresh } = await useAsyncData<UserList>(
     'users-admin-list',
     () =>
-        $fetch('/api/users', {
+        $fetch<UserList>('/api/users', {
             query: {
                 search: search.value || undefined,
                 limit: PAGE_SIZE,
