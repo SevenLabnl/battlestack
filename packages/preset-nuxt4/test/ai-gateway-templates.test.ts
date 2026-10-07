@@ -134,3 +134,12 @@ describe('no legacy gateway wiring remains anywhere in templates', () => {
         expect(src).not.toMatch(LEGACY)
     })
 })
+
+describe('Mastra telemetry', () => {
+    it('is off by default before the Mastra instance is created', async () => {
+        const src = await read('mastra', 'server', 'mastra', 'index.ts')
+        const optOut = src.indexOf("process.env.MASTRA_TELEMETRY_DISABLED ??= 'true'")
+        expect(optOut).toBeGreaterThan(-1)
+        expect(optOut).toBeLessThan(src.indexOf('new Mastra('))
+    })
+})

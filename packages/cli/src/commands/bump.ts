@@ -1,4 +1,3 @@
-import path from 'node:path'
 import type { Ora } from 'ora'
 import { ui } from '@battlestack/tui'
 import {
@@ -13,6 +12,7 @@ import {
     type ParsedArgs,
     type ReservedCommand,
     type RunContext,
+    resolveProjectName,
 } from '@battlestack/core'
 
 /** Static metadata only. `run` is built per-dispatch in `project.ts`. */
@@ -90,13 +90,13 @@ export async function bumpCommand(args: ParsedArgs, _loader: Ora, registries: Ba
 
 function buildCtx(
     projectRoot: string,
-    manifest: { framework: string, template: string, features: Array<{ id: string }> },
+    manifest: { framework: string, template: string, projectName?: string, features: Array<{ id: string }> },
     pm: PackageManager,
     args: ParsedArgs,
     registries: BattlestackRegistries,
 ): RunContext {
     return {
-        projectName: path.basename(projectRoot),
+        projectName: resolveProjectName(projectRoot, manifest),
         projectDir: projectRoot,
         framework: registries.frameworks.get(manifest.framework),
         template: registries.templates.get(manifest.template),

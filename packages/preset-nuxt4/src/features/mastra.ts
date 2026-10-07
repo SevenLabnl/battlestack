@@ -305,6 +305,8 @@ export const mastraFeature: Feature = {
             const env: Record<string, string> = {}
             for (const [k, v] of await readDotEnv(ctx.projectDir)) env[k] = v
             env.PORT = String(port)
+            // The CLI reports its own analytics to PostHog; same opt-out as the runtime in server/mastra/index.ts.
+            env.MASTRA_TELEMETRY_DISABLED ??= 'true'
             // `mastra dev` reads PORT from env, defaulting to 4111.
             await run(pm, ['exec', 'mastra', 'dev', '--dir', 'server/mastra'], {
                 cwd: ctx.projectDir,

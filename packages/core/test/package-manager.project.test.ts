@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { PNPM_PIN_MAJOR } from '../src/constants/package-manager.js'
 import { ensureWorkspaceMarker, parseIgnoredBuilds, pmInstallGlobalCommands, resolveProjectPM, writeWorkspaceReleaseAge } from '../src/utils/package-manager.js'
 
 let projectDir: string
@@ -117,7 +118,12 @@ describe('parseIgnoredBuilds', () => {
 describe('pmInstallGlobalCommands', () => {
     it('npm needs no bootstrap; pnpm/bun install globally via npm', () => {
         expect(pmInstallGlobalCommands('npm')).toEqual([])
-        expect(pmInstallGlobalCommands('pnpm')).toEqual(['npm install -g pnpm'])
+        expect(pmInstallGlobalCommands('pnpm')).toEqual([`npm install -g pnpm@${PNPM_PIN_MAJOR}`])
         expect(pmInstallGlobalCommands('bun')).toEqual(['npm install -g bun'])
+    })
+
+    // A new pnpm major can reject, under --frozen-lockfile, a lockfile the previous one accepted.
+    it('pins pnpm to a major, never to latest', () => {
+        expect(pmInstallGlobalCommands('pnpm')[0]).toMatch(/^npm install -g pnpm@\d+$/)
     })
 })

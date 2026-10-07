@@ -347,6 +347,10 @@ battlestack cleanup old-name
 Reconciles what was registered under the old name: Docker resources, hosts
 entries, gateway routes.
 
+A git worktree (`git worktree add`) is not a rename. Inside one, battlestack
+keeps the project name from the manifest, so the worktree shares the main
+checkout's Docker Compose project and port defaults.
+
 ### Removing everything for a project
 
 ```bash

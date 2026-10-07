@@ -15,6 +15,7 @@ import {
     type ParsedArgs,
     type ProjectManifest,
     type ReservedCommand,
+    resolveProjectName,
 } from '@battlestack/core'
 
 export const cleanupReservedMeta: Omit<ReservedCommand, 'run'> = {
@@ -215,7 +216,7 @@ async function cleanupDockerLeftovers(
     manifest: ProjectManifest,
     args: ParsedArgs,
 ): Promise<boolean> {
-    const current = path.basename(projectRoot)
+    const current = resolveProjectName(projectRoot, manifest)
     const names = new Set(manifest.previousNames ?? [])
     // Escape hatch for renames predating the `previousNames` field.
     const positional = String(args.secondPositional ?? '').trim()

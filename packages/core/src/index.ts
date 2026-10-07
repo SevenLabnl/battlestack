@@ -7,6 +7,7 @@ export * from './host-services.js'
 export * from './local-state.js'
 export * from './project-root.js'
 export * from './manifest.js'
+export * from './project-name.js'
 export * from './run-context.js'
 export * from './orchestrator.js'
 

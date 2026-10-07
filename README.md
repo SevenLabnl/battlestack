@@ -1,7 +1,13 @@
 # battlestack
 
-A scaffolding CLI for Nuxt 4. Answer a few prompts and it hands you a running
-app, not a folder of TODOs you still have to wire together.
+[![npm version](https://img.shields.io/npm/v/battlestack?logo=npm)](https://www.npmjs.com/package/battlestack)
+[![npm downloads](https://img.shields.io/npm/dm/battlestack)](https://www.npmjs.com/package/battlestack)
+[![CI](https://github.com/SevenLabnl/battlestack/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SevenLabnl/battlestack/actions/workflows/ci.yml)
+[![node](https://img.shields.io/node/v/battlestack)](https://nodejs.org)
+[![license](https://img.shields.io/npm/l/battlestack)](LICENSE)
+
+A scaffolding CLI for Nuxt 4. You answer a few questions and get a Nuxt app
+that runs, with Docker and CI set up and, if you want them, auth and a database.
 
 ```bash
 npx battlestack@latest my-app
@@ -9,34 +15,77 @@ cd my-app
 battlestack dev
 ```
 
-Then open the URL it prints. That is the whole happy path.
+Then open the URL it prints.
+
+## Quick start
+
+Run it with whichever package manager you already have. None of these need an
+install first:
+
+```bash
+npx battlestack@latest my-app
+pnpm dlx battlestack@latest my-app
+bunx battlestack@latest my-app
+```
+
+Keep `@latest` in there. Without it, `npx` can reuse an older copy from its
+cache.
+
+Some common variations:
+
+```bash
+# Pick the template up front, accept every default (good for CI)
+npx battlestack@latest my-app nuxt4-fullstack --yes
+
+# Plain Nuxt app, no database, no Docker needed
+pnpm dlx battlestack@latest my-app nuxt4-minimal
+
+# Keep the generated project on npm or bun instead of pnpm
+npx battlestack@latest my-app --pm npm
+bunx battlestack@latest my-app --pm bun
+
+# See what would be generated without writing anything
+npx battlestack@latest my-app nuxt4-ai --dry-run
+
+# Leave out optional features you don't want
+npx battlestack@latest my-app --disable nuxt4:storage,nuxt4:rag
+
+# Try the next release before it ships
+npx battlestack@next my-app
+```
+
+If you scaffold often, install it globally so `battlestack` (or the short
+`bstack`) is always on your PATH:
+
+```bash
+pnpm add -g battlestack   # or: npm i -g battlestack, bun i -g battlestack
+battlestack my-app
+```
 
 ## Why this exists
 
-Every new project at SevenLab started the same way: scaffold Nuxt, then spend
-days wiring the same things — auth, Postgres, migrations, Docker, CI, health
-checks, agent config — before writing the first line of product code. Starters
-and boilerplates only half-solve this: they hand you the wiring once, and from
-that moment your copy drifts. A fix upstream never reaches you.
+Every new project at SevenLab used to start the same way. Scaffold Nuxt, then
+spend days on auth, Postgres, migrations, Docker, CI, health checks and agent
+config before writing any product code. Starter kits help with the first day,
+but once you copy one, your project and the starter go their separate ways.
+Fixes made upstream never reach you.
 
-battlestack fixes both halves. The scaffold is assembled from versioned
-features rather than copied from a frozen template, and every generated
-project keeps a manifest of which feature versions produced which files — so
-`battlestack pull` can bring upstream fixes into a project you scaffolded
-months ago, and `battlestack doctor` can tell you when you've drifted. It is
-the difference between a starter kit and a maintained one.
+battlestack builds the project from versioned features instead of copying a
+fixed template. Each generated project keeps a manifest of which feature
+versions wrote which files. That lets `battlestack pull` bring upstream fixes
+into a project you scaffolded months ago, and lets `battlestack doctor` tell
+you where your project has drifted.
 
 ## Before you start
 
-**Node 24 or newer** is the only hard requirement. Check with `node -v`.
+You need **Node 24 or newer**. Check with `node -v`.
 
-**Docker** is needed only for the templates with a database (`nuxt4-fullstack`
-and `nuxt4-ai`), which run Postgres in a container. `nuxt4-minimal` needs
-nothing but Node. If Docker is missing, the CLI tells you before it writes
-anything rather than failing halfway through.
+You need **Docker** only for the templates with a database (`nuxt4-fullstack`
+and `nuxt4-ai`), which run Postgres in a container. `nuxt4-minimal` needs only
+Node. If Docker is missing, the CLI tells you before it writes any files.
 
-You do **not** need pnpm installed. `npx` ships with Node, and `--pm npm` keeps
-the generated project on npm too.
+You don't need pnpm. `npx` comes with Node, and `--pm npm` keeps the generated
+project on npm as well.
 
 ## Step by step
 
@@ -46,9 +95,9 @@ the generated project on npm too.
 npx battlestack@latest my-app
 ```
 
-It asks which template you want and which optional features to include, then
-writes the project and installs its dependencies. Expect a few minutes: most of
-it is the dependency install, not us.
+It asks which template and which optional features you want, then writes the
+project and installs dependencies. This takes a few minutes, mostly for the
+install.
 
 To skip the questions, name the template and pass `--yes`:
 
@@ -63,80 +112,78 @@ cd my-app
 battlestack dev
 ```
 
-On a template with a database this also starts Postgres and applies the schema
-before the dev server comes up, so there is no separate migrate step on a fresh
-project.
+On a template with a database, this also starts Postgres and applies the schema
+before the dev server starts. A fresh project needs no separate migrate step.
 
-**3. Log in.** Templates with auth seed an admin user. Rather than hunting for
-its password:
+**3. Log in.** Templates with auth create a seeded admin user. To sign in as
+that user:
 
 ```bash
 battlestack login
 ```
 
-That opens your browser already signed in as the seed admin. It is dev-only and
-refuses to work against a production host. `battlestack uli` is a shorter alias.
+This opens your browser already signed in as the admin. It only works in
+development and refuses to run against a production host. `battlestack uli` is
+a shorter alias.
 
-Leave `battlestack dev` running in one terminal and use another for `login`.
+Keep `battlestack dev` running in one terminal and run `login` in another.
 
 ## Which template
 
-| Template | Gets you | Needs Docker |
+| Template | What you get | Needs Docker |
 | --- | --- | --- |
 | `nuxt4-minimal` | Nuxt 4 + UI v4 + Tailwind v4, i18n, Pinia, a `/api/health` route, production Dockerfile + CI. No database, no auth. | no |
-| `nuxt4-fullstack` | The above plus Postgres, Drizzle, custom auth, Mastra and Docker Compose. | yes |
-| `nuxt4-ai` | Full stack plus Mastra agents and WebSocket streaming chat behind an OpenAI-compatible AI gateway (sluis.ai preset). RAG opt-in. | yes |
+| `nuxt4-fullstack` | Everything in minimal, plus Postgres, Drizzle, custom auth, Mastra and Docker Compose. | yes |
+| `nuxt4-ai` | Everything in fullstack, plus Mastra agents and WebSocket streaming chat through an OpenAI-compatible AI gateway (sluis.ai preset). RAG is opt-in. | yes |
 
-Start with `nuxt4-minimal` if you only want a well-configured Nuxt app. Pick
-`nuxt4-fullstack` if you know you need users and a database. Nothing is a dead
-end: `battlestack add <feature>` pulls in more later.
+Use `nuxt4-minimal` if you just want a well-configured Nuxt app. Use
+`nuxt4-fullstack` if you need users and a database. You can always add more
+later with `battlestack add <feature>`.
 
-## What you can do with it
+## Features
 
-Templates are curated bundles of *features*, and `battlestack add` picks from
-the same catalog. What is in it today:
+Templates are bundles of *features*, and `battlestack add` picks from the same
+list. Currently available:
 
-- **Auth, properly done.** Session auth with argon2id, optional passkeys
-  (WebAuthn), TOTP two-factor with secrets encrypted at rest, password
-  recovery, email verification, and GitHub/Google OAuth.
-- **Data layer.** Postgres + Drizzle running in Docker with `db:push`, `seed`,
-  `studio` and `shell` commands; optional Redis rate limiting with a circuit
-  breaker that fails over to Postgres; object storage (RustFS locally, S3 in
-  production).
-- **AI features.** Mastra agents behind an OpenAI-compatible AI gateway
-  (sluis.ai preset — see below), a WebSocket-streaming chat UI, opt-in RAG on
-  pgvector (ingest, chunk, embed, query), and admin-editable agent prompts.
-- **App surface.** Landing shell, authenticated dashboard, admin-gated user
-  management, an append-only security audit log, PWA, i18n (EN + NL), Nuxt UI
-  v4 + Tailwind v4, Pinia.
-- **Ops and quality.** Production Dockerfile and compose setup, a real
-  `/api/health`, GitHub Actions, pre-commit hooks, Vitest, security headers,
-  and a supply-chain release-age policy for dependencies.
+- **Auth.** Session auth with argon2id, optional passkeys (WebAuthn), TOTP
+  two-factor with secrets encrypted at rest, password recovery, email
+  verification, and GitHub/Google OAuth.
+- **Data.** Postgres + Drizzle in Docker with `db:push`, `seed`, `studio` and
+  `shell` commands. Optional Redis rate limiting that falls back to Postgres if
+  Redis goes down. Object storage (RustFS locally, S3 in production).
+- **AI.** Mastra agents behind an OpenAI-compatible AI gateway (sluis.ai preset,
+  see below), a WebSocket streaming chat UI, opt-in RAG on pgvector (ingest,
+  chunk, embed, query), and agent prompts that admins can edit.
+- **App.** Landing page, signed-in dashboard, admin-only user management, an
+  append-only security audit log, PWA, i18n (EN + NL), Nuxt UI v4 + Tailwind
+  v4, Pinia.
+- **Ops.** Production Dockerfile and compose setup, a `/api/health` endpoint
+  that checks the database and config, GitHub Actions, pre-commit hooks, Vitest,
+  security headers, and a minimum release age for new dependency versions.
 
-Local development gets extras too: `battlestack gateway:up` runs a shared
-Traefik proxy so each project serves at `https://<name>.battlestack.test`
-with locally-trusted TLS, and `battlestack login` opens a browser already
-signed in as the seeded admin.
+For local development, `battlestack gateway:up` runs a shared Traefik proxy so
+each project is served at `https://<name>.battlestack.test` with a locally
+trusted certificate.
 
-### The AI gateway, and sluis.ai
+### The AI gateway and sluis.ai
 
-The AI templates never talk to model providers directly: everything goes
-through one OpenAI-compatible AI gateway, configured by `NUXT_AI_GATEWAY_URL`
-and `NUXT_AI_GATEWAY_KEY` in `.env`. The scaffold's built-in preset is
-[sluis.ai](https://sluis.ai), SevenLab's own hosted AI gateway: one API for
-every AI model, EU data residency by default, PII stripped from prompts before
-they leave (and restored in the answers), and a tamper-evident audit ledger
-that proves compliance. New accounts start with 50,000 free tokens, so a fresh
-`nuxt4-ai` scaffold can chat before you have set up anything else.
+The AI templates don't call model providers directly. All requests go through
+one OpenAI-compatible gateway, set by `NUXT_AI_GATEWAY_URL` and
+`NUXT_AI_GATEWAY_KEY` in `.env`. The default preset is
+[sluis.ai](https://sluis.ai), SevenLab's hosted gateway. It gives you one API
+for many models, keeps data in the EU by default, strips personal data from
+prompts before they leave and puts it back in the answers, and keeps a
+tamper-evident audit log. New accounts get 50,000 free tokens, so a fresh
+`nuxt4-ai` project can chat right away.
 
-Prefer your own infrastructure? Pick the custom option at scaffold time and
-point `NUXT_AI_GATEWAY_URL` at any OpenAI-compatible endpoint — a self-hosted
-LiteLLM proxy works fine.
+To use your own setup instead, choose the custom option when scaffolding and
+point `NUXT_AI_GATEWAY_URL` at any OpenAI-compatible endpoint. A self-hosted
+LiteLLM proxy works.
 
 ## Everyday commands
 
-Run these inside the project. `battlestack --help` lists all of them, and the
-list reflects what you actually installed.
+Run these inside the project. `battlestack --help` lists them all, and only
+shows commands for the features you installed.
 
 ```
 battlestack dev          # dev server (starts Postgres if the project has one)
@@ -146,155 +193,147 @@ battlestack up           # just the services (Postgres, mail catcher)
 battlestack down         # stop them
 battlestack login        # browser, signed in as the seed admin (dev only)
 battlestack db:studio    # Drizzle Studio
-battlestack add <id>     # add an optional feature after the fact
+battlestack add <id>     # add an optional feature later
 battlestack doctor       # check the project for drift and missing config
 battlestack upgrade      # pick up newer feature versions
 ```
 
-**`bstack` is a shorter alias for `battlestack`.** Same binary, either name, so
-`bstack dev` works too.
+`bstack` is a shorter alias for `battlestack`, so `bstack dev` works too.
 
 ## Installing and updating
 
-**Scaffolding needs no install.** `npx battlestack@latest` (or `pnpm dlx`,
-`bunx`) always fetches the newest release for that one run.
-
-**For daily use, install the CLI globally** so `battlestack` and `bstack` are
-on your PATH inside projects:
-
-```bash
-pnpm add -g battlestack   # or: npm i -g battlestack · bun i -g battlestack
-```
-
-**Trying the next release early.** Prereleases publish under the `next`
-dist-tag, so they never reach a plain install:
-
-```bash
-npx battlestack@next my-app
-```
-
-**Updating the CLI.** A global install updates itself:
+**Updating the CLI.** A global install can update itself:
 
 ```bash
 battlestack self-update
 ```
 
-Under pnpm this respects the release-age gate, so a release published minutes
-ago is held back briefly; `--force` installs the true latest now. If you only
-ever run via `npx`, there is nothing persistent to update — `@latest` already
-does it.
+Under pnpm this respects the minimum release age, so a release published a few
+minutes ago is held back for a while. `--force` installs the latest right away.
+If you only use `npx battlestack@latest`, there's nothing to update.
 
-**Updating a project.** A scaffolded project is not frozen at scaffold time:
+**Updating plugins.** Plugins you installed with `battlestack plugin add` can
+be updated the same way:
 
 ```bash
-battlestack pull    # re-apply template + config changes, drift-aware
+battlestack plugin outdated            # list plugins with a newer version
+battlestack plugin update              # update all of them (or name one)
+battlestack plugin auto-update apply   # off, notify (default) or apply
+```
+
+Updates respect the same minimum release age; `--force` skips it. If a new
+version fails to load, it is rolled back. By default battlestack checks once a
+day and tells you when updates are available. With `apply`, it installs them at
+the start of your next command. [`docs/plugins.md`](docs/plugins.md#keeping-plugins-up-to-date)
+has the details.
+
+**Updating a project.** You can keep pulling changes into a project after you
+scaffold it:
+
+```bash
+battlestack pull    # re-apply template and config changes, skipping files you edited
 battlestack bump    # bump npm dependencies to latest
 battlestack sync    # pull + bump + doctor in one go
 ```
 
-`pull` refuses to clobber files you have edited; `--force` overwrites them and
-saves each one as `.battlestack/pull/<path>.bak` first, and `battlestack own <path>`
-tells `pull` to leave a file alone permanently.
+`pull` won't overwrite files you have edited. With `--force` it does, after
+saving each one to `.battlestack/pull/<path>.bak`. Run
+`battlestack own <path>` to tell `pull` to never touch a file again.
 
-**Cloned an existing battlestack project?** `battlestack install` is the
-post-clone bootstrap: it writes `.env`, installs dependencies and applies the
-database schema in one step.
+**Cloned an existing battlestack project?** Run `battlestack install`. It writes
+`.env`, installs dependencies and applies the database schema.
 
 ## Choosing a package manager
 
-`--pm <pnpm|npm|bun>` sets the package manager for the *generated* project,
-independent of whichever one ran the scaffold:
+`--pm <pnpm|npm|bun>` sets the package manager for the generated project. It
+doesn't matter which one you used to run the scaffold:
 
 ```bash
 npx battlestack@latest my-app --pm npm
 ```
 
-pnpm is the default. `--pm` is honoured everywhere it is load-bearing for
-*running* the project: the lockfile, the install, the production Dockerfile and
-the emitted GitHub Actions workflow are all correct for whichever you pick.
+pnpm is the default. The lockfile, install, production Dockerfile and GitHub
+Actions workflow all follow your choice.
 
-It is not yet honoured everywhere it is load-bearing for *instructing* a human
-or an agent. Parts of the generated `README.md` and `AGENTS.md`, and the
-`.claude/` rules and skills, still spell their commands `pnpm`. Under
-`--pm npm` or `--pm bun`, read those as "your package manager".
+The docs it generates don't follow it everywhere yet. Parts of the generated
+`README.md` and `AGENTS.md`, and the `.claude/` rules and skills, still say
+`pnpm`. With `--pm npm` or `--pm bun`, substitute your package manager.
 
-## When something goes wrong
+## Troubleshooting
 
-**`node: command not found`, or `node -v` prints below 24.** Install Node 24+
-from [nodejs.org](https://nodejs.org) or your version manager. Node 25 dropped
-bundled Corepack, so a fresh machine often has npm and nothing else. That is
-fine: use `npx` to scaffold and `--pm npm` for the project.
+**`node: command not found`, or `node -v` shows less than 24.** Install Node 24
+or newer from [nodejs.org](https://nodejs.org) or your version manager. Node 25
+no longer bundles Corepack, so a new machine often has only npm. That's fine:
+scaffold with `npx` and use `--pm npm`.
 
-**A Docker error, or Postgres will not start.** Docker needs to be installed
-*and running*, not just installed. `docker ps` should print a table rather than
-an error. On Docker Desktop, that means the app is open.
+**Docker errors, or Postgres won't start.** Docker has to be running, not just
+installed. `docker ps` should print a table, not an error. With Docker Desktop,
+the app needs to be open.
 
-**A port is already in use.** Each project derives its ports from its name,
-probes them, and freezes the working set into `.env` on first run, so two
-scaffolds can run side by side. If something outside battlestack holds a port,
-edit the relevant `*_PORT` in `.env` and restart.
+**A port is already in use.** Each project picks its ports based on its name,
+checks they are free, and saves them to `.env` on the first run, so two
+projects can run side by side. If another program holds a port, change the
+matching `*_PORT` in `.env` and restart.
 
-**The scaffold stopped partway.** Re-run the same command with `--force` to
-recreate the directory from scratch. Nothing outside that directory is touched.
+**The scaffold stopped partway.** Run the same command again with `--force` to
+recreate the directory. Nothing outside that directory is changed.
 
-**Something feels out of sync.** `battlestack doctor` reports drift between the
-project and what it expects, including missing config and files that have moved.
+**Something seems out of sync.** `battlestack doctor` lists where the project
+differs from what it expects, including missing config and moved files.
 
-## Built for an AI to pick up on day one
+## Ready for AI coding agents
 
-Every scaffold writes `AGENTS.md`, generated from the features you actually
-enabled rather than copied from a static template. Skip auth and there is no
-auth section; turn on Mastra and the agent-specific conventions appear.
-`CLAUDE.md` is a one-line pointer at it, so Claude Code and anything else
-reading `AGENTS.md` see one source instead of two docs drifting apart.
+Every project gets an `AGENTS.md` generated from the features you enabled. If
+you skip auth, there's no auth section. If you turn on Mastra, the Mastra
+conventions are included. `CLAUDE.md` is a one-line pointer to `AGENTS.md`, so
+Claude Code and other agents all read the same file.
 
-`.mcp.json` is generated too: it registers MCP servers for exactly what you
-turned on, Nuxt UI when `nuxt-ui` is on, Mastra when Mastra is, Playwright when
-Playwright is, and nothing else.
+`.mcp.json` is generated too. It registers MCP servers only for what you turned
+on: Nuxt UI when `nuxt-ui` is enabled, Mastra when Mastra is, Playwright when
+Playwright is.
 
-Rule files in `.claude/rules/` work the other way round. They are a fixed set,
-copied verbatim, each scoped by a glob its own frontmatter declares, so your
-agent loads a rule only while editing files that match. `drizzle.mdc` covers
-`server/database/**/*.ts` and `drizzle.config.ts`; `vue.mdc` covers `*.vue`.
-Because the set is fixed, a template without a database still gets
-`drizzle.mdc` and `postgres.mdc` on disk: inert, since nothing matches their
-globs, but present.
+The rule files in `.claude/rules/` are different: every project gets the same
+set. Each rule declares a glob in its frontmatter, and your agent loads it only
+while editing matching files. `drizzle.mdc` covers `server/database/**/*.ts` and
+`drizzle.config.ts`; `vue.mdc` covers `*.vue`. So a project without a database
+still has `drizzle.mdc` and `postgres.mdc`, but they never load because no
+files match.
 
-## Shaped for deployment, not just a demo
+## Deployment
 
-Every template ships a production Dockerfile. The templates with a database also
-ship a `docker-compose.yml` wiring up Postgres and whichever other services you
-enabled, plus a profile-gated `app` service and `battlestack prod` commands to
-drive it.
+Every template includes a production Dockerfile. Templates with a database also
+include a `docker-compose.yml` with Postgres and the other services you
+enabled, a profile-gated `app` service, and `battlestack prod` commands to run
+it.
 
-`GET /api/health` returns a real status: a database ping and required-config
-checks, bounded by a timeout and configurable per environment, so a container
-orchestrator can probe it rather than reading a static 200. Schema changes go
-through Drizzle migrations that track what is already applied, so re-running one
-is a no-op instead of a second attempt at the same change.
+`GET /api/health` checks the database connection and required config, with a
+timeout you can set per environment. Schema changes go through Drizzle
+migrations that track what has been applied, so running one twice does nothing
+the second time.
 
-`.env` is generated from the features you enabled, not a template with
-placeholders left in it for you to find later.
+`.env` is generated from the features you enabled.
 
-## Parts and components
+## Packages
 
-battlestack is a small plugin system, not a monolith. Four packages:
+battlestack is published as six npm packages:
 
-| Package | What it is |
-| --- | --- |
-| `battlestack` | The CLI binary you run. Thin: arg parsing, plugin loading, command dispatch. |
-| `@battlestack/core` | The plugin SDK — types, registries, and the orchestrator that turns enabled features into an execution plan. |
-| `@battlestack/preset-nuxt4` | The Nuxt 4 preset: one framework, three templates and 39 features. It uses the same plugin API a third-party plugin would. |
-| `@battlestack/tui` | Shared terminal UI (prompts, spinners, banner). |
+| Package | Version | What it is |
+| --- | --- | --- |
+| [`battlestack`](https://www.npmjs.com/package/battlestack) | [![npm](https://img.shields.io/npm/v/battlestack?label=)](https://www.npmjs.com/package/battlestack) | The `npx battlestack` entry point. A thin wrapper around `@battlestack/cli`. |
+| [`@battlestack/cli`](https://www.npmjs.com/package/@battlestack/cli) | [![npm](https://img.shields.io/npm/v/@battlestack/cli?label=)](https://www.npmjs.com/package/@battlestack/cli) | The CLI engine: arg parsing, plugin loading, command dispatch. |
+| [`@battlestack/core`](https://www.npmjs.com/package/@battlestack/core) | [![npm](https://img.shields.io/npm/v/@battlestack/core?label=)](https://www.npmjs.com/package/@battlestack/core) | The plugin SDK: types, registries and the orchestrator that turns enabled features into an execution plan. |
+| [`@battlestack/preset-nuxt4`](https://www.npmjs.com/package/@battlestack/preset-nuxt4) | [![npm](https://img.shields.io/npm/v/@battlestack/preset-nuxt4?label=)](https://www.npmjs.com/package/@battlestack/preset-nuxt4) | The Nuxt 4 preset: one framework, three templates and 39 features. It uses the same plugin API a third-party plugin would. |
+| [`@battlestack/tui`](https://www.npmjs.com/package/@battlestack/tui) | [![npm](https://img.shields.io/npm/v/@battlestack/tui?label=)](https://www.npmjs.com/package/@battlestack/tui) | Shared terminal UI (prompts, spinners, banner). |
+| [`@battlestack/theme`](https://www.npmjs.com/package/@battlestack/theme) | [![npm](https://img.shields.io/npm/v/@battlestack/theme?label=)](https://www.npmjs.com/package/@battlestack/theme) | The Nuxt UI theme generated projects use: light and dark tokens, brand assets and the logo. |
 
-The units compose as **framework → template → feature**: a template is a
-curated list of features, and a feature is a versioned unit that contributes
-files, dependencies, env vars, docs sections and its own CLI subcommands.
-Anyone can ship more of them: a plugin is an npm package built with
-`defineBattlestackPlugin()` that registers features, templates, commands or
-deploy targets — including private, unpublished plugins that extend a public
-install without the public code referencing them. [`docs/architecture.md`](docs/architecture.md) has the
-full picture.
+Projects are built up in three layers: **framework → template → feature**. A
+template is a list of features. A feature is a versioned unit that adds files,
+dependencies, env vars, docs sections and its own CLI commands. Anyone can
+write more: a plugin is an npm package built with `defineBattlestackPlugin()`
+that registers features, templates, commands or deploy targets. Plugins can be
+private and unpublished; the public code doesn't need to know about them.
+[`docs/architecture.md`](docs/architecture.md) explains how it all fits
+together.
 
 ## More
 
@@ -326,9 +365,8 @@ together.
 
 ## Who built this
 
-battlestack is built and maintained by **SevenLab**, where it scaffolds the
-projects we build for ourselves and for clients — the public spine of the
-stack we use every day.
+battlestack is built and maintained by **SevenLab**. We use it to start our
+own projects and the ones we build for clients.
 
-Questions, ideas, or want to work with us? Reach out at
-[hello@sevenlab.ai](mailto:hello@sevenlab.ai), or open an issue.
+Questions, ideas, or want to work with us? Email
+[hello@sevenlab.ai](mailto:hello@sevenlab.ai) or open an issue.

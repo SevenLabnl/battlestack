@@ -21,6 +21,8 @@ import {
     type ParsedArgs,
     type ReservedCommand,
     type RunContext,
+    resolveProjectName,
+    type ProjectManifest,
 } from '@battlestack/core'
 import { applyEnv, collectEnvForFeature } from '@battlestack/preset-nuxt4'
 import { ui } from '@battlestack/tui'
@@ -93,7 +95,7 @@ export async function addCommand(args: ParsedArgs, loader: Ora, registries: Batt
 
     const pm = manifest.packageManager as PackageManager
     const fullEnabled = [...manifest.features.map((f) => f.id), fqid]
-    const ctx = buildCtx(projectRoot, manifest.framework, manifest.template, fullEnabled, pm, args, registries)
+    const ctx = buildCtx(projectRoot, manifest, fullEnabled, pm, args, registries)
     // Pre-primed so writeManifest preserves existing entries. Keyed bare.
     for (const f of manifest.features) {
         if (!registries.features.has(f.id)) continue
@@ -251,8 +253,7 @@ export async function removeCommand(args: ParsedArgs, _loader: Ora, registries: 
     const pm = manifest.packageManager as PackageManager
     const ctxForDeps = buildCtx(
         projectRoot,
-        manifest.framework,
-        manifest.template,
+        manifest,
         manifest.features.map((f) => f.id),
         pm,
         args,
@@ -265,8 +266,7 @@ export async function removeCommand(args: ParsedArgs, _loader: Ora, registries: 
     manifest.updatedAt = new Date().toISOString()
     const ctx = buildCtx(
         projectRoot,
-        manifest.framework,
-        manifest.template,
+        manifest,
         manifest.features.map((f) => f.id),
         pm,
         args,
@@ -355,18 +355,17 @@ async function requireProjectRoot(): Promise<string> {
 
 function buildCtx(
     projectRoot: string,
-    frameworkId: string,
-    templateId: string,
+    manifest: Pick<ProjectManifest, 'framework' | 'template' | 'projectName'>,
     enabled: string[],
     pm: PackageManager,
     args: ParsedArgs,
     registries: BattlestackRegistries,
 ): RunContext {
     return {
-        projectName: path.basename(projectRoot),
+        projectName: resolveProjectName(projectRoot, manifest),
         projectDir: projectRoot,
-        framework: registries.frameworks.get(frameworkId),
-        template: registries.templates.get(templateId),
+        framework: registries.frameworks.get(manifest.framework),
+        template: registries.templates.get(manifest.template),
         enabledFeatures: new Set(enabled),
         state: { packageManager: pm, skipInstall: args.skipInstall },
         debug: args.debug,
