@@ -16,7 +16,7 @@ const toast = useToast()
 const headers = useRequestHeaders(['cookie'])
 const { data: modelConfigs, refresh: refreshConfigs } = await useAsyncData<ModelConfig[]>(
     'ai-model-configs',
-    () => $fetch('/api/ai/configs', { headers }),
+    () => $fetch<ModelConfig[]>('/api/ai/configs', { headers }),
 )
 interface ProxyModel {
     id: string
@@ -76,7 +76,7 @@ interface PromptRow {
 
 const { data: agentRows, refresh: refreshAgents } = await useAsyncData<AgentRow[]>(
     'ai-agents',
-    () => $fetch('/api/ai/agents', { headers }),
+    () => $fetch<AgentRow[]>('/api/ai/agents', { headers }),
     { default: () => [] },
 )
 

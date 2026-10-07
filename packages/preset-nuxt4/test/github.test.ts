@@ -202,6 +202,19 @@ describe('githubFeature', () => {
         expect(workflow).not.toMatch(/^\s{2}schedule:/m)
     })
 
+    /** A self-hosted `CI_RUNNER` image may lack the GitHub CLI. */
+    it('publishes the release through the REST API, never the gh CLI', async () => {
+        await githubFeature.execute!(ctx())
+        const workflow = await readFile(path.join(projectDir, '.github/workflows/release.yml'), 'utf8')
+        const commands = workflow.split('\n').filter((line) => !line.trim().startsWith('#'))
+
+        expect(commands.some((line) => /\bgh\b/.test(line))).toBe(false)
+        expect(workflow).toContain('${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/releases')
+        expect(workflow).toContain(
+            `'{"tag_name":"%s","name":"%s","target_commitish":"%s","generate_release_notes":true}' "$TAG" "$TAG" "$GITHUB_SHA"`,
+        )
+    })
+
     it('collectDocs documents the quality gate under a single GitHub Actions heading', () => {
         const docs = githubFeature.collectDocs!(ctx())
         expect(docs).toHaveLength(1)
