@@ -7,7 +7,7 @@ import { STAGE } from '@battlestack/core'
 /** TOTP-based two-factor auth. Secrets encrypted at rest with AES-256-GCM via `NUXT_TOTP_ENCRYPTION_KEY`. */
 export const auth2faFeature: Feature = {
     id: 'nuxt4:auth-2fa',
-    version: '1.2.1',
+    version: '1.2.2',
     label: 'Two-factor auth (TOTP)',
     description: 'Authenticator-app 2FA; TOTP secrets encrypted at rest.',
     frameworks: ['nuxt4'],
