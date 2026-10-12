@@ -4,7 +4,7 @@ import { db } from '#server/database/client'
 import { users, Role } from '#server/database/schema/users'
 import { requireRole } from '#server/utils/auth'
 import { hashUserPassword } from '#server/utils/password'
-import { checkPasswordPolicy } from '#server/utils/password-policy'
+import { checkPasswordPolicy } from '#shared/utils/password-policy'
 import { tryLogAudit } from '#server/utils/audit-bridge'
 
 const schema = z.object({

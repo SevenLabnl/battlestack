@@ -11,13 +11,27 @@
             <p class="text-sm text-muted">{{ t('auth.signup.success.description') }}</p>
         </div>
 
-        <UForm v-else :state="state" :schema="signupSchema" class="space-y-4" @submit="onSubmit">
-            <UFormField :label="t('auth.signup.email')" name="email">
+        <UForm
+            v-else
+            :state="state"
+            :schema="signupSchema"
+            novalidate
+            class="space-y-4"
+            @submit="onSubmit"
+        >
+            <UFormField
+                :label="t('auth.signup.email')"
+                name="email"
+                :help="t('auth.signup.emailHint')"
+                eager-validation
+                required
+            >
                 <div data-allow-mismatch>
                     <UInput
                         v-model="state.email"
                         type="email"
                         autocomplete="email"
+                        required
                         class="w-full"
                     />
                 </div>
@@ -25,21 +39,24 @@
             <UFormField
                 :label="t('auth.signup.password')"
                 name="password"
-                :description="t('auth.signup.passwordHint', { min: MIN })"
+                :description="t('auth.signup.passwordHint', { min: PASSWORD_MIN_LENGTH })"
+                eager-validation
+                required
             >
                 <div data-allow-mismatch>
                     <UInput
                         v-model="state.password"
                         type="password"
                         autocomplete="new-password"
+                        required
                         class="w-full"
                     />
                 </div>
             </UFormField>
-            <UButton type="submit" :loading="loading" block>
+            <UButton type="submit" loading-auto block>
                 {{ t('auth.signup.submit') }}
             </UButton>
-            <p v-if="error" class="text-sm text-error">{{ error }}</p>
+            <p v-if="error" role="alert" class="text-sm text-error">{{ error }}</p>
         </UForm>
 
         <template #footer>
@@ -52,6 +69,7 @@
 
 <script setup lang="ts">
 import { z } from 'zod'
+import { checkPasswordPolicy, PASSWORD_MIN_LENGTH } from '#shared/utils/password-policy'
 
 definePageMeta({ layout: 'auth' })
 
@@ -64,27 +82,29 @@ if (runtimeConfig.public.allowRegistration !== true) {
 
 const { t } = useI18n()
 
-const MIN = 12
-
-const signupSchema = z.object({
-    email: z.email(t('auth.signup.validation.email')),
-    password: z
-        .string()
-        .min(MIN, t('auth.signup.validation.minLength', { min: MIN }))
-        .regex(/[a-z]/, t('auth.signup.validation.lowercase'))
-        .regex(/[A-Z]/, t('auth.signup.validation.uppercase'))
-        .regex(/[0-9]/, t('auth.signup.validation.digit'))
-        .regex(/[^a-zA-Z0-9]/, t('auth.signup.validation.symbol')),
-})
+const signupSchema = computed(() =>
+    z.object({
+        email: z.email(t('auth.signup.validation.email')),
+        password: z.string().superRefine((password, ctx) => {
+            const policy = checkPasswordPolicy(password)
+            if (!policy.valid) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message: t(`auth.signup.validation.${policy.code}`, {
+                        min: PASSWORD_MIN_LENGTH,
+                    }),
+                })
+            }
+        }),
+    }),
+)
 
 const state = reactive({ email: '', password: '' })
-const loading = ref(false)
 const error = ref<string | null>(null)
 const sent = ref(false)
 const { signup } = useAuth()
 
 async function onSubmit() {
-    loading.value = true
     error.value = null
     try {
         await signup(state.email, state.password)
@@ -93,8 +113,6 @@ async function onSubmit() {
         sent.value = true
     } catch (e: unknown) {
         error.value = serverErrorMessage(e, t('auth.signup.errors.generic'))
-    } finally {
-        loading.value = false
     }
 }
 </script>

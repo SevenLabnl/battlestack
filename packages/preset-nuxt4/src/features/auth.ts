@@ -29,7 +29,7 @@ function titleCase(slug: string): string {
 /** Session auth on `nuxt-auth-utils`. The sealed cookie carries an opaque sessionId. */
 export const authFeature: Feature = {
     id: 'nuxt4:auth',
-    version: '1.10.0',
+    version: '1.10.1',
     label: 'Session-based auth (argon2id)',
     frameworks: ['nuxt4'],
     stage: STAGE.AUTH,
@@ -76,6 +76,14 @@ export const authFeature: Feature = {
                     'Registration is **off by default**. Both `/signup` and `POST /api/auth/signup` return 404 until you flip `NUXT_PUBLIC_ALLOW_REGISTRATION=true` (or set `runtimeConfig.public.allowRegistration: true` in `nuxt.config.ts`). The login page hides the "Create account" link automatically when the flag is off.',
                     '',
                     'Until you flip it, the only path to a working account is `battlestack db:seed` (admin from `SEED_ADMIN_*`) or an admin manually creating users via `/dashboard/users`.',
+                    '',
+                    '### Password creation policy',
+                    '',
+                    '`shared/utils/password-policy.ts` is the browser-safe source of truth for signup and user-admin password creation/change. It checks the minimum length, lowercase/uppercase letters, a digit, a symbol and normalized common-password substrings, in that order. Forms translate stable rule codes; API handlers keep authoritative validation and their existing status messages.',
+                    '',
+                    'Login and seeding do not apply creation rules to existing credentials. Password reset retains its separate length/confirmation contract. Do not tighten those paths by putting policy checks inside the password hashing helper.',
+                    '',
+                    'The emitted `test/unit/password-policy.test.ts` runs without a database. Signup form tests live in `test/nuxt/` and exercise validation before any request.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },

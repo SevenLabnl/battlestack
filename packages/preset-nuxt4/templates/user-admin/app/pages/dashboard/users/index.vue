@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
+import { z } from 'zod'
+import { checkPasswordPolicy, PASSWORD_MIN_LENGTH } from '#shared/utils/password-policy'
 
 definePageMeta({ middleware: 'admin' })
 
@@ -56,6 +58,22 @@ const toast = useToast()
 const showCreate = ref(false)
 const newUser = reactive({ email: '', password: '', name: '', role: 'user' as 'admin' | 'user' })
 const createError = ref('')
+const createSchema = computed(() =>
+    z.object({
+        email: z.email(t('userAdmin.validation.emailInvalid')),
+        password: z.string().superRefine((password, ctx) => {
+            const policy = checkPasswordPolicy(password)
+            if (!policy.valid) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message: t(`userAdmin.validation.passwordErrors.${policy.code}`, {
+                        min: PASSWORD_MIN_LENGTH,
+                    }),
+                })
+            }
+        }),
+    }),
+)
 
 async function createUser() {
     createError.value = ''
@@ -66,10 +84,7 @@ async function createUser() {
         await refresh()
         toast.add({ title: t('userAdmin.create.successTitle'), color: 'success' })
     } catch (e) {
-        const msg =
-            (e as { statusMessage?: string; message?: string }).statusMessage ||
-            (e as Error).message ||
-            t('userAdmin.create.failed')
+        const msg = serverErrorMessage(e, t('userAdmin.create.failed'))
         createError.value = msg
         toast.add({ title: t('userAdmin.create.failedTitle'), description: msg, color: 'error' })
     }
@@ -144,17 +159,42 @@ async function createUser() {
             <template #content>
                 <UCard>
                     <template #header>{{ t('userAdmin.create.title') }}</template>
-                    <form class="space-y-3" @submit.prevent="createUser">
-                        <UFormField :label="t('userAdmin.create.email')" required>
-                            <UInput v-model="newUser.email" type="email" required class="w-full" />
+                    <UForm
+                        :state="newUser"
+                        :schema="createSchema"
+                        novalidate
+                        class="space-y-3"
+                        @submit="createUser"
+                    >
+                        <UFormField
+                            :label="t('userAdmin.create.email')"
+                            name="email"
+                            :help="t('userAdmin.validation.emailHelp')"
+                            eager-validation
+                            required
+                        >
+                            <UInput
+                                v-model="newUser.email"
+                                type="email"
+                                autocomplete="email"
+                                required
+                                class="w-full"
+                            />
                         </UFormField>
                         <UFormField :label="t('userAdmin.create.name')">
                             <UInput v-model="newUser.name" class="w-full" />
                         </UFormField>
-                        <UFormField :label="t('userAdmin.create.password')" required>
+                        <UFormField
+                            :label="t('userAdmin.create.password')"
+                            name="password"
+                            :help="t('userAdmin.validation.passwordHelp', { min: PASSWORD_MIN_LENGTH })"
+                            eager-validation
+                            required
+                        >
                             <UInput
                                 v-model="newUser.password"
                                 type="password"
+                                autocomplete="new-password"
                                 required
                                 class="w-full"
                             />
@@ -162,16 +202,18 @@ async function createUser() {
                         <UFormField :label="t('userAdmin.create.role')">
                             <USelect v-model="newUser.role" :items="roleItems" />
                         </UFormField>
-                        <p v-if="createError" class="text-sm text-red-600">{{ createError }}</p>
+                        <p v-if="createError" role="alert" class="text-sm text-error">
+                            {{ createError }}
+                        </p>
                         <div class="flex gap-2 justify-end">
                             <UButton color="neutral" variant="ghost" @click="showCreate = false">{{
                                 t('userAdmin.create.cancel')
                             }}</UButton>
-                            <UButton type="submit" color="primary">{{
+                            <UButton type="submit" color="primary" loading-auto>{{
                                 t('userAdmin.create.submit')
                             }}</UButton>
                         </div>
-                    </form>
+                    </UForm>
                 </UCard>
             </template>
         </UModal>

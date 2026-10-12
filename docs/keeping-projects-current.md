@@ -59,6 +59,40 @@ your edits survive.
 This is the default because the alternative, discarding your work to apply an
 update, is the one behaviour that would make the whole mechanism untrustworthy.
 
+## Moving template files
+
+When a template stops shipping a tracked path, `pull` removes the old hash record.
+It deletes the file only if it still matches the recorded baseline, is not
+explicitly user-owned, and no other enabled feature still owns the same path.
+Modified or explicitly owned obsolete files stay on disk and are reported.
+Their edits are not automatically transferred to a replacement path.
+
+The user-form validation update moves
+`server/utils/password-policy.ts` to `shared/utils/password-policy.ts`.
+Untouched projects receive the shared helper, updated imports and forms, and the
+old helper is removed. Fresh scaffolds ship only the shared path.
+
+For a customized project:
+
+1. Run `battlestack doctor`, then `battlestack pull`.
+2. Merge staged changes from `.battlestack/pull/` into customized forms and API
+   handlers. Explicitly owned paths are skipped rather than staged; compare them
+   with the new templates manually.
+3. If the old policy was retained, port deliberate policy changes to the shared
+   helper and update every import to `#shared/utils/password-policy`.
+4. Remove the retained old helper once no caller uses it. Leaving both utilities
+   can produce duplicate Nuxt auto-imports; keeping a compatibility re-export is
+   not required.
+5. Run the project's unit/Nuxt tests, typecheck and lint, then restart the dev
+   server so its auto-import index reflects the moved file.
+
+`pull` records the new feature version even if a drifted or owned file was skipped.
+A second normal pull does not retry that version. After deliberately resolving
+those files, use `battlestack pull --force` to reapply it. `--overwrite` alone
+changes file protection, not the feature-version gate; reapplying an already
+recorded version with a deliberate reset requires `--force --overwrite`.
+Neither option automatically ports custom code from a retired file.
+
 ## When you want it to just overwrite
 
 ```bash

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Show localized inline email/password validation in user-admin create/edit and
+  signup forms; reuse the canonical password policy and display API error details.
+- Run emitted password-policy and Nuxt form regression tests in generated projects.
+- Preserve explicitly owned obsolete template files during updates, including
+  the password-policy move from `server/utils/` to `shared/utils/`.
+
 ## v1.3.0 (2026-09-24)
 
 - fix(release): count only plain tags, see lightweight ones, keep branch names out of the script (3832a58)
