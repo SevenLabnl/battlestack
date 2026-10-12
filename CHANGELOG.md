@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- Show localized inline email/password validation in user-admin create/edit and
+  signup forms; reuse the canonical password policy and display API error details.
+- Run emitted password-policy and Nuxt form regression tests in generated projects.
+- Preserve explicitly owned obsolete template files during updates, including
+  the password-policy move from `server/utils/` to `shared/utils/`.
+- Translate API password-policy rejections in signup and user-admin forms,
+  validate the user-admin name length before sending, and clear a stale create
+  error when the dialog reopens.
+- Warn on `pull` when an old `server/utils/password-policy.ts` or its test stays
+  beside the shared policy.
+- Include `shared/**` in generated Vitest coverage.
+- Pin generated projects to TypeScript 6: `vue-tsc` and typescript-eslint do not
+  support TypeScript 7 yet. A feature's explicit dependency range now also wins
+  over a peer pin that `nuxi module add` wrote into the other bucket.
+
 ## v1.3.0 (2026-09-24)
 
 - fix(release): count only plain tags, see lightweight ones, keep branch names out of the script (3832a58)

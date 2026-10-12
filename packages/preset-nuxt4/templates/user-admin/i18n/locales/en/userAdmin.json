@@ -14,6 +14,9 @@
             "previous": "Previous",
             "next": "Next"
         },
+        "validation": {
+            "nameTooLong": "At most {max} characters"
+        },
         "create": {
             "title": "New user",
             "email": "Email",

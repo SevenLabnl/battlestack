@@ -4,7 +4,7 @@ import { db } from '#server/database/client'
 import { users, Role } from '#server/database/schema/users'
 import { requireRole } from '#server/utils/auth'
 import { hashUserPassword } from '#server/utils/password'
-import { checkPasswordPolicy } from '#server/utils/password-policy'
+import { checkPasswordPolicy } from '#shared/utils/password-policy'
 import { tryLogAudit } from '#server/utils/audit-bridge'
 
 const schema = z.object({
@@ -20,7 +20,11 @@ export default defineEventHandler(async (event) => {
 
     const policy = checkPasswordPolicy(body.password)
     if (!policy.valid) {
-        throw createError({ statusCode: 400, statusMessage: policy.error })
+        throw createError({
+            statusCode: 400,
+            statusMessage: policy.error,
+            data: { passwordPolicy: policy.code },
+        })
     }
 
     const [existing] = await db

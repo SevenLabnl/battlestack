@@ -14,6 +14,9 @@
             "previous": "Vorige",
             "next": "Volgende"
         },
+        "validation": {
+            "nameTooLong": "Maximaal {max} tekens"
+        },
         "create": {
             "title": "Nieuwe gebruiker",
             "email": "E-mail",

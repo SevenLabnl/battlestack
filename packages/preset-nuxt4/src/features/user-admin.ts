@@ -6,7 +6,7 @@ import { STAGE } from '@battlestack/core'
 /** Admin-gated user CRUD + admin pages + admin route middleware. */
 export const userAdminFeature: Feature = {
     id: 'nuxt4:user-admin',
-    version: '1.0.4',
+    version: '1.0.5',
     label: 'User administration (admin-gated CRUD)',
     description: 'Admin-only /dashboard/users for listing, creating, editing, and deleting users.',
     frameworks: ['nuxt4'],
@@ -28,6 +28,12 @@ export const userAdminFeature: Feature = {
                     '- `DELETE /api/users/[id]` (admin only; refuses to delete self)',
                     '',
                     'Bootstrap an admin via `SEED_ADMIN_EMAIL` + `SEED_ADMIN_PASSWORD` in `.env`, then `battlestack db:seed`.',
+                    '',
+                    'Create and edit forms explain the email format and password requirements, validate while typing and before submission, and show field-specific errors in Dutch or English. Email syntax follows the same Zod validator as the API; format validation does not verify mailbox existence.',
+                    '',
+                    'A new user needs a password that passes `shared/utils/password-policy.ts`. An empty password on the edit form leaves the existing password unchanged; a nonempty replacement must pass the same policy. Direct API requests remain validated independently, and an explicitly empty API password is rejected.',
+                    '',
+                    'The name field mirrors the API limit of 80 characters. Password-policy rejections from the API carry `data.passwordPolicy` and are shown translated through `passwordPolicyServerMessage`; other server failures use `serverErrorMessage` so the API response explanation is visible instead of a generic HTTP error. Permission checks and duplicate-email handling remain server-side. Form regressions run in the generated `test/nuxt/` project without a database or a running dev server.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },

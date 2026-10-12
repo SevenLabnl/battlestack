@@ -4,7 +4,7 @@ import { db } from '#server/database/client'
 import { users } from '#server/database/schema/users'
 import { hashUserPassword } from '#server/utils/password'
 import { rateLimit, RATE_LIMIT_POLICIES } from '#server/utils/rate-limit'
-import { checkPasswordPolicy } from '#server/utils/password-policy'
+import { checkPasswordPolicy } from '#shared/utils/password-policy'
 import { tryLogAudit } from '#server/utils/audit-bridge'
 import { sendEmail } from '#server/utils/email'
 import { emailContent } from '#server/utils/email-templates'
@@ -27,7 +27,11 @@ export default defineEventHandler(async (event) => {
 
     const policy = checkPasswordPolicy(password)
     if (!policy.valid) {
-        throw createError({ statusCode: 400, statusMessage: policy.error })
+        throw createError({
+            statusCode: 400,
+            statusMessage: policy.error,
+            data: { passwordPolicy: policy.code },
+        })
     }
 
     // Anti-enumeration: identical `{ ok: true }` either way. Do NOT add auto-login here;

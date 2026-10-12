@@ -11,7 +11,7 @@ import { ui } from '@battlestack/tui'
 /** Aggregates `collectDeps()` into `package.json`, then installs. Runs on `pull` too. */
 export const installFeature: Feature = {
     id: 'shared:install',
-    version: '1.2.0',
+    version: '1.2.1',
     label: 'package.json + install',
     stage: STAGE.FINALIZE,
 
@@ -103,8 +103,8 @@ function collectDeclaredDeps(ctx: RunContext): {
     return { prod, dev }
 }
 
-/** Merges declared deps into package.json buckets in place. A user pin survives, and moves with it. */
-function reconcileDependencyBuckets(
+/** Merges declared deps into package.json buckets in place. A user pin moves with it and survives a bare spec, as in `mergeDeps`. */
+export function reconcileDependencyBuckets(
     pkg: Record<string, unknown>,
     incomingProd: Record<string, string>,
     incomingDev: Record<string, string>,
@@ -130,8 +130,8 @@ function reconcileDependencyBuckets(
     const carryProdIntoDev: Record<string, string> = { ...incomingDev }
     const carryDevIntoProd: Record<string, string> = { ...incomingProd }
     for (const [name, pin] of Object.entries(migrated)) {
-        if (incomingDev[name] && pin !== 'latest') carryProdIntoDev[name] = pin
-        if (incomingProd[name] && pin !== 'latest') carryDevIntoProd[name] = pin
+        if (incomingDev[name] === 'latest' && pin !== 'latest') carryProdIntoDev[name] = pin
+        if (incomingProd[name] === 'latest' && pin !== 'latest') carryDevIntoProd[name] = pin
     }
     pkg.dependencies = mergeDeps(cleanedProd, carryDevIntoProd)
     pkg.devDependencies = mergeDeps(cleanedDev, carryProdIntoDev)

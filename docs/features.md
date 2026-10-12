@@ -49,6 +49,44 @@ Session auth, and the pieces that build on it.
 browser signed in as the seeded admin. It is dev-only and refuses to run against
 a production host.
 
+### User creation and validation
+
+With `nuxt4:user-admin`, create and edit forms explain the email format and
+password rules, show inline errors while typing, and prevent invalid submissions.
+Help and validation messages are available in Dutch and English. Validation uses
+the selected locale whenever a field is checked or the form is submitted.
+Email syntax validation does not check whether a mailbox exists.
+
+Signup and user-admin share the auth-owned
+`shared/utils/password-policy.ts`: at least 12 characters, an ASCII lowercase
+letter, an ASCII uppercase letter, a digit, a symbol, and no normalized
+common-password substring. The validator reports the first unmet rule. These
+are the existing API rules, not a new password policy. Passwords are not trimmed.
+An empty edit-form password leaves the stored password unchanged; a nonempty
+replacement is validated. An explicitly empty password sent directly to the API
+is still invalid.
+
+Browser validation is feedback, not authorization: the API continues validating
+direct requests, permissions, and duplicate addresses. The name field mirrors the
+API's 80-character limit. A password the API rejects is shown in the selected
+language, using the rule code the API returns as `data.passwordPolicy`. Other
+admin API failures display the response explanation instead of the generic
+ofetch error. Public signup
+retains its neutral response and does not disclose whether an account exists.
+Login, bootstrap seeding, and password reset keep their existing contracts.
+
+Generated projects include database-independent regression tests:
+
+```bash
+pnpm test --project unit test/unit/password-policy.test.ts
+pnpm test --project nuxt
+```
+
+The Nuxt tests mount the actual forms, including validation and API error feedback;
+they do not require a running dev server. See
+[Keeping a project current](keeping-projects-current.md#moving-template-files)
+for upgrading projects with customized or explicitly owned files.
+
 ## Data
 
 | Feature | What it gives you |

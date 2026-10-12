@@ -21,7 +21,7 @@ import {
     type Provenance,
     type RunContext,
 } from '@battlestack/core'
-import { defaultArgs, withCwd } from './test-utils.js'
+import { buildRegistries, defaultArgs, withCwd } from './test-utils.js'
 
 /**
  * `pullCommand` is the ONE command that rewrites files a user may have hand-edited, and
@@ -299,6 +299,85 @@ describe('battlestack pull: ownedByUser is inviolable', () => {
         expect(rec.ownedByUser).toEqual(['a.ts'])
         // No merge artifacts staged for an owned file; there is nothing to merge.
         expect(await exists(path.join(projectDir, '.battlestack', 'pull', 'a.ts.new'))).toBe(false)
+    })
+
+    it('retires a moved template through real ownership and version-gated pulls without data loss', async () => {
+        const projectDir = await tmp('battlestack-pull-owned-retirement-')
+        const tplV1 = await tmp('battlestack-pull-owned-retirement-v1-')
+        const tplV2 = await tmp('battlestack-pull-owned-retirement-v2-')
+        const featureId = 'test:retired-policy'
+        // A root-level owned path keeps this retirement test independent of separator normalization.
+        const ownedRel = 'password-policy.ts'
+        const pristineRel = path.join('server', 'utils', 'unused.ts')
+        const modifiedRel = path.join('server', 'utils', 'custom-policy.ts')
+        const newRel = path.join('shared', 'utils', 'password-policy.ts')
+        const oldContent = 'export const policy = 1\n'
+        const newContent = 'export const policy = 2\n'
+        const customContent = 'export const custom = true\n'
+        await writeTemplateFile(tplV1, ownedRel, oldContent)
+        await writeTemplateFile(tplV1, pristineRel, 'obsolete\n')
+        await writeTemplateFile(tplV1, modifiedRel, 'original\n')
+        await writeTemplateFile(tplV2, newRel, newContent)
+
+        // Author bare ids and let the production finalizer resolve the catalog.
+        const registriesFor = (feature: Feature): BattlestackRegistries => {
+            const built = buildRegistries({
+                namespace: NAMESPACE,
+                frameworks: [{ id: FW, label: FW, supportedFeatures: [featureId] }],
+                features: [feature],
+                templates: [{
+                    id: TPL,
+                    label: TPL,
+                    framework: FW,
+                    requiredFeatures: [featureId],
+                    optionalFeatures: [],
+                }],
+            })
+            expect(built.warnings).toEqual([])
+            return built.registries
+        }
+        const featV1 = makeFileFeature(featureId, '1.0.0', tplV1)
+        const registriesV1 = registriesFor(featV1)
+        const ctx = scaffoldCtx(projectDir, registriesV1, registriesV1.templates.get(TPL).requiredFeatures)
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+        await withCwd(projectDir, () =>
+            ownCommand(defaultArgs({ positionals: ['own', ownedRel] }), silentLoader()))
+        await writeFile(path.join(projectDir, modifiedRel), customContent, 'utf8')
+
+        let updateCalls = 0
+        const featV2 = makeFileFeature(featureId, '2.0.0', tplV2)
+        featV2.update = async (updateCtx, prev) => {
+            updateCalls++
+            return updateFromTemplateDir(updateCtx, featureId, tplV2, prev)
+        }
+        const registriesV2 = registriesFor(featV2)
+        await runPull(projectDir, registriesV2)
+
+        expect(updateCalls).toBe(1)
+        expect(await readFile(path.join(projectDir, ownedRel), 'utf8')).toBe(oldContent)
+        expect(await exists(path.join(projectDir, pristineRel))).toBe(false)
+        expect(await readFile(path.join(projectDir, modifiedRel), 'utf8')).toBe(customContent)
+        expect(await readFile(path.join(projectDir, newRel), 'utf8')).toBe(newContent)
+        const manifest = await readManifestRaw(projectDir)
+        const rec = manifest.features.find((f) => f.id === registriesV2.features.get(featureId).fqid)!
+        expect(rec.version).toBe('2.0.0')
+        expect(rec.files).toEqual({ [newRel]: await hashFile(path.join(tplV2, newRel)) })
+        expect(rec.ownedByUser).toEqual([ownedRel])
+        expect(await exists(path.join(projectDir, '.battlestack', 'pull', ownedRel + '.new'))).toBe(false)
+
+        const manifestBytes = await readFile(path.join(projectDir, MANIFEST_PATH), 'utf8')
+        await runPull(projectDir, registriesV2)
+        // Same-version default pull is genuinely gated, not an accidental re-update.
+        expect(updateCalls).toBe(1)
+        expect(await readFile(path.join(projectDir, MANIFEST_PATH), 'utf8')).toBe(manifestBytes)
+        await runPull(projectDir, registriesV2, { force: true })
+        expect(updateCalls).toBe(2)
+        expect(await readFile(path.join(projectDir, ownedRel), 'utf8')).toBe(oldContent)
+        expect(await readFile(path.join(projectDir, modifiedRel), 'utf8')).toBe(customContent)
+        expect(await readFile(path.join(projectDir, newRel), 'utf8')).toBe(newContent)
+        expect(await exists(path.join(projectDir, pristineRel))).toBe(false)
+        expect(await readManifestRaw(projectDir)).toEqual(manifest)
     })
 
     it('CORE PROPERTY: a `structuralFiles()`-declared path is honored even though the ORIGINAL manifest predates that hook (seedOwnedFromStructural)', async () => {
