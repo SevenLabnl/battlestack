@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { z } from 'zod'
-import { checkPasswordPolicy, PASSWORD_MIN_LENGTH } from '#shared/utils/password-policy'
+import { PASSWORD_MIN_LENGTH } from '#shared/utils/password-policy'
 
 definePageMeta({ middleware: 'admin' })
+
+// Mirrors the `name` limit in the /api/users handlers.
+const NAME_MAX_LENGTH = 80
 
 interface UserRow {
     id: string
@@ -36,19 +39,9 @@ const formError = ref('')
 const showDelete = ref(false)
 const editSchema = computed(() =>
     z.object({
-        email: z.email(t('userAdmin.validation.emailInvalid')),
-        password: z.string().superRefine((password, ctx) => {
-            if (password === '') return
-            const policy = checkPasswordPolicy(password)
-            if (!policy.valid) {
-                ctx.addIssue({
-                    code: 'custom',
-                    message: t(`userAdmin.validation.passwordErrors.${policy.code}`, {
-                        min: PASSWORD_MIN_LENGTH,
-                    }),
-                })
-            }
-        }),
+        email: z.email(t('auth.signup.validation.email')),
+        name: z.string().max(NAME_MAX_LENGTH, t('userAdmin.validation.nameTooLong', { max: NAME_MAX_LENGTH })),
+        password: passwordPolicySchema(t, { allowEmpty: true }),
     }),
 )
 
@@ -80,7 +73,7 @@ async function save() {
         await refresh()
         toast.add({ title: t('userAdmin.edit.savedTitle'), color: 'success' })
     } catch (e) {
-        const msg = serverErrorMessage(e, t('userAdmin.edit.saveFailed'))
+        const msg = passwordPolicyServerMessage(e, t) ?? serverErrorMessage(e, t('userAdmin.edit.saveFailed'))
         formError.value = msg
         toast.add({ title: t('userAdmin.edit.saveFailedTitle'), description: msg, color: 'error' })
     }
@@ -127,7 +120,7 @@ async function destroy() {
             <UFormField
                 :label="t('userAdmin.create.email')"
                 name="email"
-                :help="t('userAdmin.validation.emailHelp')"
+                :help="t('auth.signup.emailHint')"
                 eager-validation
                 required
             >
@@ -139,13 +132,13 @@ async function destroy() {
                     class="w-full"
                 />
             </UFormField>
-            <UFormField :label="t('userAdmin.create.name')">
+            <UFormField :label="t('userAdmin.create.name')" name="name" eager-validation>
                 <UInput v-model="form.name" class="w-full" />
             </UFormField>
             <UFormField
                 :label="t('userAdmin.edit.passwordPlaceholder')"
                 name="password"
-                :help="t('userAdmin.validation.passwordHelp', { min: PASSWORD_MIN_LENGTH })"
+                :help="t('auth.signup.passwordHint', { min: PASSWORD_MIN_LENGTH })"
                 eager-validation
             >
                 <UInput

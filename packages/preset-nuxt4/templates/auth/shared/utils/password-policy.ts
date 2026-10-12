@@ -19,13 +19,24 @@ const COMMON_PASSWORDS = new Set([
     'dragon',
 ])
 
+export const PASSWORD_POLICY_CODES = [
+    'minLength',
+    'lowercase',
+    'uppercase',
+    'digit',
+    'symbol',
+    'common',
+] as const
+
+export type PasswordPolicyCode = (typeof PASSWORD_POLICY_CODES)[number]
+
+export function isPasswordPolicyCode(value: unknown): value is PasswordPolicyCode {
+    return (PASSWORD_POLICY_CODES as readonly unknown[]).includes(value)
+}
+
 export type PasswordCheck =
     | { valid: true }
-    | {
-        valid: false
-        code: 'minLength' | 'lowercase' | 'uppercase' | 'digit' | 'symbol' | 'common'
-        error: string
-    }
+    | { valid: false; code: PasswordPolicyCode; error: string }
 
 export function checkPasswordPolicy(password: string): PasswordCheck {
     if (password.length < PASSWORD_MIN_LENGTH) {

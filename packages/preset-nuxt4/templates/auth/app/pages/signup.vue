@@ -69,7 +69,7 @@
 
 <script setup lang="ts">
 import { z } from 'zod'
-import { checkPasswordPolicy, PASSWORD_MIN_LENGTH } from '#shared/utils/password-policy'
+import { PASSWORD_MIN_LENGTH } from '#shared/utils/password-policy'
 
 definePageMeta({ layout: 'auth' })
 
@@ -85,17 +85,7 @@ const { t } = useI18n()
 const signupSchema = computed(() =>
     z.object({
         email: z.email(t('auth.signup.validation.email')),
-        password: z.string().superRefine((password, ctx) => {
-            const policy = checkPasswordPolicy(password)
-            if (!policy.valid) {
-                ctx.addIssue({
-                    code: 'custom',
-                    message: t(`auth.signup.validation.${policy.code}`, {
-                        min: PASSWORD_MIN_LENGTH,
-                    }),
-                })
-            }
-        }),
+        password: passwordPolicySchema(t),
     }),
 )
 
@@ -112,7 +102,8 @@ async function onSubmit() {
         // state; the user verifies / signs in from there.
         sent.value = true
     } catch (e: unknown) {
-        error.value = serverErrorMessage(e, t('auth.signup.errors.generic'))
+        error.value =
+            passwordPolicyServerMessage(e, t) ?? serverErrorMessage(e, t('auth.signup.errors.generic'))
     }
 }
 </script>

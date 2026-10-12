@@ -82,7 +82,9 @@ For a customized project:
    helper and update every import to `#shared/utils/password-policy`.
 4. Remove the retained old helper once no caller uses it. Leaving both utilities
    can produce duplicate Nuxt auto-imports; keeping a compatibility re-export is
-   not required.
+   not required. `pull` prints a note for as long as the old helper or
+   `server/utils/password-policy.test.ts` is still on disk; move that test's
+   cases to `test/unit/password-policy.test.ts`.
 5. Run the project's unit/Nuxt tests, typecheck and lint, then restart the dev
    server so its auto-import index reflects the moved file.
 

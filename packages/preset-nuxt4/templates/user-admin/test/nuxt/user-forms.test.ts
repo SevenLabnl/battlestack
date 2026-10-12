@@ -3,7 +3,7 @@ import type { NuxtApp } from '#app'
 import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
 import { DOMWrapper, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
-import { readBody, setResponseStatus } from 'h3'
+import { createError, readBody, setResponseStatus } from 'h3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { unref } from 'vue'
 import EditUser from '~/pages/dashboard/users/[id].vue'
@@ -32,6 +32,7 @@ let deletes = 0
 let createFailure = ''
 let saveFailure = ''
 let deleteFailure = ''
+let savePolicyFailure = false
 
 // In-process test endpoints exercise real ofetch responses, without a DB or dev server.
 registerEndpoint('/api/users', {
@@ -54,6 +55,13 @@ registerEndpoint('/api/users/fixture-user', {
     method: 'PUT',
     handler: async (event) => {
         updates.push(await readBody<Record<string, unknown>>(event))
+        if (savePolicyFailure) {
+            throw createError({
+                statusCode: 400,
+                statusMessage: 'Password is too common',
+                data: { passwordPolicy: 'common' },
+            })
+        }
         if (saveFailure) {
             setResponseStatus(event, 400, 'Bad Request')
             return { statusCode: 400, statusMessage: saveFailure }
@@ -86,6 +94,7 @@ beforeEach(async () => {
     updates.length = 0
     deletes = 0
     createFailure = saveFailure = deleteFailure = ''
+    savePolicyFailure = false
     clearNuxtData()
     const previousLocale = unref(i18n.locale)
     restoreLocale = () => i18n.setLocale(previousLocale)
@@ -125,7 +134,7 @@ async function submit(form: Omit<DOMWrapper<Element>, 'exists'>) {
 }
 
 async function fieldError(form: Omit<DOMWrapper<Element>, 'exists'>, selector: string, message: string) {
-    expect(message).not.toMatch(/^userAdmin\./)
+    expect(message).not.toMatch(/^(userAdmin|auth)\./)
     const input = form.get(selector)
     // Assert the displayed error is connected to its input, not just somewhere on the page.
     await expect.poll(() => {
@@ -141,16 +150,16 @@ describe('user-admin form validation', () => {
         const form = await createForm()
         await form.get('input[type="email"]').setValue('not-an-email')
         await form.get('input[type="password"]').setValue('short')
-        const dutchEmailError = t('userAdmin.validation.emailInvalid')
+        const dutchEmailError = t('auth.signup.validation.email')
         await fieldError(form, 'input[type="email"]', dutchEmailError)
-        await fieldError(form, 'input[type="password"]', t('userAdmin.validation.passwordErrors.minLength', { min: 12 }))
+        await fieldError(form, 'input[type="password"]', t('auth.signup.validation.minLength', { min: 12 }))
         await submit(form)
         expect(creates).toHaveLength(0)
 
         // Changing locale on the same mounted form must also update schema error messages.
         await i18n.setLocale('en')
         await submit(form)
-        const englishEmailError = t('userAdmin.validation.emailInvalid')
+        const englishEmailError = t('auth.signup.validation.email')
         expect(englishEmailError).not.toBe(dutchEmailError)
         await fieldError(form, 'input[type="email"]', englishEmailError)
         expect(form.text()).not.toContain(dutchEmailError)
@@ -159,7 +168,7 @@ describe('user-admin form validation', () => {
         await form.get('input[type="email"]').setValue('created@example.com')
         await form.get('input[type="password"]').setValue('Password123!')
         await submit(form)
-        await fieldError(form, 'input[type="password"]', t('userAdmin.validation.passwordErrors.common'))
+        await fieldError(form, 'input[type="password"]', t('auth.signup.validation.common'))
         expect(creates).toHaveLength(0)
 
         await form.get('input[type="password"]').setValue('Mountain-Pine42!')
@@ -184,8 +193,8 @@ describe('user-admin form validation', () => {
         await form.get('input[type="email"]').setValue('bad address@example.com')
         await form.get('input[type="password"]').setValue('mountain-pine42!')
         await submit(form)
-        await fieldError(form, 'input[type="email"]', t('userAdmin.validation.emailInvalid'))
-        await fieldError(form, 'input[type="password"]', t('userAdmin.validation.passwordErrors.uppercase'))
+        await fieldError(form, 'input[type="email"]', t('auth.signup.validation.email'))
+        await fieldError(form, 'input[type="password"]', t('auth.signup.validation.uppercase'))
         expect(updates).toHaveLength(0)
 
         await form.get('input[type="email"]').setValue('corrected@example.com')
@@ -215,5 +224,46 @@ describe('user-admin form validation', () => {
         await expect.poll(() => deletes).toBe(1)
         await expect.poll(() => form.find('[role="alert"]').text()).toBe(deleteFailure)
         expect(form.get('[role="alert"]').text()).not.toContain('Forbidden')
+    }, 30_000)
+
+    it('blocks names longer than the API accepts', async () => {
+        const form = await createForm()
+        await form.get('input[type="email"]').setValue('long-name@example.com')
+        await form.get('input[type="password"]').setValue('Mountain-Pine42!')
+        const nameInput = form.findAll('input').find((input) => !input.attributes('type') || input.attributes('type') === 'text')
+        expect(nameInput).toBeDefined()
+        await nameInput!.setValue('x'.repeat(81))
+        await submit(form)
+        await expect.poll(() => form.text()).toContain(t('userAdmin.validation.nameTooLong', { max: 80 }))
+        expect(creates).toHaveLength(0)
+    }, 30_000)
+
+    it('translates an API password-policy rejection instead of showing its English statusMessage', async () => {
+        await i18n.setLocale('nl')
+        savePolicyFailure = true
+        const form = await editForm()
+        await submit(form)
+        await expect.poll(() => updates.length).toBe(1)
+        await expect.poll(() => form.find('[role="alert"]').text()).toBe(t('auth.signup.validation.common'))
+        expect(form.get('[role="alert"]').text()).not.toContain('Password is too common')
+    }, 30_000)
+
+    it('clears a previous create error when the dialog is reopened', async () => {
+        createFailure = 'Email already exists'
+        let form = await createForm()
+        await form.get('input[type="email"]').setValue('existing@example.com')
+        await form.get('input[type="password"]').setValue('Mountain-Pine42!')
+        await submit(form)
+        await expect.poll(() => form.find('[role="alert"]').text()).toBe(createFailure)
+
+        const cancel = form.findAll('button').find((button) => button.text() === t('userAdmin.create.cancel'))
+        expect(cancel).toBeDefined()
+        await cancel!.trigger('click')
+        await expect.poll(() => document.querySelector('[role="dialog"] form')).toBeNull()
+        const open = wrapper!.findAll('button').find((button) => button.text() === t('userAdmin.new'))
+        await open!.trigger('click')
+        await expect.poll(() => document.querySelector('[role="dialog"] form')).not.toBeNull()
+        form = new DOMWrapper(document.querySelector<HTMLFormElement>('[role="dialog"] form')!)
+        expect(form.find('[role="alert"]').exists()).toBe(false)
     }, 30_000)
 })

@@ -76,3 +76,28 @@ it('retires the pristine server policy during an auth/user-admin update and conv
     expect(report.skipped).toEqual([])
     expect(await hashFile(path.join(projectDir, SHARED_POLICY))).toBe(files[SHARED_POLICY])
 })
+
+it('notes an owned old policy and test left beside the shared policy', async () => {
+    const ctx = context()
+    const oldTest = path.join('server', 'utils', 'password-policy.test.ts')
+    await mkdir(path.dirname(path.join(projectDir, OLD_POLICY)), { recursive: true })
+    await writeFile(path.join(projectDir, OLD_POLICY), 'export const PASSWORD_MIN_LENGTH = 10\n')
+    await writeFile(path.join(projectDir, oldTest), "import './password-policy'\n")
+    const previous: InstalledFeatureRecord = {
+        id: 'nuxt4:nuxt4:auth',
+        version: '1.10.0',
+        files: {
+            [OLD_POLICY]: await hashFile(path.join(projectDir, OLD_POLICY)),
+            [oldTest]: await hashFile(path.join(projectDir, oldTest)),
+        },
+        ownedByUser: [OLD_POLICY, oldTest],
+    }
+    ctx.state['files:nuxt4:auth'] = { ...previous.files }
+
+    const report = await authFeature.update!(ctx, previous)
+    expect(await readFile(path.join(projectDir, OLD_POLICY), 'utf8')).toContain('10')
+    expect(report.notes).toEqual(expect.arrayContaining([
+        expect.stringContaining('server/utils/password-policy.ts still exists next to shared/utils/password-policy.ts'),
+        expect.stringContaining('server/utils/password-policy.test.ts still exists'),
+    ]))
+})

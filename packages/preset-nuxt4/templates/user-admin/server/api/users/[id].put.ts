@@ -37,7 +37,11 @@ export default defineEventHandler(async (event) => {
     if (body.password) {
         const policy = checkPasswordPolicy(body.password)
         if (!policy.valid) {
-            throw createError({ statusCode: 400, statusMessage: policy.error })
+            throw createError({
+                statusCode: 400,
+                statusMessage: policy.error,
+                data: { passwordPolicy: policy.code },
+            })
         }
     }
 

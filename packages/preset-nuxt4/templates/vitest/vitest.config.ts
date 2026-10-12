@@ -73,7 +73,7 @@ export default defineConfig({
             provider: 'v8',
             reporter: ['text', 'lcov', 'html'],
             reportsDirectory: 'coverage',
-            include: ['app/**/*.{ts,vue,js,mjs}', 'server/**/*.{ts,js,mjs}'],
+            include: ['app/**/*.{ts,vue,js,mjs}', 'server/**/*.{ts,js,mjs}', 'shared/**/*.{ts,js,mjs}'],
             exclude: [
                 '**/node_modules/**',
                 '.nuxt/**',

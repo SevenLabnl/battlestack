@@ -15,17 +15,7 @@
             "next": "Next"
         },
         "validation": {
-            "emailHelp": "Use an address such as name{'@'}example.com, without spaces.",
-            "emailInvalid": "Enter a valid email address without spaces",
-            "passwordHelp": "At least {min} characters, with a lowercase letter (a–z), an uppercase letter (A–Z), a digit (0–9) and another character (e.g. ! or a space). Avoid common passwords and number sequences, even within a longer password.",
-            "passwordErrors": {
-                "minLength": "At least {min} characters",
-                "lowercase": "Must contain a lowercase letter (a–z)",
-                "uppercase": "Must contain an uppercase letter (A–Z)",
-                "digit": "Must contain a digit (0–9)",
-                "symbol": "Must contain a character other than a–z, A–Z or 0–9 (e.g. ! or a space)",
-                "common": "Contains a common password or sequence; choose a less predictable password"
-            }
+            "nameTooLong": "At most {max} characters"
         },
         "create": {
             "title": "New user",

@@ -67,8 +67,11 @@ replacement is validated. An explicitly empty password sent directly to the API
 is still invalid.
 
 Browser validation is feedback, not authorization: the API continues validating
-direct requests, permissions, and duplicate addresses. Admin API failures display
-the response explanation instead of the generic ofetch error. Public signup
+direct requests, permissions, and duplicate addresses. The name field mirrors the
+API's 80-character limit. A password the API rejects is shown in the selected
+language, using the rule code the API returns as `data.passwordPolicy`. Other
+admin API failures display the response explanation instead of the generic
+ofetch error. Public signup
 retains its neutral response and does not disclose whether an account exists.
 Login, bootstrap seeding, and password reset keep their existing contracts.
 

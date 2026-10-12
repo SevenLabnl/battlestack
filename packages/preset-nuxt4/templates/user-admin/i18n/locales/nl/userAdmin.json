@@ -15,17 +15,7 @@
             "next": "Volgende"
         },
         "validation": {
-            "emailHelp": "Gebruik een adres zoals naam{'@'}voorbeeld.nl, zonder spaties.",
-            "emailInvalid": "Voer een geldig e-mailadres zonder spaties in",
-            "passwordHelp": "Minimaal {min} tekens, met een kleine letter (a–z), hoofdletter (A–Z), cijfer (0–9) en een ander teken (bijv. ! of een spatie). Vermijd veelgebruikte wachtwoorden en cijferreeksen, ook als onderdeel van een langer wachtwoord.",
-            "passwordErrors": {
-                "minLength": "Minimaal {min} tekens",
-                "lowercase": "Moet een kleine letter bevatten (a–z)",
-                "uppercase": "Moet een hoofdletter bevatten (A–Z)",
-                "digit": "Moet een cijfer bevatten (0–9)",
-                "symbol": "Moet een ander teken dan a–z, A–Z of 0–9 bevatten (bijv. ! of een spatie)",
-                "common": "Bevat een veelgebruikt wachtwoord of een reeks; kies een minder voorspelbaar wachtwoord"
-            }
+            "nameTooLong": "Maximaal {max} tekens"
         },
         "create": {
             "title": "Nieuwe gebruiker",

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import { z } from 'zod'
-import { checkPasswordPolicy, PASSWORD_MIN_LENGTH } from '#shared/utils/password-policy'
+import { PASSWORD_MIN_LENGTH } from '#shared/utils/password-policy'
 
 definePageMeta({ middleware: 'admin' })
+
+// Mirrors the `name` limit in the /api/users handlers.
+const NAME_MAX_LENGTH = 80
 
 interface UserRow {
     id: string
@@ -60,20 +63,15 @@ const newUser = reactive({ email: '', password: '', name: '', role: 'user' as 'a
 const createError = ref('')
 const createSchema = computed(() =>
     z.object({
-        email: z.email(t('userAdmin.validation.emailInvalid')),
-        password: z.string().superRefine((password, ctx) => {
-            const policy = checkPasswordPolicy(password)
-            if (!policy.valid) {
-                ctx.addIssue({
-                    code: 'custom',
-                    message: t(`userAdmin.validation.passwordErrors.${policy.code}`, {
-                        min: PASSWORD_MIN_LENGTH,
-                    }),
-                })
-            }
-        }),
+        email: z.email(t('auth.signup.validation.email')),
+        name: z.string().max(NAME_MAX_LENGTH, t('userAdmin.validation.nameTooLong', { max: NAME_MAX_LENGTH })),
+        password: passwordPolicySchema(t),
     }),
 )
+
+watch(showCreate, (open) => {
+    if (open) createError.value = ''
+})
 
 async function createUser() {
     createError.value = ''
@@ -84,7 +82,7 @@ async function createUser() {
         await refresh()
         toast.add({ title: t('userAdmin.create.successTitle'), color: 'success' })
     } catch (e) {
-        const msg = serverErrorMessage(e, t('userAdmin.create.failed'))
+        const msg = passwordPolicyServerMessage(e, t) ?? serverErrorMessage(e, t('userAdmin.create.failed'))
         createError.value = msg
         toast.add({ title: t('userAdmin.create.failedTitle'), description: msg, color: 'error' })
     }
@@ -169,7 +167,7 @@ async function createUser() {
                         <UFormField
                             :label="t('userAdmin.create.email')"
                             name="email"
-                            :help="t('userAdmin.validation.emailHelp')"
+                            :help="t('auth.signup.emailHint')"
                             eager-validation
                             required
                         >
@@ -181,13 +179,13 @@ async function createUser() {
                                 class="w-full"
                             />
                         </UFormField>
-                        <UFormField :label="t('userAdmin.create.name')">
+                        <UFormField :label="t('userAdmin.create.name')" name="name" eager-validation>
                             <UInput v-model="newUser.name" class="w-full" />
                         </UFormField>
                         <UFormField
                             :label="t('userAdmin.create.password')"
                             name="password"
-                            :help="t('userAdmin.validation.passwordHelp', { min: PASSWORD_MIN_LENGTH })"
+                            :help="t('auth.signup.passwordHint', { min: PASSWORD_MIN_LENGTH })"
                             eager-validation
                             required
                         >

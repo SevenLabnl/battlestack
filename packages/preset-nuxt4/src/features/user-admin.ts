@@ -33,7 +33,7 @@ export const userAdminFeature: Feature = {
                     '',
                     'A new user needs a password that passes `shared/utils/password-policy.ts`. An empty password on the edit form leaves the existing password unchanged; a nonempty replacement must pass the same policy. Direct API requests remain validated independently, and an explicitly empty API password is rejected.',
                     '',
-                    'Server failures use `serverErrorMessage` so the API response explanation is visible instead of a generic HTTP error. Permission checks and duplicate-email handling remain server-side. Form regressions run in the generated `test/nuxt/` project without a database or a running dev server.',
+                    'The name field mirrors the API limit of 80 characters. Password-policy rejections from the API carry `data.passwordPolicy` and are shown translated through `passwordPolicyServerMessage`; other server failures use `serverErrorMessage` so the API response explanation is visible instead of a generic HTTP error. Permission checks and duplicate-email handling remain server-side. Form regressions run in the generated `test/nuxt/` project without a database or a running dev server.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },
