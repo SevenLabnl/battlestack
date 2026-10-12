@@ -488,7 +488,7 @@ async function applyUpdateState(
     )
 }
 
-/** Deletes pristine files no longer shipped. User-modified ones stay, with a note.
+/** Deletes pristine files no longer shipped. User-owned or modified ones stay, with a note.
  *  A rel another enabled feature still tracks is only dropped from this feature's
  *  records — the file is that feature's to keep. */
 async function deleteObsoleteFiles(
@@ -496,6 +496,7 @@ async function deleteObsoleteFiles(
     featureId: string,
     prev: InstalledFeatureRecord | null,
     seen: Set<string>,
+    ownedSet: Set<string>,
     trackedElsewhere: Set<string>,
     report: UpdateReport,
 ): Promise<void> {
@@ -510,6 +511,12 @@ async function deleteObsoleteFiles(
         if (trackedElsewhere.has(toPosix(rel))) continue
         const dest = path.join(ctx.projectDir, rel)
         if (!(await exists(dest))) continue
+        if (ownedSet.has(rel)) {
+            report.notes.push(
+                `file no longer shipped but user-owned, left in place: ${rel}; review and remove manually if no longer needed`,
+            )
+            continue
+        }
         const currentHash = await hashFile(dest)
         if (currentHash === recordedHash) {
             await rm(dest, { force: true })
@@ -610,7 +617,7 @@ export async function updateFromTemplateDirs(
         }
     }
 
-    await deleteObsoleteFiles(ctx, featureId, prev, seen, trackedElsewhere, report)
+    await deleteObsoleteFiles(ctx, featureId, prev, seen, ownedSet, trackedElsewhere, report)
     return report
 }
 

@@ -347,39 +347,67 @@ describe('updateFromTemplateDir', () => {
         expect(onDisk).toBe('export const newone = 1\n')
     })
 
-    it('removes obsolete files when still pristine, keeps user-modified ones', async () => {
-        // The new version drops both tracked files: pristine.ts should be removed,
-        // modified.ts kept with a note.
+    it.each([
+        ['default', {}],
+        ['--force', { force: true }],
+        ['--overwrite', { overwrite: true }],
+    ])('retires obsolete tracking without deleting owned or modified files (%s)', async (_label, flags) => {
+        const oldRel = path.join('server', 'utils', 'policy.ts')
+        const newRel = path.join('shared', 'utils', 'policy.ts')
+        const ownedContent = 'export const policy = 1\n'
+        const newContent = 'export const policy = 2\n'
         const pristineContent = 'pristine\n'
         const userContent = 'user-edited\n'
-        const { createHash } = await import('node:crypto')
-        const pristineHash = createHash('sha256').update(pristineContent).digest('hex')
-        const userOriginalHash = createHash('sha256').update('user-original\n').digest('hex')
 
+        await mkdir(path.dirname(path.join(projectDir, oldRel)), { recursive: true })
+        await mkdir(path.dirname(path.join(templateDir, newRel)), { recursive: true })
+        await writeFile(path.join(projectDir, oldRel), ownedContent)
+        await writeFile(path.join(templateDir, newRel), newContent)
         await writeFile(path.join(projectDir, 'pristine.ts'), pristineContent)
         await writeFile(path.join(projectDir, 'modified.ts'), userContent)
 
         const ctx = makeCtx()
+        Object.assign(ctx.state, flags)
         const prev: InstalledFeatureRecord = {
             id: 'test:tpl-update-drop',
             version: '0.1.0',
             files: {
-                'pristine.ts': pristineHash,
-                'modified.ts': userOriginalHash,
+                [oldRel]: sha256Of(ownedContent),
+                'pristine.ts': sha256Of(pristineContent),
+                'modified.ts': sha256Of('user-original\n'),
             },
+            ownedByUser: [oldRel],
         }
 
-        const report = await updateFromTemplateDir(ctx, 'test:tpl-update-drop', templateDir, prev)
+        const report = await updateFromTemplateDir(ctx, prev.id, templateDir, prev)
 
-        // Pristine file removed
-        await expect(readFile(path.join(projectDir, 'pristine.ts'), 'utf8')).rejects.toThrow()
-        // Modified file preserved
-        const stillThere = await readFile(path.join(projectDir, 'modified.ts'), 'utf8')
-        expect(stillThere).toBe(userContent)
+        expect(await exists(path.join(projectDir, 'pristine.ts'))).toBe(false)
+        expect(await readFile(path.join(projectDir, 'modified.ts'), 'utf8')).toBe(userContent)
+        // Explicit ownership protects even bytes identical to the old shipped version.
+        expect(await readFile(path.join(projectDir, oldRel), 'utf8')).toBe(ownedContent)
+        expect(await readFile(path.join(projectDir, newRel), 'utf8')).toBe(newContent)
+        expect(report.written).toContain(newRel)
 
-        // Notes mention both
-        expect(report.notes.some((n) => n.includes('pristine.ts'))).toBe(true)
-        expect(report.notes.some((n) => n.includes('modified.ts'))).toBe(true)
+        const recorded = ctx.state[`files:${prev.id}`] as Record<string, string>
+        expect(recorded).toEqual({ [newRel]: sha256Of(newContent) })
+        expect(ctx.state[`owned:${prev.id}`]).toEqual([oldRel])
+
+        // A later update starts from the retired tracking, not the old manifest.
+        const nextPrev: InstalledFeatureRecord = {
+            ...prev,
+            version: '0.2.0',
+            files: { ...recorded },
+            ownedByUser: [...ctx.state[`owned:${prev.id}`] as string[]],
+        }
+        const nextCtx = makeCtx()
+        Object.assign(nextCtx.state, flags)
+        await updateFromTemplateDir(nextCtx, prev.id, templateDir, nextPrev)
+
+        expect(await readFile(path.join(projectDir, oldRel), 'utf8')).toBe(ownedContent)
+        expect(await readFile(path.join(projectDir, 'modified.ts'), 'utf8')).toBe(userContent)
+        expect(await readFile(path.join(projectDir, newRel), 'utf8')).toBe(newContent)
+        expect(nextCtx.state[`files:${prev.id}`]).toEqual({ [newRel]: sha256Of(newContent) })
+        expect(nextCtx.state[`owned:${prev.id}`]).toEqual([oldRel])
     })
 })
 
