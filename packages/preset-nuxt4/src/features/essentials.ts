@@ -16,7 +16,7 @@ const ICON_FILES = [
 /** Always-on Nuxt essentials: `@nuxt/eslint`, `@nuxt/fonts`, `@nuxt/image`, datepicker, `@iconify/vue`. */
 export const essentialsFeature: Feature = {
     id: 'nuxt4:essentials',
-    version: '1.2.0',
+    version: '1.2.1',
     label: 'Nuxt essentials (eslint, fonts, image, iconify, datepicker, nodemailer)',
     frameworks: ['nuxt4'],
     stage: STAGE.BASE_CONFIG,
@@ -29,7 +29,7 @@ export const essentialsFeature: Feature = {
         return {
             prod: ['@vuepic/vue-datepicker', '@iconify/vue', 'h3@^1'],
             // `@iconify-json/lucide` is a local icon bundle. eslint/typescript/vue-tsc are explicit.
-            dev: ['@iconify-json/lucide', 'eslint', 'typescript', 'vue-tsc'],
+            dev: ['@iconify-json/lucide', 'eslint', 'typescript@^6', 'vue-tsc'],
         }
     },
 
