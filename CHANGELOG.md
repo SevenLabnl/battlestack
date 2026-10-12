@@ -13,6 +13,9 @@
 - Warn on `pull` when an old `server/utils/password-policy.ts` or its test stays
   beside the shared policy.
 - Include `shared/**` in generated Vitest coverage.
+- Pin generated projects to TypeScript 6: `vue-tsc` and typescript-eslint do not
+  support TypeScript 7 yet. A feature's explicit dependency range now also wins
+  over a peer pin that `nuxi module add` wrote into the other bucket.
 
 ## v1.3.0 (2026-09-24)
 
