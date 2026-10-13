@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '#server/database/client'
 import { users, Role } from '#server/database/schema/users'
@@ -54,12 +54,21 @@ export default defineEventHandler(async (event) => {
     const [existing] = await db.select().from(users).where(eq(users.id, id)).limit(1)
     if (!existing) throw createError({ statusCode: 404, statusMessage: 'User not found' })
 
-    const [updated] = await db.update(users).set(patch).where(eq(users.id, id)).returning({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        role: users.role,
-        createdAt: users.createdAt,
+    const credentialsChanged = !!body.password || (body.email !== undefined && body.email !== existing.email)
+    const updated = await db.transaction(async (tx) => {
+        const [row] = await tx.update(users).set(patch).where(eq(users.id, id)).returning({
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            role: users.role,
+            createdAt: users.createdAt,
+        })
+        // A reset link already mailed (possibly to the old address) must not outlive the change. Raw SQL: the
+        // table's schema module only exists when nuxt4:auth-recovery is installed.
+        if (row && credentialsChanged && useRuntimeConfig().public.authRecovery === true) {
+            await tx.execute(sql`DELETE FROM password_reset_tokens WHERE user_id = ${id}`)
+        }
+        return row
     })
 
     if (!updated) throw createError({ statusCode: 500, statusMessage: 'Update failed' })
