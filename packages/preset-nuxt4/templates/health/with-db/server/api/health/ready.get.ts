@@ -49,12 +49,14 @@ export default defineEventHandler(async (event: H3Event) => {
             }),
         ])
     } catch (err) {
+        // Public route: the driver's message can name the database host, so it only goes to the log.
+        console.error('[health/ready] db check failed:', err)
         setResponseStatus(event, 503)
         return {
             status: 'degraded' as const,
             env: { ok: true },
             boot: { ok: true },
-            db: { ok: false, error: err instanceof Error ? err.message : 'db check failed' },
+            db: { ok: false, error: 'db check failed' },
         }
     } finally {
         clearTimeout(timer)
