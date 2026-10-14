@@ -16,7 +16,7 @@ const SUPPORTED: AiTool[] = ['claude-code', 'gemini-cli', 'cursor', 'codex']
 /** AI coding tool rules + MCP server scaffolding. Selection via `state.aiTool` (default: `claude-code`). */
 export const aiToolConfigFeature: Feature = {
     id: 'shared:ai-tool-config',
-    version: '1.1.9',
+    version: '1.1.10',
     label: 'AI coding tool config',
     stage: STAGE.AI_TOOL_CONFIG,
 
@@ -117,7 +117,8 @@ async function emitMcpJson(ctx: RunContext): Promise<void> {
     if (isFeatureEnabled(ctx, 'shared:playwright')) {
         mcpServers.playwright = {
             command: 'npx',
-            args: ['-y', '@playwright/mcp@latest'],
+            // The default `chrome` channel needs a system Chrome, which linux-arm64 and WSL lack.
+            args: ['-y', '@playwright/mcp@latest', '--browser', 'chromium'],
             env: {
                 PLAYWRIGHT_TEST_EMAIL: '${PLAYWRIGHT_TEST_EMAIL}',
                 PLAYWRIGHT_TEST_PASSWORD: '${PLAYWRIGHT_TEST_PASSWORD}',

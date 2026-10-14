@@ -23,6 +23,8 @@
   the raw templates with that config.
 - `battlestack <command> --help` prints that command's usage, and `--help`
   inside a project lists the core commands (`pull`, `own`, `doctor`, …).
+- Start the Playwright MCP server with the bundled Chromium (`--browser chromium`)
+  instead of a system Chrome, which linux-arm64 and WSL lack.
 
 ## v1.3.0 (2026-09-24)
 

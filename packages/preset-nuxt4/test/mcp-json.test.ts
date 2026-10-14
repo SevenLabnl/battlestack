@@ -88,7 +88,7 @@ describe('.mcp.json server gating', () => {
 
         const servers = await mcpServers()
         expect(Object.keys(servers)).toContain('playwright')
-        expect(servers.playwright).toMatchObject({ args: ['-y', '@playwright/mcp@latest'] })
+        expect(servers.playwright).toMatchObject({ args: ['-y', '@playwright/mcp@latest', '--browser', 'chromium'] })
     })
 
     it('omits the Playwright MCP server when shared:playwright is not enabled', async () => {
