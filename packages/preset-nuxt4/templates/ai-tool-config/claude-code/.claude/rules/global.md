@@ -1,11 +1,5 @@
----
-description:
-globs:
-alwaysApply: true
----
 ## Project Conventions
 
-- Always consult the [CLAUDE.md](mdc:CLAUDE.md) file at the root of the project for stack overview and conventions
 - Default package manager is **pnpm**. `bun`, `npm`, `yarn` also work; match the project's `packageManager` field. Use `pnpm add`, `pnpm dlx`, `pnpm run`.
 - Always run `pnpm run lint` and `pnpm test` before considering work complete.
 

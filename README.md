@@ -294,11 +294,12 @@ on: Nuxt UI when `nuxt-ui` is enabled, Mastra when Mastra is, Playwright when
 Playwright is.
 
 The rule files in `.claude/rules/` are different: every project gets the same
-set. Each rule declares a glob in its frontmatter, and your agent loads it only
-while editing matching files. `drizzle.mdc` covers `server/database/**/*.ts` and
-`drizzle.config.ts`; `vue.mdc` covers `*.vue`. So a project without a database
-still has `drizzle.mdc` and `postgres.mdc`, but they never load because no
-files match.
+set. Each rule lists globs under `paths:` in its frontmatter, and Claude Code
+loads it only once it reads a matching file. `drizzle.md` covers
+`server/database/**` and `drizzle.config.ts`; `vue.md` covers `**/*.vue`. So a
+project without a database still has `drizzle.md` and `postgres.md`, but they
+never load because no files match. Workflow skills (brainstorming, planning,
+debugging) live in `.claude/skills/` and load on demand.
 
 ## Deployment
 
