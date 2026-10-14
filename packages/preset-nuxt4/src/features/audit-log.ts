@@ -6,7 +6,7 @@ import { STAGE } from '@battlestack/core'
 /** Append-only audit trail. Best-effort on insert. */
 export const auditLogFeature: Feature = {
     id: 'nuxt4:audit-log',
-    version: '1.0.1',
+    version: '1.0.2',
     label: 'Audit log (security events)',
     description: 'Append-only trail of login, signup, role changes, and passkey events.',
     frameworks: ['nuxt4'],

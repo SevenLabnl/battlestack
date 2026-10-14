@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { users } from './users'
 
 export const sessions = pgTable('sessions', {
@@ -11,6 +11,8 @@ export const sessions = pgTable('sessions', {
     expiresAt: timestamp('expires_at').notNull(),
     lastSeenAt: timestamp('last_seen_at').notNull().defaultNow(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
-})
+}, (t) => [
+    index('sessions_user_id_idx').on(t.userId),
+])
 
 export type Session = typeof sessions.$inferSelect

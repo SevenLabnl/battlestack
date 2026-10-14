@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { users } from './users'
 
 export const files = pgTable('files', {
@@ -10,4 +10,6 @@ export const files = pgTable('files', {
     mime: text('mime'),
     etag: text('etag'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+}, (t) => [
+    index('files_user_id_idx').on(t.userId),
+])

@@ -16,6 +16,11 @@
 - Pin generated projects to TypeScript 6: `vue-tsc` and typescript-eslint do not
   support TypeScript 7 yet. A feature's explicit dependency range now also wins
   over a peer pin that `nuxi module add` wrote into the other bucket.
+- Index every `user_id` foreign key in the scaffold's schema (sessions, files,
+  audit events, backup codes, passkeys, reset and verification tokens, OAuth
+  accounts), so deleting a user no longer scans each of those tables. Existing
+  projects get the schema change on `battlestack pull`; run
+  `battlestack db:generate` afterwards and commit the new migration.
 
 ## v1.3.0 (2026-09-24)
 
