@@ -21,6 +21,8 @@
 - Format the template files with the generated project's own ESLint config, so
   `pull` no longer turns style differences into merge conflicts. CI now lints
   the raw templates with that config.
+- `battlestack <command> --help` prints that command's usage, and `--help`
+  inside a project lists the core commands (`pull`, `own`, `doctor`, …).
 
 ## v1.3.0 (2026-09-24)
 

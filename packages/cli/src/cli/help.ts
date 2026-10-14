@@ -17,6 +17,22 @@ export async function printHelp(
     }
 }
 
+/** `battlestack <command> --help` for a reserved command. False when `name` is not one. */
+export function printCommandHelp(name: string | undefined): boolean {
+    const cmd = RESERVED_COMMANDS.find((c) => c.name === name)
+    if (!cmd) return false
+    ui.plain(pc.bold('Usage'))
+    ui.dim(`  ${cmd.usage}`)
+    ui.blank()
+    ui.plain(`  ${cmd.label}`)
+    if (cmd.helpExtra) {
+        ui.blank()
+        ui.kv(cmd.helpExtra, '  ')
+    }
+    ui.blank()
+    return true
+}
+
 /**
  * Plugin-contributed commands, one block per owning plugin. Scaffold-only ids
  * are excluded, plus anything in `claimed` that would lose dispatch anyway.

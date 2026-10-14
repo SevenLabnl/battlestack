@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BattlestackRegistries } from '@battlestack/core'
-import { printHelp } from '../src/cli/help.js'
+import { printCommandHelp, printHelp } from '../src/cli/help.js'
 
 afterEach(() => {
     vi.restoreAllMocks()
@@ -49,5 +49,15 @@ describe('printHelp', () => {
 
     it('defaults to scaffold mode', async () => {
         expect(await capture()).toContain('--template')
+    })
+
+    it('prints a reserved command\'s own usage for `<command> --help`', () => {
+        const lines: string[] = []
+        vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+            lines.push(args.join(' '))
+        })
+        expect(printCommandHelp('own')).toBe(true)
+        expect(lines.join('\n')).toContain('battlestack own <path...>')
+        expect(printCommandHelp('my-app')).toBe(false)
     })
 })
