@@ -18,6 +18,9 @@
   over a peer pin that `nuxi module add` wrote into the other bucket.
 - Install the lefthook git hooks: generated projects get a
   `prepare: lefthook install || exit 0` script, and `pull` runs it once.
+- Format the template files with the generated project's own ESLint config, so
+  `pull` no longer turns style differences into merge conflicts. CI now lints
+  the raw templates with that config.
 
 ## v1.3.0 (2026-09-24)
 

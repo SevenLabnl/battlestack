@@ -93,10 +93,17 @@ async function createUser() {
     <UCard>
         <template #header>
             <div class="flex items-center justify-between">
-                <h1 class="text-lg font-medium">{{ t('userAdmin.title') }}</h1>
-                <UButton icon="i-lucide-plus" @click="showCreate = true">{{
-                    t('userAdmin.new')
-                }}</UButton>
+                <h1 class="text-lg font-medium">
+                    {{ t('userAdmin.title') }}
+                </h1>
+                <UButton
+                    icon="i-lucide-plus"
+                    @click="showCreate = true"
+                >
+                    {{
+                        t('userAdmin.new')
+                    }}
+                </UButton>
             </div>
         </template>
 
@@ -111,7 +118,11 @@ async function createUser() {
             class="mb-4"
         />
 
-        <UTable :data="data?.rows ?? []" :columns="columns" :loading="status === 'pending'">
+        <UTable
+            :data="data?.rows ?? []"
+            :columns="columns"
+            :loading="status === 'pending'"
+        >
             <template #email-cell="{ row }">
                 <NuxtLink
                     :to="`/dashboard/users/${row.original.id}`"
@@ -144,19 +155,33 @@ async function createUser() {
                 }}
             </span>
             <div class="flex gap-2">
-                <UButton :disabled="page === 0" variant="ghost" @click="page--">{{
-                    t('userAdmin.pagination.previous')
-                }}</UButton>
-                <UButton :disabled="page >= pageCount - 1" variant="ghost" @click="page++">{{
-                    t('userAdmin.pagination.next')
-                }}</UButton>
+                <UButton
+                    :disabled="page === 0"
+                    variant="ghost"
+                    @click="page--"
+                >
+                    {{
+                        t('userAdmin.pagination.previous')
+                    }}
+                </UButton>
+                <UButton
+                    :disabled="page >= pageCount - 1"
+                    variant="ghost"
+                    @click="page++"
+                >
+                    {{
+                        t('userAdmin.pagination.next')
+                    }}
+                </UButton>
             </div>
         </div>
 
         <UModal v-model:open="showCreate">
             <template #content>
                 <UCard>
-                    <template #header>{{ t('userAdmin.create.title') }}</template>
+                    <template #header>
+                        {{ t('userAdmin.create.title') }}
+                    </template>
                     <UForm
                         :state="newUser"
                         :schema="createSchema"
@@ -179,8 +204,15 @@ async function createUser() {
                                 class="w-full"
                             />
                         </UFormField>
-                        <UFormField :label="t('userAdmin.create.name')" name="name" eager-validation>
-                            <UInput v-model="newUser.name" class="w-full" />
+                        <UFormField
+                            :label="t('userAdmin.create.name')"
+                            name="name"
+                            eager-validation
+                        >
+                            <UInput
+                                v-model="newUser.name"
+                                class="w-full"
+                            />
                         </UFormField>
                         <UFormField
                             :label="t('userAdmin.create.password')"
@@ -198,18 +230,37 @@ async function createUser() {
                             />
                         </UFormField>
                         <UFormField :label="t('userAdmin.create.role')">
-                            <USelect v-model="newUser.role" :items="roleItems" />
+                            <USelect
+                                v-model="newUser.role"
+                                :items="roleItems"
+                            />
                         </UFormField>
-                        <p v-if="createError" role="alert" class="text-sm text-error">
+                        <p
+                            v-if="createError"
+                            role="alert"
+                            class="text-sm text-error"
+                        >
                             {{ createError }}
                         </p>
                         <div class="flex gap-2 justify-end">
-                            <UButton color="neutral" variant="ghost" @click="showCreate = false">{{
-                                t('userAdmin.create.cancel')
-                            }}</UButton>
-                            <UButton type="submit" color="primary" loading-auto>{{
-                                t('userAdmin.create.submit')
-                            }}</UButton>
+                            <UButton
+                                color="neutral"
+                                variant="ghost"
+                                @click="showCreate = false"
+                            >
+                                {{
+                                    t('userAdmin.create.cancel')
+                                }}
+                            </UButton>
+                            <UButton
+                                type="submit"
+                                color="primary"
+                                loading-auto
+                            >
+                                {{
+                                    t('userAdmin.create.submit')
+                                }}
+                            </UButton>
                         </div>
                     </UForm>
                 </UCard>

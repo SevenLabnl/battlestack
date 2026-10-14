@@ -9,13 +9,13 @@ import postgres from 'postgres'
 const SEED_ADVISORY_LOCK_KEY = 6_154_321_001_001_002
 
 if (
-    process.env.NODE_ENV === 'production' &&
-    process.env.SEED_ALLOW_PRODUCTION !== 'true' &&
-    process.env.SEED_FORCE !== 'true'
+    process.env.NODE_ENV === 'production'
+    && process.env.SEED_ALLOW_PRODUCTION !== 'true'
+    && process.env.SEED_FORCE !== 'true'
 ) {
     console.error(
-        '[seed] refusing to run with NODE_ENV=production. ' +
-            'Set SEED_ALLOW_PRODUCTION=true to override.',
+        '[seed] refusing to run with NODE_ENV=production. '
+        + 'Set SEED_ALLOW_PRODUCTION=true to override.',
     )
     process.exit(1)
 }

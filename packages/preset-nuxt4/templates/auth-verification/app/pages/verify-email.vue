@@ -1,10 +1,15 @@
 <template>
     <UCard>
         <template #header>
-            <h1 class="text-xl font-semibold">{{ t('authVerification.verify.title') }}</h1>
+            <h1 class="text-xl font-semibold">
+                {{ t('authVerification.verify.title') }}
+            </h1>
         </template>
 
-        <p v-if="status === 'pending'" class="text-sm text-muted">
+        <p
+            v-if="status === 'pending'"
+            class="text-sm text-muted"
+        >
             {{ t('authVerification.verify.pending') }}
         </p>
         <UAlert

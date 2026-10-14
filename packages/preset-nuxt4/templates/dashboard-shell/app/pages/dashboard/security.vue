@@ -1,8 +1,12 @@
 <template>
     <div class="space-y-6">
         <div>
-            <h1 class="text-2xl font-bold">{{ t('dashboard.security.title') }}</h1>
-            <p class="mt-1 text-sm text-muted">{{ t('dashboard.security.subtitle') }}</p>
+            <h1 class="text-2xl font-bold">
+                {{ t('dashboard.security.title') }}
+            </h1>
+            <p class="mt-1 text-sm text-muted">
+                {{ t('dashboard.security.subtitle') }}
+            </p>
         </div>
 
         <!-- Each card is session-dependent data fetched in onMounted(), so SSR renders the empty state while client
@@ -24,13 +28,20 @@
                                 {{ t('dashboard.security.passkeys.description') }}
                             </p>
                         </div>
-                        <UButton icon="i-lucide-key" size="sm" @click="onAddPasskey">
+                        <UButton
+                            icon="i-lucide-key"
+                            size="sm"
+                            @click="onAddPasskey"
+                        >
                             {{ t('dashboard.security.passkeys.add') }}
                         </UButton>
                     </div>
                 </template>
 
-                <ul v-if="passkeys.length" class="divide-y divide-default -my-3">
+                <ul
+                    v-if="passkeys.length"
+                    class="divide-y divide-default -my-3"
+                >
                     <li
                         v-for="p in passkeys"
                         :key="p.id"
@@ -39,17 +50,17 @@
                         <div>
                             <p class="font-medium">
                                 {{
-                                    p.label ||
-                                    p.deviceType ||
-                                    t('dashboard.security.passkeys.labelFallback')
+                                    p.label
+                                        || p.deviceType
+                                        || t('dashboard.security.passkeys.labelFallback')
                                 }}
                             </p>
                             <p class="text-xs text-muted">
                                 {{
                                     p.lastUsedAt
                                         ? t('dashboard.security.passkeys.lastUsed', {
-                                              date: new Date(p.lastUsedAt).toLocaleDateString(),
-                                          })
+                                            date: new Date(p.lastUsedAt).toLocaleDateString(),
+                                        })
                                         : t('dashboard.security.passkeys.neverUsed')
                                 }}
                             </p>
@@ -64,7 +75,10 @@
                         />
                     </li>
                 </ul>
-                <p v-else class="text-sm text-muted">
+                <p
+                    v-else
+                    class="text-sm text-muted"
+                >
                     {{ t('dashboard.security.passkeys.empty') }}
                 </p>
             </UCard>
@@ -79,10 +93,16 @@
                     </p>
                 </template>
 
-                <p v-if="!activeSessions.length" class="text-sm text-muted">
+                <p
+                    v-if="!activeSessions.length"
+                    class="text-sm text-muted"
+                >
                     {{ t('dashboard.security.sessions.empty') }}
                 </p>
-                <ul v-else class="divide-y divide-default -my-3">
+                <ul
+                    v-else
+                    class="divide-y divide-default -my-3"
+                >
                     <li
                         v-for="s in activeSessions"
                         :key="s.id"
@@ -104,7 +124,10 @@
                                         date: new Date(s.lastSeenAt).toLocaleString(),
                                     })
                                 }}
-                                <span v-if="s.ip" class="ml-2 font-mono">{{ s.ip }}</span>
+                                <span
+                                    v-if="s.ip"
+                                    class="ml-2 font-mono"
+                                >{{ s.ip }}</span>
                             </p>
                         </div>
                         <UButton
@@ -131,13 +154,21 @@
                 </template>
 
                 <div v-if="!totpStatus.enabled && !setup.otpauthUrl">
-                    <UButton icon="i-lucide-shield-check" @click="startTotp">
+                    <UButton
+                        icon="i-lucide-shield-check"
+                        @click="startTotp"
+                    >
                         {{ t('dashboard.security.twoFactor.enable') }}
                     </UButton>
                 </div>
 
-                <div v-else-if="setup.otpauthUrl" class="space-y-3">
-                    <p class="text-sm">{{ t('dashboard.security.twoFactor.setupHint') }}</p>
+                <div
+                    v-else-if="setup.otpauthUrl"
+                    class="space-y-3"
+                >
+                    <p class="text-sm">
+                        {{ t('dashboard.security.twoFactor.setupHint') }}
+                    </p>
                     <img
                         v-if="qrDataUrl"
                         :src="qrDataUrl"
@@ -163,12 +194,17 @@
                             class="w-full max-w-xs font-mono"
                         />
                     </UFormField>
-                    <UButton @click="verifyTotp">{{
-                        t('dashboard.security.twoFactor.verify')
-                    }}</UButton>
+                    <UButton @click="verifyTotp">
+                        {{
+                            t('dashboard.security.twoFactor.verify')
+                        }}
+                    </UButton>
                 </div>
 
-                <div v-else-if="totpStatus.enabled" class="space-y-3">
+                <div
+                    v-else-if="totpStatus.enabled"
+                    class="space-y-3"
+                >
                     <UAlert
                         color="success"
                         :title="t('dashboard.security.twoFactor.enabled')"
@@ -183,7 +219,11 @@
                             class="w-full max-w-xs font-mono"
                         />
                     </UFormField>
-                    <UButton color="error" variant="soft" @click="disableTotp">
+                    <UButton
+                        color="error"
+                        variant="soft"
+                        @click="disableTotp"
+                    >
                         {{ t('dashboard.security.twoFactor.disable') }}
                     </UButton>
                 </div>
@@ -199,7 +239,10 @@
                     </p>
                 </template>
 
-                <div v-if="!revealedCodes.length" class="space-y-3">
+                <div
+                    v-if="!revealedCodes.length"
+                    class="space-y-3"
+                >
                     <p class="text-sm">
                         <span v-if="backupCodes.unused > 0">
                             {{
@@ -207,11 +250,17 @@
                                     count: backupCodes.unused,
                                 })
                             }}
-                            <span v-if="backupCodes.unused < 3" class="text-error">
+                            <span
+                                v-if="backupCodes.unused < 3"
+                                class="text-error"
+                            >
                                 {{ t('dashboard.security.backupCodes.runningLow') }}
                             </span>
                         </span>
-                        <span v-else class="text-muted">{{
+                        <span
+                            v-else
+                            class="text-muted"
+                        >{{
                             t('dashboard.security.backupCodes.none')
                         }}</span>
                     </p>
@@ -228,7 +277,10 @@
                     </UButton>
                 </div>
 
-                <div v-else class="space-y-3">
+                <div
+                    v-else
+                    class="space-y-3"
+                >
                     <UAlert
                         color="warning"
                         :title="t('dashboard.security.backupCodes.saveTitle')"
@@ -238,9 +290,17 @@
                     <ul
                         class="grid grid-cols-1 gap-2 rounded border border-default bg-elevated p-3 font-mono text-sm sm:grid-cols-2"
                     >
-                        <li v-for="c in revealedCodes" :key="c">{{ c }}</li>
+                        <li
+                            v-for="c in revealedCodes"
+                            :key="c"
+                        >
+                            {{ c }}
+                        </li>
                     </ul>
-                    <UButton variant="soft" @click="revealedCodes = []">
+                    <UButton
+                        variant="soft"
+                        @click="revealedCodes = []"
+                    >
                         {{ t('dashboard.security.backupCodes.saved') }}
                     </UButton>
                 </div>
@@ -256,10 +316,16 @@
                     </p>
                 </template>
 
-                <p v-if="!auditEvents.length" class="text-sm text-muted">
+                <p
+                    v-if="!auditEvents.length"
+                    class="text-sm text-muted"
+                >
                     {{ t('dashboard.security.auditLog.empty') }}
                 </p>
-                <ul v-else class="divide-y divide-default -my-3">
+                <ul
+                    v-else
+                    class="divide-y divide-default -my-3"
+                >
                     <li
                         v-for="ev in auditEvents"
                         :key="ev.id"
@@ -268,13 +334,19 @@
                         <div class="min-w-0 flex-1">
                             <p class="text-sm font-medium">
                                 {{ actionLabel(ev.action) }}
-                                <span v-if="metaSubject(ev)" class="ml-1 font-normal text-muted">
+                                <span
+                                    v-if="metaSubject(ev)"
+                                    class="ml-1 font-normal text-muted"
+                                >
                                     : {{ metaSubject(ev) }}
                                 </span>
                             </p>
                             <p class="text-xs text-muted">
                                 {{ new Date(ev.createdAt).toLocaleString() }}
-                                <span v-if="ev.ip" class="ml-2 font-mono">{{ ev.ip }}</span>
+                                <span
+                                    v-if="ev.ip"
+                                    class="ml-2 font-mono"
+                                >{{ ev.ip }}</span>
                             </p>
                         </div>
                     </li>
@@ -282,10 +354,20 @@
             </UCard>
 
             <UCard v-if="!passkeysAvailable && !totpAvailable && !auditAvailable">
-                <i18n-t keypath="dashboard.security.empty" tag="p" class="text-sm text-muted">
-                    <template #extras><code>nuxt:auth-passkeys</code></template>
-                    <template #twoFactor><code>nuxt:auth-2fa</code></template>
-                    <template #addCommand><code>battlestack add &lt;feature&gt;</code></template>
+                <i18n-t
+                    keypath="dashboard.security.empty"
+                    tag="p"
+                    class="text-sm text-muted"
+                >
+                    <template #extras>
+                        <code>nuxt:auth-passkeys</code>
+                    </template>
+                    <template #twoFactor>
+                        <code>nuxt:auth-2fa</code>
+                    </template>
+                    <template #addCommand>
+                        <code>battlestack add &lt;feature&gt;</code>
+                    </template>
                 </i18n-t>
             </UCard>
         </ClientOnly>
@@ -337,11 +419,11 @@ const passkeysAvailable = ref(false)
 const passkeys = ref<Passkey[]>([])
 
 const totpAvailable = ref(false)
-const totpStatus = ref<{ enabled: boolean; enabledAt: string | null }>({
+const totpStatus = ref<{ enabled: boolean, enabledAt: string | null }>({
     enabled: false,
     enabledAt: null,
 })
-const setup = reactive<{ otpauthUrl: string | null; code: string }>({
+const setup = reactive<{ otpauthUrl: string | null, code: string }>({
     otpauthUrl: null,
     code: '',
 })
@@ -378,25 +460,25 @@ function describeSession(ua: string | null): string {
     const platform = /iPhone/.test(ua)
         ? 'iPhone'
         : /iPad/.test(ua)
-          ? 'iPad'
-          : /Android/.test(ua)
-            ? 'Android'
-            : /Mac/.test(ua)
-              ? 'Mac'
-              : /Windows/.test(ua)
-                ? 'Windows'
-                : /Linux/.test(ua)
-                  ? 'Linux'
-                  : 'Device'
+            ? 'iPad'
+            : /Android/.test(ua)
+                ? 'Android'
+                : /Mac/.test(ua)
+                    ? 'Mac'
+                    : /Windows/.test(ua)
+                        ? 'Windows'
+                        : /Linux/.test(ua)
+                            ? 'Linux'
+                            : 'Device'
     const browser = /Edg\//.test(ua)
         ? 'Edge'
         : /Chrome\//.test(ua)
-          ? 'Chrome'
-          : /Firefox\//.test(ua)
-            ? 'Firefox'
-            : /Safari\//.test(ua)
-              ? 'Safari'
-              : null
+            ? 'Chrome'
+            : /Firefox\//.test(ua)
+                ? 'Firefox'
+                : /Safari\//.test(ua)
+                    ? 'Safari'
+                    : null
     return browser ? `${platform} · ${browser}` : platform
 }
 
@@ -472,25 +554,25 @@ function defaultPasskeyLabel(): string {
     const platform = /iPhone/.test(ua)
         ? 'iPhone'
         : /iPad/.test(ua)
-          ? 'iPad'
-          : /Android/.test(ua)
-            ? 'Android'
-            : /Mac/.test(ua)
-              ? 'Mac'
-              : /Windows/.test(ua)
-                ? 'Windows'
-                : /Linux/.test(ua)
-                  ? 'Linux'
-                  : 'Device'
+            ? 'iPad'
+            : /Android/.test(ua)
+                ? 'Android'
+                : /Mac/.test(ua)
+                    ? 'Mac'
+                    : /Windows/.test(ua)
+                        ? 'Windows'
+                        : /Linux/.test(ua)
+                            ? 'Linux'
+                            : 'Device'
     const browser = /Edg\//.test(ua)
         ? 'Edge'
         : /Chrome\//.test(ua)
-          ? 'Chrome'
-          : /Firefox\//.test(ua)
-            ? 'Firefox'
-            : /Safari\//.test(ua)
-              ? 'Safari'
-              : null
+            ? 'Chrome'
+            : /Firefox\//.test(ua)
+                ? 'Firefox'
+                : /Safari\//.test(ua)
+                    ? 'Safari'
+                    : null
     return browser ? `${platform} · ${browser}` : platform
 }
 

@@ -1,14 +1,21 @@
 <template>
     <div class="flex h-full flex-col gap-4">
         <div class="flex-1 space-y-3 overflow-y-auto">
-            <template v-for="m in messages" :key="m.id">
+            <template
+                v-for="m in messages"
+                :key="m.id"
+            >
                 <div
                     v-if="m.content || m.role === 'user'"
                     class="rounded-md p-3"
                     :class="m.role === 'user' ? 'bg-primary-50' : 'bg-muted'"
                 >
-                    <div class="text-xs uppercase tracking-wide text-muted">{{ m.role }}</div>
-                    <div class="whitespace-pre-wrap">{{ m.content }}</div>
+                    <div class="text-xs uppercase tracking-wide text-muted">
+                        {{ m.role }}
+                    </div>
+                    <div class="whitespace-pre-wrap">
+                        {{ m.content }}
+                    </div>
                 </div>
             </template>
 
@@ -33,7 +40,10 @@
             icon="i-lucide-triangle-alert"
         />
 
-        <form class="flex gap-2" @submit.prevent="onSubmit">
+        <form
+            class="flex gap-2"
+            @submit.prevent="onSubmit"
+        >
             <UInput
                 ref="inputRef"
                 v-model="input"

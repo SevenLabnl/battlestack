@@ -1,25 +1,48 @@
 <template>
     <div class="space-y-6">
         <div>
-            <h1 class="text-2xl font-bold tracking-tight">{{ t('rag.title') }}</h1>
-            <p class="mt-1 text-muted">{{ t('rag.subtitle') }}</p>
+            <h1 class="text-2xl font-bold tracking-tight">
+                {{ t('rag.title') }}
+            </h1>
+            <p class="mt-1 text-muted">
+                {{ t('rag.subtitle') }}
+            </p>
         </div>
 
         <UCard>
             <template #header>
-                <h2 class="font-semibold">{{ t('rag.ingest.heading') }}</h2>
+                <h2 class="font-semibold">
+                    {{ t('rag.ingest.heading') }}
+                </h2>
             </template>
             <div class="space-y-3">
                 <UFormField :label="t('rag.ingest.title')">
-                    <UInput v-model="ingest.title" class="w-full" />
+                    <UInput
+                        v-model="ingest.title"
+                        class="w-full"
+                    />
                 </UFormField>
-                <UFormField :label="t('rag.ingest.source')" :description="t('rag.ingest.sourceHint')">
-                    <UInput v-model="ingest.source" class="w-full" />
+                <UFormField
+                    :label="t('rag.ingest.source')"
+                    :description="t('rag.ingest.sourceHint')"
+                >
+                    <UInput
+                        v-model="ingest.source"
+                        class="w-full"
+                    />
                 </UFormField>
                 <UFormField :label="t('rag.ingest.text')">
-                    <UTextarea v-model="ingest.text" :rows="6" class="w-full" />
+                    <UTextarea
+                        v-model="ingest.text"
+                        :rows="6"
+                        class="w-full"
+                    />
                 </UFormField>
-                <UButton :loading="ingesting" :disabled="!canIngest" @click="onIngest">
+                <UButton
+                    :loading="ingesting"
+                    :disabled="!canIngest"
+                    @click="onIngest"
+                >
                     {{ t('rag.ingest.submit') }}
                 </UButton>
             </div>
@@ -27,7 +50,9 @@
 
         <UCard>
             <template #header>
-                <h2 class="font-semibold">{{ t('rag.query.heading') }}</h2>
+                <h2 class="font-semibold">
+                    {{ t('rag.query.heading') }}
+                </h2>
             </template>
             <div class="space-y-3">
                 <div class="flex gap-2">
@@ -37,12 +62,19 @@
                         :placeholder="t('rag.query.placeholder')"
                         @keydown.enter="onQuery"
                     />
-                    <UButton :loading="querying" :disabled="!query.trim()" @click="onQuery">
+                    <UButton
+                        :loading="querying"
+                        :disabled="!query.trim()"
+                        @click="onQuery"
+                    >
                         {{ t('rag.query.submit') }}
                     </UButton>
                 </div>
 
-                <div v-if="results.length" class="space-y-2">
+                <div
+                    v-if="results.length"
+                    class="space-y-2"
+                >
                     <div
                         v-for="(r, i) in results"
                         :key="i"
@@ -52,10 +84,17 @@
                             <span class="truncate">{{ resultLabel(r) }}</span>
                             <span class="font-mono shrink-0">{{ r.score.toFixed(3) }}</span>
                         </div>
-                        <p class="mt-1 text-sm whitespace-pre-wrap">{{ resultText(r) }}</p>
+                        <p class="mt-1 text-sm whitespace-pre-wrap">
+                            {{ resultText(r) }}
+                        </p>
                     </div>
                 </div>
-                <p v-else-if="queried" class="text-sm text-muted">{{ t('rag.query.empty') }}</p>
+                <p
+                    v-else-if="queried"
+                    class="text-sm text-muted"
+                >
+                    {{ t('rag.query.empty') }}
+                </p>
             </div>
         </UCard>
     </div>
@@ -71,7 +110,7 @@ interface RagResult {
 }
 
 function errMessage(e: unknown, fallback: string): string {
-    const err = e as { data?: { statusMessage?: string; message?: string } }
+    const err = e as { data?: { statusMessage?: string, message?: string } }
     return err.data?.statusMessage || err.data?.message || fallback
 }
 function resultLabel(r: RagResult): string {

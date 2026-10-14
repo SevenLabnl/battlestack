@@ -13,8 +13,8 @@ function getEncryptionKey(): Buffer {
     const hex = useRuntimeConfig().totpEncryptionKey as string | undefined
     if (!hex || hex.length !== 64) {
         throw new Error(
-            'NUXT_TOTP_ENCRYPTION_KEY missing or not 64 hex chars. ' +
-                "Generate one with `node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"` and set it in .env.",
+            'NUXT_TOTP_ENCRYPTION_KEY missing or not 64 hex chars. '
+            + 'Generate one with `node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"` and set it in .env.',
         )
     }
     return Buffer.from(hex, 'hex')

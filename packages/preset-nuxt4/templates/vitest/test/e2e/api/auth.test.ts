@@ -34,8 +34,8 @@ describe('e2e: auth flow', () => {
         if (registrationOn) return // registration was deliberately opened; nothing to assert here
         // Runs exactly when "signup succeeds without auto-login" self-skips; surface why, so the skip isn't silent in the vitest output.
         console.warn(
-            '[auth.e2e] "signup succeeds without auto-login" was SKIPPED: self-service registration is OFF. ' +
-                'Set NUXT_PUBLIC_ALLOW_REGISTRATION=true in .env to exercise the signup happy path.',
+            '[auth.e2e] "signup succeeds without auto-login" was SKIPPED: self-service registration is OFF. '
+            + 'Set NUXT_PUBLIC_ALLOW_REGISTRATION=true in .env to exercise the signup happy path.',
         )
         const { status } = await apiPost('/api/auth/signup', {
             email: `gate-probe-${Date.now()}@example.com`,

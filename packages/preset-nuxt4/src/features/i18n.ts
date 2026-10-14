@@ -6,7 +6,7 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
 /** @nuxtjs/i18n with per-locale namespace JSONs under `i18n/locales/<lang>/<ns>.json`. */
 export const i18nFeature: Feature = {
     id: 'nuxt4:i18n',
-    version: '1.1.1',
+    version: '1.1.2',
     label: 'i18n (Dutch + English)',
     frameworks: ['nuxt4'],
     stage: STAGE.I18N,

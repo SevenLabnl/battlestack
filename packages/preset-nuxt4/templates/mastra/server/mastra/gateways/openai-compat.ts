@@ -108,14 +108,14 @@ export function gatewayEmbedding(modelId: string) {
     }).textEmbeddingModel(modelId)
 }
 
-let _endpoints: { root: string; apiRoot: string; apiKey: string } | null = null
+let _endpoints: { root: string, apiRoot: string, apiKey: string } | null = null
 
 /**
  * Normalizes the gateway URL (strips/re-appends trailing `/v1`) and throws if unset, so an unconfigured project fails loudly instead of silently hitting a bad upstream.
  * Reads `process.env` directly (not `useRuntimeConfig`) because this gateway also loads under standalone `mastra dev` Studio, which has no Nitro runtime context.
  * Memoized: env is process-constant and this is on the per-message hot path.
  */
-export function gatewayEndpoints(): { root: string; apiRoot: string; apiKey: string } {
+export function gatewayEndpoints(): { root: string, apiRoot: string, apiKey: string } {
     if (_endpoints) return _endpoints
     const raw = String(process.env.NUXT_AI_GATEWAY_URL ?? '').trim()
     if (!raw) {
@@ -197,7 +197,7 @@ function hasHeaderAuth(): boolean {
  * Errors resolve to an empty list — discovery and the picker both degrade gracefully.
  */
 export async function fetchGatewayModelIds(): Promise<string[]> {
-    let endpoints: { root: string; apiKey: string }
+    let endpoints: { root: string, apiKey: string }
     try {
         endpoints = gatewayEndpoints()
     } catch {
@@ -237,18 +237,18 @@ export async function fetchGatewayModelIds(): Promise<string[]> {
 function isNonChatModelName(id: string): boolean {
     const lower = id.toLowerCase()
     return (
-        lower.includes('embed') ||
-        lower.includes('whisper') ||
-        lower.includes('tts') ||
-        lower.includes('dall-e') ||
-        lower.includes('moderation') ||
-        lower.includes('transcribe') ||
-        lower.includes('gpt-image') ||
-        lower.includes('sora') ||
-        /\/(low|medium|high|standard|hd)\//.test(lower) ||
-        /\/\d+-x-\d+\//.test(lower) ||
-        lower.startsWith('voyage') ||
-        lower.includes('/voyage')
+        lower.includes('embed')
+        || lower.includes('whisper')
+        || lower.includes('tts')
+        || lower.includes('dall-e')
+        || lower.includes('moderation')
+        || lower.includes('transcribe')
+        || lower.includes('gpt-image')
+        || lower.includes('sora')
+        || /\/(low|medium|high|standard|hd)\//.test(lower)
+        || /\/\d+-x-\d+\//.test(lower)
+        || lower.startsWith('voyage')
+        || lower.includes('/voyage')
     )
 }
 
@@ -272,12 +272,12 @@ function toUpstreamId(providerId: string, modelId: string): string {
 export function inferProviderFromName(modelGroup: string): string | null {
     const name = modelGroup.toLowerCase()
     if (
-        name.startsWith('gpt-') ||
-        name.startsWith('o1') ||
-        name.startsWith('o3') ||
-        name === 'chatgpt-4o-latest' ||
-        name.startsWith('babbage') ||
-        name.startsWith('davinci')
+        name.startsWith('gpt-')
+        || name.startsWith('o1')
+        || name.startsWith('o3')
+        || name === 'chatgpt-4o-latest'
+        || name.startsWith('babbage')
+        || name.startsWith('davinci')
     ) {
         return 'openai'
     }
@@ -285,11 +285,11 @@ export function inferProviderFromName(modelGroup: string): string | null {
     if (name.startsWith('gemini')) return 'gemini'
     if (name.startsWith('command') || name.startsWith('c4ai')) return 'cohere'
     if (
-        name.startsWith('mistral') ||
-        name.startsWith('mixtral') ||
-        name.startsWith('codestral') ||
-        name.startsWith('open-mistral') ||
-        name.startsWith('open-mixtral')
+        name.startsWith('mistral')
+        || name.startsWith('mixtral')
+        || name.startsWith('codestral')
+        || name.startsWith('open-mistral')
+        || name.startsWith('open-mixtral')
     ) {
         return 'mistral'
     }
