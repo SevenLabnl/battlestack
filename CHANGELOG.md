@@ -16,6 +16,8 @@
 - Pin generated projects to TypeScript 6: `vue-tsc` and typescript-eslint do not
   support TypeScript 7 yet. A feature's explicit dependency range now also wins
   over a peer pin that `nuxi module add` wrote into the other bucket.
+- Install the lefthook git hooks: generated projects get a
+  `prepare: lefthook install || exit 0` script, and `pull` runs it once.
 
 ## v1.3.0 (2026-09-24)
 
