@@ -1,6 +1,8 @@
 import path from 'node:path'
 import { existsSync } from 'node:fs'
+import { copyFile, mkdir, readFile } from 'node:fs/promises'
 import {
+    deleteObsoleteFiles,
     isFeatureEnabled,
     writeFileEnsured,
     recordFile,
@@ -9,13 +11,18 @@ import {
     STAGE_ORDER,
     type DocSection,
     type Feature,
+    type InstalledFeatureRecord,
     type RunContext,
+    type UpdateReport,
 } from '@battlestack/core'
 
-/** Generates AGENTS.md, CLAUDE.md and README.md from `collectDocs()`. Always rewritten. */
+/**
+ * Generates AGENTS.md, CLAUDE.md, README.md and `docs/battlestack/*.md` from `collectDocs()`.
+ * Always rewritten.
+ */
 export const docsFeature: Feature = {
     id: 'nuxt4:docs',
-    version: '1.0.26',
+    version: '1.1.0',
     label: 'Generate AGENTS.md + CLAUDE.md + README.md',
     frameworks: ['nuxt4'],
     stage: STAGE.DOCS,
@@ -29,8 +36,10 @@ export const docsFeature: Feature = {
                     '- Server routes in `server/api/`. Use `defineEventHandler`.',
                     '- Shared utilities in `server/utils/`. Vue composables in `app/composables/`.',
                     '- Run `battlestack` (no args) inside the project to see all task commands.',
+                    `- Server code runs as several replicas: no authoritative module-level state. Read \`${DOCS_DIR}/${SERVER_STATE_FILE}.md\` before adding a module-level variable.`,
                 ].join('\n'),
                 targets: ['agents'],
+                inline: true,
             },
             buildOwnershipSection(),
             buildBareCommandsSection(ctx),
@@ -40,28 +49,75 @@ export const docsFeature: Feature = {
     },
 
     async execute(ctx) {
-        const sections = collect(ctx)
-        const modulesSection = collectModulesSection(ctx)
-        if (modulesSection) sections.unshift(modulesSection)
-
-        const readme = renderReadme(ctx)
-        const agentsMd = renderAgentsMd(ctx, sections)
-        const claudeMd = renderClaudePointer()
-
-        await writeRecorded(ctx, 'README.md', readme)
-        await writeRecorded(ctx, 'AGENTS.md', agentsMd)
-        await writeRecorded(ctx, 'CLAUDE.md', claudeMd)
-        await writeProjectClaudeStub(ctx)
+        await generate(ctx, null)
     },
 
     async update(ctx, prev) {
-        await this.execute(ctx)
-        return {
-            written: ['README.md', 'AGENTS.md', 'CLAUDE.md', PROJECT_CLAUDE],
-            skipped: [],
-            notes: prev ? ['regenerated from current feature set'] : [],
-        }
+        const report = await generate(ctx, prev)
+        if (prev) report.notes.push('regenerated from current feature set')
+        return report
     },
+}
+
+/** Per-feature reference docs, read on demand instead of loaded into every agent session. */
+const DOCS_DIR = 'docs/battlestack'
+const SERVER_STATE_FILE = 'server-state'
+
+async function generate(ctx: RunContext, prev: InstalledFeatureRecord | null): Promise<UpdateReport> {
+    const report: UpdateReport = { written: [], skipped: [], notes: [] }
+    const sections = collect(ctx)
+    const modulesSection = collectModulesSection(ctx)
+    if (modulesSection) sections.unshift(modulesSection)
+
+    const referenceDocs = new Map<string, DocSection[]>()
+    for (const s of sections) {
+        if (s.inline) continue
+        const rel = `${DOCS_DIR}/${s.file}.md`
+        referenceDocs.set(rel, [...(referenceDocs.get(rel) ?? []), s])
+    }
+
+    const outputs = new Map<string, string>([
+        ['README.md', renderReadme(ctx)],
+        ['AGENTS.md', renderAgentsMd(ctx, sections.filter((s) => s.inline), referenceDocs)],
+        ['CLAUDE.md', renderClaudePointer()],
+    ])
+    for (const [rel, group] of referenceDocs) outputs.set(rel, renderReferenceDoc(group))
+
+    const owned = new Set(prev?.ownedByUser ?? [])
+    for (const [rel, content] of outputs) {
+        if (owned.has(rel)) {
+            report.skipped.push(rel)
+            continue
+        }
+        await backUpLocalEdits(ctx, prev, rel, content, report)
+        await writeRecorded(ctx, rel, content)
+        report.written.push(rel)
+    }
+    await writeProjectClaudeStub(ctx)
+    // A disabled feature's reference doc goes, unless the user edited or owns it.
+    await deleteObsoleteFiles(ctx, docsFeature.id, prev, new Set(outputs.keys()), owned, new Set(), report)
+    return report
+}
+
+/** Generated files are overwritten even when edited, so the edit is kept where `pull --force` keeps its backups. */
+async function backUpLocalEdits(
+    ctx: RunContext,
+    prev: InstalledFeatureRecord | null,
+    rel: string,
+    content: string,
+    report: UpdateReport,
+): Promise<void> {
+    const recorded = prev?.files[rel]
+    const dest = path.join(ctx.projectDir, rel)
+    if (!recorded || !existsSync(dest) || (await hashFile(dest)) === recorded) return
+    if ((await readFile(dest, 'utf8')) === content) return
+    const bak = path.join(ctx.projectDir, '.battlestack', 'pull', `${rel}.bak`)
+    await mkdir(path.dirname(bak), { recursive: true })
+    await copyFile(dest, bak)
+    report.notes.push(
+        `${rel}: had local edits and was regenerated; your version is in ${path.relative(ctx.projectDir, bak)}. `
+        + `Project-specific notes belong in ${PROJECT_CLAUDE}, or \`battlestack own ${rel}\` to keep editing it.`,
+    )
 }
 
 /** Imported by CLAUDE.md, deliberately absent from `files`: agents write here without drift. */
@@ -96,8 +152,8 @@ function buildOwnershipSection(): DocSection {
             'tracks a few hundred paths, including `AGENTS.md`, `CLAUDE.md`, `README.md`, `Dockerfile`',
             'and everything under `.claude/`.',
             '',
-            '`README.md`, `AGENTS.md` and `CLAUDE.md` are regenerated on every `battlestack pull`, so an',
-            'edit to them is lost. Editing any other tracked file is drift, and `pull` keeps your',
+            `\`README.md\`, \`AGENTS.md\`, \`CLAUDE.md\` and \`${DOCS_DIR}/\` are regenerated on every \`battlestack pull\`,`,
+            'so an edit to them is lost. Editing any other tracked file is drift, and `pull` keeps your',
             'version: it stages the upstream one under `.battlestack/pull/` (`<path>.new` and',
             '`<path>.patch`) for you to merge, and that file stops receiving upstream changes until you',
             'do. `battlestack pull --force` takes upstream instead and saves yours as `<path>.bak`.',
@@ -119,6 +175,7 @@ function buildOwnershipSection(): DocSection {
             'imported by `CLAUDE.md`. Put them there rather than editing `CLAUDE.md` or `AGENTS.md`.',
         ].join('\n'),
         targets: ['agents'],
+        inline: true,
     }
 }
 
@@ -154,7 +211,7 @@ function buildBareCommandsSection(ctx: RunContext): DocSection {
         ...lines,
         '```',
         '',
-        'The `db:*` tasks are listed with the database section below.',
+        `The \`db:*\` tasks are listed in the database notes under \`${DOCS_DIR}/\`.`,
     ]
     if (isFeatureEnabled(ctx, 'nuxt4:vitest')) {
         body.push(
@@ -170,6 +227,7 @@ function buildBareCommandsSection(ctx: RunContext): DocSection {
         order: -1,
         body: body.join('\n'),
         targets: ['agents'],
+        inline: true,
     }
 }
 
@@ -249,6 +307,7 @@ function buildServerStateSection(ctx: RunContext): DocSection {
         heading: 'Server state',
         body: body.join('\n'),
         targets: ['agents'],
+        file: SERVER_STATE_FILE,
     }
 }
 
@@ -298,6 +357,7 @@ function buildRuntimeConfigSection(ctx: RunContext): DocSection {
         heading: 'Runtime config, not process.env',
         body: body.join('\n'),
         targets: ['agents'],
+        inline: true,
     }
 }
 
@@ -310,7 +370,12 @@ function collect(ctx: RunContext): DocSection[] {
     for (const feature of sortedFeatures) {
         const items = feature.collectDocs?.(ctx) ?? []
         for (const item of items ?? []) {
-            sections.push({ ...item, order: item.order ?? STAGE_ORDER.indexOf(feature.stage) })
+            if (item.targets && !item.targets.includes('agents')) continue
+            sections.push({
+                ...item,
+                order: item.order ?? STAGE_ORDER.indexOf(feature.stage),
+                file: item.file ?? feature.id.slice(feature.id.lastIndexOf(':') + 1),
+            })
         }
     }
     sections.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
@@ -342,6 +407,7 @@ function collectModulesSection(ctx: RunContext): DocSection | null {
         targets: ['readme', 'agents'],
         // Ordered near the top, before the per-feature sections.
         order: -1,
+        file: 'nuxt-modules',
     }
 }
 
@@ -380,9 +446,9 @@ function renderReadme(ctx: RunContext): string {
     out.push(
         '## Conventions and command reference',
         '',
-        'In [AGENTS.md](./AGENTS.md): file ownership, the commands behind every `battlestack` task,',
-        'per-feature notes and the house rules. Generated from the same feature set as this file,',
-        'so it never disagrees with it.',
+        'In [AGENTS.md](./AGENTS.md): file ownership, the commands behind every `battlestack` task',
+        `and the house rules. Per-feature notes are in \`${DOCS_DIR}/\`. Both are generated from the`,
+        'same feature set as this file, so they never disagree with it.',
         '',
         '## Updating',
         '',
@@ -396,27 +462,47 @@ function renderReadme(ctx: RunContext): string {
     return out.join('\n')
 }
 
-function renderAgentsMd(ctx: RunContext, sections: DocSection[]): string {
+/** Loaded into every agent session, so only the rules that apply everywhere plus one line per reference doc. */
+function renderAgentsMd(
+    ctx: RunContext,
+    inline: DocSection[],
+    referenceDocs: Map<string, DocSection[]>,
+): string {
     const out: string[] = [
         `# ${ctx.projectName} conventions`,
         '',
         `Stack: ${ctx.framework.label} via \`battlestack\`.`,
         `Template: \`${ctx.template.id}\`.`,
         '',
-        '## Enabled features',
-        '',
     ]
-    for (const id of ctx.enabledFeatures) {
-        const f = ctx.registries.features.get(id)
-        out.push(`- \`${f.id}\` v${f.version}: ${f.label}`)
-    }
-    out.push('')
-
-    for (const s of sections) {
-        if (s.targets && !s.targets.includes('agents')) continue
+    for (const s of inline) {
         out.push(`## ${s.heading}`, '', s.body, '')
     }
+    if (referenceDocs.size > 0) {
+        out.push(
+            '## Feature reference',
+            '',
+            'Not loaded automatically. Read the matching file before working in that area.',
+            '',
+        )
+        for (const [rel, group] of referenceDocs) {
+            out.push(`- \`${rel}\`: ${group.map((s) => s.heading).join(', ')}`)
+        }
+        out.push('')
+    }
+    return out.join('\n')
+}
 
+function renderReferenceDoc(sections: DocSection[]): string {
+    const out: string[] = [
+        `# ${sections.map((s) => s.heading).join(', ')}`,
+        '',
+        `Generated by \`battlestack\` and rewritten on every \`battlestack pull\`. Project-specific notes belong in \`${PROJECT_CLAUDE}\`.`,
+        '',
+    ]
+    for (const s of sections) {
+        out.push(`## ${s.heading}`, '', s.body, '')
+    }
     return out.join('\n')
 }
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Keep the generated `AGENTS.md` short: feature sections move to
+  `docs/battlestack/<feature>.md`, and `AGENTS.md` keeps the house rules plus one
+  pointer line per file (60 KB to 6.5 KB for a full-featured project). On `pull`,
+  an edited generated doc is backed up under `.battlestack/pull/`, an owned one
+  is left alone, and a disabled feature's pristine doc is removed.
 - Show localized inline email/password validation in user-admin create/edit and
   signup forms; reuse the canonical password policy and display API error details.
 - Run emitted password-policy and Nuxt form regression tests in generated projects.

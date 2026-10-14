@@ -491,7 +491,7 @@ async function applyUpdateState(
 /** Deletes pristine files no longer shipped. User-owned or modified ones stay, with a note.
  *  A rel another enabled feature still tracks is only dropped from this feature's
  *  records — the file is that feature's to keep. */
-async function deleteObsoleteFiles(
+export async function deleteObsoleteFiles(
     ctx: RunContext,
     featureId: string,
     prev: InstalledFeatureRecord | null,

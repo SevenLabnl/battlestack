@@ -244,7 +244,7 @@ enables. Beyond `id`/`label`/`version`, its shape is a family of optional
 
 - `collectDeps` → npm dependencies to install
 - `collectEnv` → `.env` entries, aggregated and written once by `shared:env`
-- `collectDocs` → README/AGENTS.md sections
+- `collectDocs` → `docs/battlestack/<feature>.md` sections, indexed from AGENTS.md (`inline: true` puts a section in AGENTS.md itself)
 - `collectModules` → Nuxt module ids
 - `collectSkills` → AI-agent skill sources to install. `shared:install`
   aggregates these across enabled features and shells out to the project's
