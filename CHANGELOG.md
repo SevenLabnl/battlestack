@@ -16,6 +16,9 @@
 - Pin generated projects to TypeScript 6: `vue-tsc` and typescript-eslint do not
   support TypeScript 7 yet. A feature's explicit dependency range now also wins
   over a peer pin that `nuxi module add` wrote into the other bucket.
+- Pin the production Dockerfile's `node:24-alpine` base image by digest in both
+  stages, and remove npm, npx and corepack from the runtime stage, which only
+  runs `node`. Updating the base image is now an explicit change to the digest.
 
 ## v1.3.0 (2026-09-24)
 
