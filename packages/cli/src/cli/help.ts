@@ -17,9 +17,17 @@ export async function printHelp(
     }
 }
 
-/** `battlestack <command> --help` for a reserved command. False when `name` is not one. */
+/** Dispatched in `index.ts` before project detection, so it is not a reserved project command. */
+const SELF_UPDATE_HELP = {
+    name: 'self-update',
+    usage: 'battlestack self-update [--force]',
+    label: 'upgrade the globally-installed CLI to the latest release',
+    helpExtra: [['battlestack self-update --force', 'opt out of pnpm release-age gate; install true latest now']] as [string, string][],
+}
+
+/** `battlestack <command> --help` for a reserved command or `self-update`. False when `name` is neither. */
 export function printCommandHelp(name: string | undefined): boolean {
-    const cmd = RESERVED_COMMANDS.find((c) => c.name === name)
+    const cmd = [...RESERVED_COMMANDS, SELF_UPDATE_HELP].find((c) => c.name === name)
     if (!cmd) return false
     ui.plain(pc.bold('Usage'))
     ui.dim(`  ${cmd.usage}`)

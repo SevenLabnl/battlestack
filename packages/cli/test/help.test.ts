@@ -60,4 +60,13 @@ describe('printHelp', () => {
         expect(lines.join('\n')).toContain('battlestack own <path...>')
         expect(printCommandHelp('my-app')).toBe(false)
     })
+
+    it('prints self-update\'s usage, which is dispatched before the reserved commands', () => {
+        const lines: string[] = []
+        vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+            lines.push(args.join(' '))
+        })
+        expect(printCommandHelp('self-update')).toBe(true)
+        expect(lines.join('\n')).toContain('battlestack self-update [--force]')
+    })
 })

@@ -149,6 +149,10 @@ async function main(): Promise<void> {
 
     // Runs inside a project or not: it upgrades the globally-installed CLI, not deps.
     if (args.projectName === 'self-update' || args.projectName === 'update') {
+        if (args.help) {
+            printCommandHelp('self-update')
+            return
+        }
         try {
             await selfUpdateCommand({
                 packageManager: args.packageManager,
