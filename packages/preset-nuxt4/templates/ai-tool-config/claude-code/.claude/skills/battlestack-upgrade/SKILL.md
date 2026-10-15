@@ -16,7 +16,7 @@ git switch -c chore/battlestack-upgrade
 battlestack pull
 ```
 
-A project without `.battlestack/manifest.json` cannot be pulled. If it was made with an older tool, run `battlestack migrate --help` to see which conversions the installed plugins offer, run the one that applies, commit its result on its own, and pull after that.
+A project without `.battlestack/manifest.json` cannot be pulled. If it was made with an older tool, run `battlestack migrate` to see which conversions the installed plugins offer, run the one that applies, commit its result on its own, and pull after that.
 
 ## Reading the result
 
@@ -24,16 +24,16 @@ Exit code 0 means nothing needs attention. Exit code 2 means the pull finished a
 
 ## Conflicts
 
-Both the project and upstream changed the same lines. The file holds diff3 markers:
+Both the project and upstream changed the same lines. The file holds diff3 markers, shown indented here; in the file they start at the beginning of the line:
 
 ```
-<<<<<<< server/utils/auth.ts (yours)
-what the project has now
-||||||| server/utils/auth.ts (upstream before, nuxt4:auth)
-what upstream shipped last time
-=======
-what upstream ships now
->>>>>>> server/utils/auth.ts (upstream now, nuxt4:auth)
+  <<<<<<< server/utils/auth.ts (yours)
+  what the project has now
+  ||||||| server/utils/auth.ts (upstream before, nuxt4:auth)
+  what upstream shipped last time
+  =======
+  what upstream ships now
+  >>>>>>> server/utils/auth.ts (upstream now, nuxt4:auth)
 ```
 
 Compare each side with the middle section. The difference between "upstream before" and "yours" is the project's deliberate change. The difference between "upstream before" and "upstream now" is the fix or feature being delivered. Keep the project's intent and apply the upstream change on top of it. When the two cannot both hold, keep the project's behaviour and tell the user which upstream change you left out and why.
