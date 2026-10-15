@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.4.0 (2026-10-15)
 
 - Keep the generated `AGENTS.md` short: feature sections move to
   `docs/battlestack/<feature>.md`, and `AGENTS.md` keeps the house rules plus one
@@ -57,6 +57,77 @@
   so the auth-2fa and storage e2e suites pass without user-admin. Update your own
   tests to `import { createTestUser } from '~~/test/helpers/users'` and drop the
   first argument.
+
+### Commits
+
+- chore(deps): bump vitest from 5.0.3 to 5.0.4 in the dev-tooling group (bd26240)
+- ci: require a changelog entry for changes that ship (8373b61)
+- fix(release): fold the Unreleased notes into the release stanza (e87afb2)
+- fix(preset-nuxt4): resolve the two template feature-scope violations (97a89a5)
+- test(preset-nuxt4): state each optional call's real guard (cf52953)
+- test(preset-nuxt4): check every template's feature scope, not only vitest's (fbc72c5)
+- chore: bump auth past the stack base (65c1990)
+- fix(bump-check): see the feature a file was moved out of (31d7da3)
+- chore: bump auth and vitest past main (ae286d2)
+- fix(vitest): ship the auth e2e test with nuxt4:auth (93aa8a5)
+- ci: bypass the bump check with a skip-bump-check label (541bb05)
+- chore: bump audit-log, auth-2fa, auth-recovery, auth-verification, auth and storage past main (f74fcde)
+- chore: bump auth, vitest and docs past main (9881dd7)
+- fix(auth): refuse revoked sessions on every request (3f08e8f)
+- ci: correct why the theme job links the checkout (6efb206)
+- chore: rebump after rebasing onto main (be03513)
+- fix(ai-tool-config): point agents at the workflow skills from global.md (b0dd2e2)
+- fix(ai-tool-config): ship Claude Code rules in a format Claude Code loads (4eb58d4)
+- ci: install the theme scaffold without a frozen lockfile (01c90d2)
+- chore: rebump after rebasing onto main (57595c4)
+- fix(database): keep a boot task's error out of the health responses (da094c8)
+- fix(health): keep the database error out of the public health responses (454c1b4)
+- ci(dependabot): keep the template's digest-pinned node image current (25f85cf)
+- ci: scaffold with the theme layer and build it (50c97d7)
+- chore(deps): drop the postcss override (abde25d)
+- chore(deps): regenerate the lockfile and update within ranges (482ee1e)
+- fix(cli): print self-update's usage for `self-update --help` instead of running it (252b243)
+- fix(preset-nuxt4): patch nuxt.config.ts without reformatting it (cec625c)
+- fix(add): run the eslint --fix pass after adding a feature (fa91019)
+- chore(deps): bump the dev-tooling group across 1 directory with 2 updates (26485a7)
+- chore(deps): bump vite from 8.3.2 to 8.3.4 (5221261)
+- chore(deps): bump @nuxt/kit from 4.5.2 to 4.6.1 (63076ad)
+- Revert "fix(ai-tool-config): start Playwright MCP with the bundled Chromium" (a109c38)
+- fix(ai-tool-config): start Playwright MCP with the bundled Chromium (11729b2)
+- fix(cli): show a core command's usage for `<command> --help` (c1845b2)
+- fix(nuxt4): format templates with the generated project's ESLint config (27d1e7d)
+- fix(ci): install the lefthook git hooks from a prepare script (8ddd0aa)
+- feat(docs): keep the generated AGENTS.md an index (90aede9)
+- perf(db): index every foreign key in the scaffold's schema (0b6d6e8)
+- fix(docker): pin the base image by digest and drop npm from the runtime stage (3eb5180)
+- fix(user-admin): drop outstanding reset links on an email or password change (29cfcfa)
+- fix(nuxt4): pin generated projects to TypeScript 6 (295bbc8)
+- fix(nuxt4): address review on user form validation (943d0b6)
+- fix(nuxt4): explain and validate email and password requirements (ce0c0c6)
+- fix(core): preserve explicitly owned obsolete template files (85ca934)
+- fix(admin): type async-data fetch responses explicitly (dddd0ac)
+- fix(mastra): bump past current main feature version (2afd8c2)
+- fix(mastra): type admin fetch responses to avoid recursive route inference (f6d2aff)
+- fix(auth-2fa): type fetch responses to avoid recursive Nuxt route inference (eac4964)
+- fix(docs): bump writer for release workflow documentation update (b30dd65)
+- fix(mastra): turn Mastra's PostHog telemetry off by default (f7d6371)
+- chore(deps): bump vite from 8.3.1 to 8.3.2 (178a01c)
+- fix(docker): pin pnpm to a major in the generated Dockerfile (361ead2)
+- fix(release): pass when a retried POST finds the release already created (cd2c879)
+- fix(core): keep the recorded project name inside a git worktree (2bfd5c6)
+- docs(readme): cover plugin outdated, update and auto-update (68f6f65)
+- docs(readme): rewrite in plain language and add a quick start section (cd08363)
+- docs(readme): add npm, CI, node and license badges; list all six packages (b65becf)
+- fix(release): keep the token out of argv and report every publish failure (6a677d3)
+- fix(release): survive old curl and transient API errors when publishing (fe54c02)
+- fix(release): publish the release through the REST API, not the gh CLI (a5c2799)
+- fix(docs): say what pull really does to an edited file (0c78ea1)
+- fix(core): run `skills add` with git and ssh unable to prompt (d7eded3)
+- chore(deps): bump the dev-tooling group across 1 directory with 2 updates (b203217)
+- feat(cli): plugin update, outdated and an auto-update policy (8b5d5f9)
+- chore(deps): bump vite from 8.3.0 to 8.3.1 (5396f15)
+
+[Full changelog](https://github.com/SevenLabnl/battlestack/compare/v1.3.0...v1.4.0)
 
 ## v1.3.0 (2026-09-24)
 
