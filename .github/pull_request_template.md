@@ -59,6 +59,19 @@ existing project, which is the most confusing possible outcome.
 
 CI gates this, so an unbumped feature fails the run before anything else.
 
+## Changelog
+
+Skip this section if nothing under `packages/` changes, other than a package's own
+`test/` or `README.md`.
+
+Prepare release turns `## Unreleased` in `CHANGELOG.md` into the release notes,
+so an entry missing there is missing from the release.
+
+- [ ] I added a line under `## Unreleased` saying what changes for someone using battlestack
+- [ ] Not applicable
+
+CI gates this. For a change with nothing to tell users, add the `skip-changelog` label and say why here.
+
 ## Testing
 
 <!--

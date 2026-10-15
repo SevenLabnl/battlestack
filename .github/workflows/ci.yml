@@ -62,6 +62,29 @@ jobs:
       - name: Lockstep package version check
         run: pnpm version:check
 
+  # Prepare release turns `## Unreleased` into the release notes, so a shipped change without an entry
+  # is missing from them. Runs on push too, where it has no base and passes.
+  changelog-check:
+    name: Changelog entry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Changelog check
+        env:
+          CHANGELOG_CHECK_BASE: ${{ github.base_ref && format('origin/{0}', github.base_ref) || '' }}
+          CHANGELOG_CHECK_HEAD_REF: ${{ github.head_ref }}
+          SKIP_CHANGELOG_CHECK: ${{ contains(github.event.pull_request.labels.*.name, 'skip-changelog') && '1' || '' }}
+        run: node scripts/changelog-check.mjs
+
   verify:
     name: Type-check and test (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
