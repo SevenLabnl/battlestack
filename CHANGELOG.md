@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+- `pull` merges upstream changes into files you edited instead of only staging
+  them. Edited files get a three-way merge against the version battlestack last
+  wrote, with diff3 conflict markers where both sides changed the same lines.
+  Those versions are kept in `.battlestack/base/`, which should be committed;
+  a project's first merge finds them in git history.
+- `pull` no longer overwrites local work. A feature new to the project stages
+  its file when you already have one at that path, the Dockerfile is merged
+  like any other file, and a check after the update restores and merges any
+  edited file a feature (including a plugin's) wrote over.
+- `pull` requires a clean working tree (`--allow-dirty` to override), refuses to
+  start while conflict markers from a previous pull remain, writes
+  `.battlestack/pull/REPORT.md` with what is left to do and how, and exits with
+  code 2 when that list is not empty. Console output is one line per feature.
+- Generated projects ship a `battlestack-upgrade` skill for AI agents, and the
+  generated AGENTS.md and README describe the merge instead of the old staging.
+- A feature whose plugin did not load keeps its manifest record on `pull`
+  instead of being dropped, so its files stay managed.
+- `shared:github` drops its records of the deploy workflows it no longer ships.
+- `pull` keeps a project's dependency range when it already has a higher floor
+  in the same major than the feature asks for.
+- Ports written into committed files (`docker-compose.yml` defaults, the
+  `mastra:studio` script) depend only on the project name, so they no longer
+  change between machines. `.env` still overrides them locally.
+- A project-mode command run outside a project, such as `battlestack pull`,
+  explains that there is no project here instead of starting a new one with
+  that name.
 - A skill whose `skills add` fails no longer ends the run on a plain "Scaffold
   complete" or "Update complete": the closing line names the skills that were
   not installed. The warning points at access (`gh auth login` or git

@@ -12,6 +12,7 @@ import {
     writeJson,
     writeFileEnsured,
     allocatePort,
+    defaultPort,
     run,
     resolveProjectPM,
     isFeatureEnabled,
@@ -29,7 +30,7 @@ import {
 /** Mastra AI runtime. Talks to an OpenAI-compatible AI gateway (sluis.ai preset, or any compatible URL) via `@ai-sdk/openai-compatible`. */
 export const mastraFeature: Feature = {
     id: 'nuxt4:mastra',
-    version: '2.1.6',
+    version: '2.1.7',
     label: 'Mastra AI runtime',
     frameworks: ['nuxt4'],
     stage: STAGE.AI_CORE,
@@ -89,7 +90,7 @@ export const mastraFeature: Feature = {
         const isSluis = ctx.state.aiGatewayPreset === 'sluis'
 
         // The sluis preset prefills its hosted URL (still editable); custom
-        // requires one — `validate` refuses anything that isn't http(s).
+        // requires one; `validate` refuses anything that isn't http(s).
         const { url } = await prompts({
             type: 'text',
             name: 'url',
@@ -233,7 +234,7 @@ export const mastraFeature: Feature = {
         const gatewayBlurb = ctx.state.aiGatewayPreset === 'custom'
             ? 'The gateway is configured with `NUXT_AI_GATEWAY_URL` + `NUXT_AI_GATEWAY_KEY` in `.env`'
                 + (ctx.state.aiGatewayUrl ? ` (this project: \`${ctx.state.aiGatewayUrl}\`)` : '')
-                + '. Any OpenAI-compatible endpoint works — a self-hosted LiteLLM proxy, a vendor gateway, or [sluis.ai](https://sluis.ai). Gateway-specific request headers go in `NUXT_AI_GATEWAY_HEADERS` (JSON object).'
+                + '. Any OpenAI-compatible endpoint works: a self-hosted LiteLLM proxy, a vendor gateway, or [sluis.ai](https://sluis.ai). Gateway-specific request headers go in `NUXT_AI_GATEWAY_HEADERS` (JSON object).'
             : 'The gateway is configured with `NUXT_AI_GATEWAY_URL` + `NUXT_AI_GATEWAY_KEY` in `.env`. This project uses the [sluis.ai](https://sluis.ai) preset: hosted, EU data residency, PII redaction, tamper-evident audit ledger; keys look like `sk_live_...`; per-request residency override via `NUXT_AI_GATEWAY_HEADERS`, e.g. `{"X-Sluis-Residency":"eu-only"}`. Any other OpenAI-compatible endpoint also works by swapping the URL.'
         return [
             {
@@ -338,9 +339,9 @@ async function emitStudioBundlerConfig(ctx: RunContext): Promise<void> {
     await writeFileEnsured(dest, 'const bundler = {};\n\nexport { bundler };\n')
 }
 
-// `pnpm run mastra:dev` mirrors `battlestack mastra:dev`. The port is fixed at scaffold time.
+// `pnpm run mastra:dev` mirrors `battlestack mastra:dev`. package.json is committed, so the port is the name-derived one.
 async function addStudioScript(ctx: RunContext): Promise<void> {
-    const port = allocatePort(ctx.projectName, 'mastra-studio')
+    const port = defaultPort(ctx.projectName, 'mastra-studio')
     const pkgPath = path.join(ctx.projectDir, 'package.json')
     const pkg = await readJson<Record<string, unknown>>(pkgPath)
     const scripts = (pkg.scripts as Record<string, string> | undefined) ?? {}

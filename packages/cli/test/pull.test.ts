@@ -703,7 +703,7 @@ describe('battlestack pull: a file moving to a later feature', () => {
 })
 
 describe('battlestack pull: misc plumbing', () => {
-    it('drops an orphaned feature (removed from the CLI) from the manifest without throwing', async () => {
+    it('keeps the record of a feature whose plugin did not load, and flags the pull', async () => {
         const projectDir = await tmp('battlestack-pull-orphan-')
         const tplA = await tmp('battlestack-pull-orphan-a-')
         const tplOrphan = await tmp('battlestack-pull-orphan-o-')
@@ -725,10 +725,12 @@ describe('battlestack pull: misc plumbing', () => {
         registriesV2.features.register(makeFileFeature('test:feat-a', '1.0.0', tplA), origin)
 
         await expect(runPull(projectDir, registriesV2)).resolves.not.toThrow()
+        expect(process.exitCode).toBe(2)
+        process.exitCode = undefined
 
         const manifest = await readManifestRaw(projectDir)
-        expect(manifest.features.find((f) => f.id === fqid('test:feat-orphan'))).toBeUndefined()
-        // The orphan's file is left alone; pull only stops tracking it.
+        // A missing plugin must not unmanage its files: the record survives untouched.
+        expect(manifest.features.find((f) => f.id === fqid('test:feat-orphan'))?.files).toEqual({ 'o.ts': expect.any(String) })
         expect(await readFile(path.join(projectDir, 'o.ts'), 'utf8')).toBe('o-content\n')
     })
 })
