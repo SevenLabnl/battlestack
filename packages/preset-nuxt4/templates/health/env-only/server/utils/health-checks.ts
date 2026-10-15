@@ -1,6 +1,6 @@
 /**
  * A copy, not an import: this env-only variant ships exactly when `nuxt4:auth` is absent, so importing its
- * `session-password.ts` would ENOENT the Nitro build. Keep in sync by hand; the `with-db` variant imports the real one.
+ * `session-password.ts` would ENOENT the Nitro build. Keep in sync by hand, as in the `with-db` variant.
  */
 const MIN_SESSION_PASSWORD_LENGTH = 32
 

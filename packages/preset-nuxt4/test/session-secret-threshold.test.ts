@@ -70,10 +70,17 @@ describe('minimum session-secret length is consistent across every copy', () => 
         expect(envOnly).toBe(authoritative)
     })
 
-    it('the with-db health check still imports the constant instead of re-declaring it', async () => {
-        const src = await readFile(HEALTH_WITH_DB, 'utf8')
-        expect(src).toMatch(/from '#server\/utils\/session-password'/)
-        // A local literal here would be a fourth copy to keep in sync by hand.
-        expect(src).not.toMatch(/const MIN_SESSION_PASSWORD_LENGTH\s*=\s*\d+/)
+    it('the with-db health check uses the same threshold', async () => {
+        const authoritative = await extract(
+            AUTHORITATIVE,
+            /export const MIN_SESSION_PASSWORD_LENGTH\s*=\s*(\d+)/,
+            'MIN_SESSION_PASSWORD_LENGTH',
+        )
+        const withDb = await extract(
+            HEALTH_WITH_DB,
+            /const MIN_SESSION_PASSWORD_LENGTH\s*=\s*(\d+)/,
+            'the with-db health check\'s local MIN_SESSION_PASSWORD_LENGTH',
+        )
+        expect(withDb).toBe(authoritative)
     })
 })

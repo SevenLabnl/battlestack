@@ -7,7 +7,7 @@ import { STAGE } from '@battlestack/core'
 /** GitHub + Google OAuth via `nuxt-auth-utils`. */
 export const oauthFeature: Feature = {
     id: 'nuxt4:oauth',
-    version: '1.0.3',
+    version: '1.0.4',
     label: 'OAuth (GitHub + Google)',
     description: 'Social sign-in via GitHub and Google OAuth apps.',
     frameworks: ['nuxt4'],

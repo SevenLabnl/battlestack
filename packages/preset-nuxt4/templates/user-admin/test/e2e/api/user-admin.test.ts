@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import {
     apiDelete,
@@ -5,10 +6,10 @@ import {
     apiPost,
     apiPut,
     BASE_URL,
-    createTestUser,
     isServerUp,
     loginAsAdmin,
 } from '~~/test/helpers/setup'
+import { createTestUser } from '~~/test/helpers/users'
 
 const serverUp = await isServerUp()
 
@@ -27,15 +28,20 @@ describe('e2e: user admin CRUD', () => {
     })
 
     it.skipIf(!serverUp)('non-admin is forbidden from /api/users', async () => {
-        const adminCookie = await loginAsAdmin()
-        const newUser = await createTestUser(adminCookie, { role: 'user' })
+        const newUser = await createTestUser({ role: 'user' })
         const { status } = await apiGet('/api/users', newUser.cookie)
         expect(status).toBe(403)
     })
 
-    it.skipIf(!serverUp)('admin can update + delete a user', async () => {
+    it.skipIf(!serverUp)('admin can create, update and delete a user', async () => {
         const adminCookie = await loginAsAdmin()
-        const newUser = await createTestUser(adminCookie)
+        const created = await apiPost<{ id: string }>(
+            '/api/users',
+            { name: 'Test User', email: `test-${randomUUID()}@example.com`, password: 'Mountain-Pine42!', role: 'user' },
+            adminCookie,
+        )
+        expect(created.status).toBeLessThan(400)
+        const newUser = { id: created.data!.id }
 
         const updated = await apiPut(
             `/api/users/${newUser.id}`,

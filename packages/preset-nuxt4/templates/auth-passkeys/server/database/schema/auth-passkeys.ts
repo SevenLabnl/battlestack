@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, bigint } from 'drizzle-orm/pg-core'
+import { bigint, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { users } from './users'
 
 export const webauthnCredentials = pgTable('webauthn_credentials', {
@@ -14,7 +14,9 @@ export const webauthnCredentials = pgTable('webauthn_credentials', {
     label: text('label'),
     lastUsedAt: timestamp('last_used_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+}, (t) => [
+    index('webauthn_credentials_user_id_idx').on(t.userId),
+])
 
 export const webauthnChallenges = pgTable('webauthn_challenges', {
     id: uuid('id').defaultRandom().primaryKey(),

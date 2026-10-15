@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
@@ -58,14 +57,6 @@ function resolveBaseUrl(): string {
 }
 
 export const BASE_URL = resolveBaseUrl()
-
-export interface TestUser {
-    id: string
-    name: string
-    email: string
-    role: string
-    cookie: string
-}
 
 interface ApiResult<T = unknown> {
     status: number
@@ -156,31 +147,6 @@ export async function loginAsAdmin(): Promise<string> {
         )
     }
     return loginAs(email, password)
-}
-
-/** Create a user via `POST /api/users` (admin) and log in as them. */
-export async function createTestUser(
-    adminCookie: string,
-    overrides: Partial<{ name: string, email: string, password: string, role: string }> = {},
-): Promise<TestUser> {
-    const userData = {
-        name: overrides.name ?? 'Test User',
-        // randomUUID, not Date.now(): parallel e2e files can share a millisecond, colliding on the users_email_unique constraint (a flaky 409/500).
-        email: overrides.email ?? `test-${randomUUID()}@example.com`,
-        password: overrides.password ?? 'Mountain-Pine42!',
-        role: overrides.role ?? 'user',
-    }
-    const { status, data } = await apiPost<{
-        id: string
-        name: string
-        email: string
-        role: string
-    }>('/api/users', userData, adminCookie)
-    if (status >= 400 || !data) {
-        throw new Error(`createTestUser failed: ${status}`)
-    }
-    const cookie = await loginAs(userData.email, userData.password)
-    return { id: data.id, name: data.name, email: data.email, role: data.role, cookie }
 }
 
 /**

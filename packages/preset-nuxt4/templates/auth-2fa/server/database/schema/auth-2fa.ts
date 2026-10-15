@@ -1,4 +1,4 @@
-import { boolean, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { boolean, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { users } from './users'
 
 export const totpSecrets = pgTable('totp_secrets', {
@@ -20,4 +20,6 @@ export const backupCodes = pgTable('backup_codes', {
     codeHash: text('code_hash').notNull(),
     usedAt: timestamp('used_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
-})
+}, (t) => [
+    index('backup_codes_user_id_idx').on(t.userId),
+])

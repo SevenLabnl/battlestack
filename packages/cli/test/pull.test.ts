@@ -44,13 +44,13 @@ function makeFileFeature(
     bareId: string,
     version: string,
     templateDir: string,
-    opts: { structuralFiles?: string[] } = {},
+    opts: { structuralFiles?: string[], stage?: Feature['stage'] } = {},
 ): Feature {
     return {
         id: bareId,
         label: bareId,
         version,
-        stage: STAGE.STYLING,
+        stage: opts.stage ?? STAGE.STYLING,
         ...(opts.structuralFiles ? { structuralFiles: () => opts.structuralFiles! } : {}),
         async execute(ctx) {
             await copyTemplateDirRecorded(ctx, bareId, templateDir)
@@ -630,6 +630,75 @@ describe('battlestack pull: rehydrating missing features (fqid defaultEnabledOpt
         expect(await readFile(path.join(projectDir, 'c.ts'), 'utf8')).toBe('c-content\n')
         const manifest = await readManifestRaw(projectDir)
         expect(manifest.features.find((f) => f.id === fqid('test:feat-c'))).toBeDefined()
+    })
+})
+
+describe('battlestack pull: a file moving to a later feature', () => {
+    // Mirrors nuxt4:vitest (NAMING) handing test/e2e/api/auth.test.ts to nuxt4:auth (AUTH):
+    // the old owner updates first and sees the file as obsolete.
+    const movedRel = path.join('test', 'e2e', 'moved.test.ts')
+    const movedContent = 'export const moved = true\n'
+    const FROM = 'test:from'
+    const TO = 'test:to'
+
+    async function setup(enabledBare: string[]): Promise<{ projectDir: string, registriesV2: BattlestackRegistries }> {
+        const projectDir = await tmp('battlestack-pull-moved-')
+        const fromV1 = await tmp('battlestack-pull-moved-from-v1-')
+        const fromV2 = await tmp('battlestack-pull-moved-from-v2-')
+        const toV1 = await tmp('battlestack-pull-moved-to-v1-')
+        const toV2 = await tmp('battlestack-pull-moved-to-v2-')
+        await writeTemplateFile(fromV1, movedRel, movedContent)
+        await writeTemplateFile(fromV1, 'from.ts', 'from\n')
+        await writeTemplateFile(fromV2, 'from.ts', 'from\n')
+        await writeTemplateFile(toV1, 'to.ts', 'to\n')
+        await writeTemplateFile(toV2, 'to.ts', 'to\n')
+        await writeTemplateFile(toV2, movedRel, movedContent)
+
+        const required = enabledBare.map(fqid)
+        const registriesV1 = makeRegistries({ requiredFeatures: required })
+        const v1 = [
+            makeFileFeature(FROM, '1.0.0', fromV1, { stage: STAGE.NAMING }),
+            makeFileFeature(TO, '1.0.0', toV1, { stage: STAGE.AUTH }),
+        ].filter((f) => enabledBare.includes(f.id))
+        for (const f of v1) registriesV1.features.register(f, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, required)
+        for (const f of v1) await f.execute(ctx)
+        await writeManifest(ctx)
+
+        const registriesV2 = makeRegistries({ requiredFeatures: required })
+        registriesV2.features.register(makeFileFeature(FROM, '1.1.0', fromV2, { stage: STAGE.NAMING }), origin)
+        registriesV2.features.register(makeFileFeature(TO, '1.1.0', toV2, { stage: STAGE.AUTH }), origin)
+        return { projectDir, registriesV2 }
+    }
+
+    const filesOf = (manifest: ProjectManifest, bareId: string): Record<string, string> | undefined =>
+        manifest.features.find((f) => f.id === fqid(bareId))?.files
+
+    it('keeps a pristine file and hands its record to the new owner', async () => {
+        const { projectDir, registriesV2 } = await setup([FROM, TO])
+        await runPull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(movedContent)
+        const manifest = await readManifestRaw(projectDir)
+        expect(Object.keys(filesOf(manifest, FROM) ?? {})).not.toContain(movedRel)
+        expect(Object.keys(filesOf(manifest, TO) ?? {})).toContain(movedRel)
+    })
+
+    it('CORE PROPERTY: never deletes the user\'s edits to the moved file', async () => {
+        const { projectDir, registriesV2 } = await setup([FROM, TO])
+        const edited = 'export const moved = "edited"\n'
+        await writeFile(path.join(projectDir, movedRel), edited, 'utf8')
+        await runPull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(edited)
+    })
+
+    it('removes the pristine file from a project without the new owner', async () => {
+        const { projectDir, registriesV2 } = await setup([FROM])
+        await runPull(projectDir, registriesV2)
+
+        expect(await exists(path.join(projectDir, movedRel))).toBe(false)
+        expect(Object.keys(filesOf(await readManifestRaw(projectDir), FROM) ?? {})).not.toContain(movedRel)
     })
 })
 

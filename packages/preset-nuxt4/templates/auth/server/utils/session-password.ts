@@ -1,6 +1,6 @@
 /**
- * 32 is `iron-webcrypto`'s `minPasswordlength`; below it every seal/unseal call throws. The boot guard and `nuxt4:health`
- * import this so they cannot drift, but `battlestack login` (CLI process, cannot import) repeats it: update both by hand.
+ * 32 is `iron-webcrypto`'s `minPasswordlength`; below it every seal/unseal call throws. The boot guard imports this;
+ * `battlestack login` and both `nuxt4:health` variants cannot, so they repeat it: update them by hand.
  */
 export const MIN_SESSION_PASSWORD_LENGTH = 32
 

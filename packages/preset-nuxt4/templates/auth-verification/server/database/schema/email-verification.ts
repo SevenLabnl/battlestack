@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { users } from './users'
 
 export const emailVerificationTokens = pgTable('email_verification_tokens', {
@@ -10,7 +10,9 @@ export const emailVerificationTokens = pgTable('email_verification_tokens', {
     expiresAt: timestamp('expires_at').notNull(),
     usedAt: timestamp('used_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
-})
+}, (t) => [
+    index('email_verification_tokens_user_id_idx').on(t.userId),
+])
 
 /** Row exists -> verified. Absent -> pending. Enforcement (blocking unverified users at login) is global via
  * `runtimeConfig.public.requireEmailVerification`, not per-row. */

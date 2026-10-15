@@ -288,7 +288,8 @@ function gitShow(file: string, ref: string): string | null {
 
 function gitChangedFiles(ref: string): Set<string> {
     const set = new Set<string>()
-    const tracked = git(['diff', '--name-only', ref])
+    // A rename lists only its destination, so the feature a file moved out of would read as clean.
+    const tracked = git(['diff', '--name-only', '--no-renames', ref])
     const untracked = git(['ls-files', '--others', '--exclude-standard'])
     for (const block of [tracked, untracked]) {
         for (const line of (block ?? '').split('\n')) {
