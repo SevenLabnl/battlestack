@@ -33,6 +33,7 @@ Type-check and test (Node 26)
 Type-check, test, build, CLI smoke (Windows, Node 24)
 Type-check, test, build, CLI smoke (Windows, Node 26)
 Scaffold a project and run its own gates
+Scaffold with the theme layer and build it
 ```
 
 Each context is pinned to `integration_id: 15368`, the GitHub Actions app, so
