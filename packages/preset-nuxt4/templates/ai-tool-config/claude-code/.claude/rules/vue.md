@@ -1,7 +1,6 @@
 ---
-description: Vue 3.5+ and Nuxt UI v4 component conventions
-globs: "*.vue"
-alwaysApply: false
+paths:
+  - "**/*.vue"
 ---
 
 You are an expert in TypeScript, Vue 3.5, Nuxt 4, Nuxt UI v4, Pinia, VueUse, and Tailwind CSS v4.

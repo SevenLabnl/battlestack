@@ -32,6 +32,11 @@
   error message, which could name the host or user; it goes to the server log.
   The same holds for a failed boot task such as the migration on boot: `boot.failed`
   now names the task, not its error.
+- Ship Claude Code rules as `.claude/rules/*.md` with `paths:` frontmatter instead
+  of Cursor-format `.mdc` files that Claude Code never loaded. Drop the always-on
+  `rules/skills/` duplicates of the `.claude/skills/` workflows, the inert
+  `.claude/hooks/hooks.json`, and the `k8s.mdc` entry in the generated `AGENTS.md`.
+  Align the index naming rule with drizzle (`<table>_<cols>_idx`).
 
 ## v1.3.0 (2026-09-24)
 
