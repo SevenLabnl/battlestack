@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- A skill whose `skills add` fails no longer ends the run on a plain "Scaffold
+  complete" or "Update complete": the closing line names the skills that were
+  not installed. The warning points at access (`gh auth login` or git
+  credentials for the source's host) and `battlestack pull --skills-only`, not at
+  the registry.
+
 ## v1.4.0 (2026-10-15)
 
 - Keep the generated `AGENTS.md` short: feature sections move to

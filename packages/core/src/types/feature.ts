@@ -101,6 +101,8 @@ export interface FeatureState {
     adminEmail?: string
     adminPassword?: string
     aiTool?: string
+    /** Skill sources whose `skills add` failed this run, recorded by `installSkills`. */
+    skippedSkills?: string[]
     chatTransport?: ChatTransport
     policies?: ProjectManifest['policies']
     storageRegion?: string

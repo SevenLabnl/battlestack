@@ -87,11 +87,28 @@ export async function installSkills(ctx: RunContext, sources: readonly string[])
                 env,
             })
         } catch (err) {
+            ctx.state.skippedSkills = [...(ctx.state.skippedSkills ?? []), source]
             getUiPort().warn(
-                `Skill install skipped: \`skills add ${source}\` failed. `
-                + 'Re-run `battlestack pull` once the registry is reachable.',
+                `Skill not installed: \`skills add ${source}\` failed (its output is above). `
+                + 'A private source needs `gh auth login` or git credentials for its host; '
+                + 'then run `battlestack pull --skills-only`.',
             )
             if (ctx.debug) console.error(err)
         }
+    }
+}
+
+/**
+ * The closing line of a run that installed skills. A failed install only warns, mid-output, so the
+ * run's last line names what is missing rather than reading as a clean success.
+ */
+export function skillsOutcome(ctx: RunContext, done: string): { ok: boolean, line: string } {
+    const skipped = ctx.state.skippedSkills ?? []
+    if (skipped.length === 0) return { ok: true, line: done }
+    const list = skipped.map((s) => `\`${s}\``).join(', ')
+    const noun = skipped.length === 1 ? 'skill was' : 'skills were'
+    return {
+        ok: false,
+        line: `${done}, but ${skipped.length} ${noun} not installed: ${list}. Fix access, then run \`battlestack pull --skills-only\`.`,
     }
 }

@@ -3,6 +3,7 @@ import { STAGE_ORDER } from './constants/stages.js'
 import type { Feature } from './types/feature.js'
 import type { RunContext } from './types/run-context.js'
 import { getUiPort } from './ui-port.js'
+import { skillsOutcome } from './utils/skills.js'
 
 /** Host-injected formatting hook, run after every feature and before the manifest is persisted. */
 export type PostRunFormatter = (ctx: RunContext) => Promise<void>
@@ -161,7 +162,9 @@ export async function runFeatures(
             await reconcilePostFormat(ctx, tracked, preHashes)
         }
 
-        if (!verbose) loader.succeed('Scaffold complete')
+        const outcome = skillsOutcome(ctx, 'Scaffold complete')
+        if (!outcome.ok) loader.warn(outcome.line)
+        else if (!verbose) loader.succeed(outcome.line)
     } finally {
         ui.setActiveSpinner(null)
         // A manifest is written on every path, including failure.

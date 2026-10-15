@@ -10,6 +10,7 @@ import {
     findProjectRoot,
     readManifest,
     recordOwned,
+    skillsOutcome,
     writeManifest,
     type BattlestackRegistries,
     type EnvDiff,
@@ -326,7 +327,9 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             const { collectSkillSources, installSkills } = await import('@battlestack/core')
             await installSkills(ctx, collectSkillSources(ctx, registries))
             ui.blank()
-            ui.ok('Skills refreshed (--skills-only)')
+            const outcome = skillsOutcome(ctx, 'Skills refreshed (--skills-only)')
+            if (outcome.ok) ui.ok(outcome.line)
+            else ui.warn(outcome.line)
             return
         }
 
@@ -390,7 +393,9 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         }
 
         ui.blank()
-        ui.ok('Update complete')
+        const outcome = skillsOutcome(ctx, 'Update complete')
+        if (outcome.ok) ui.ok(outcome.line)
+        else ui.warn(outcome.line)
         printEnvDiff(ctx.state['env:diff'] as EnvDiff | undefined)
     } finally {
         await releaseLock()
