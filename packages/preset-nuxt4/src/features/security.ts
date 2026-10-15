@@ -4,10 +4,20 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
 import { isFeatureEnabled, type Feature } from '@battlestack/core'
 import { STAGE } from '@battlestack/core/constants/stages.js'
 
+const RATE_LIMIT_GATE = 'process.env.NUXT_RATE_LIMIT_DISABLED === \'true\' ? false : '
+
+/**
+ * Projects scaffolded before the gate existed carry a bare `rateLimiter: {...}`, which e2e runs cannot switch off.
+ * Wraps that object, keeping its values; anything else (already gated, `false`, a nested object) is left alone.
+ */
+export function gateRateLimiter(raw: string): string {
+    return raw.replace(/(\brateLimiter:\s*)(\{[^{}]*\})/, (_, key: string, obj: string) => `${key}${RATE_LIMIT_GATE}${obj}`)
+}
+
 /** `nuxt-security` wrapper: response headers and a module-level rate-limit floor. */
 export const securityFeature: Feature = {
     id: 'shared:security',
-    version: '1.0.4',
+    version: '1.0.5',
     label: 'Security headers (nuxt-security)',
     stage: STAGE.BASE_CONFIG,
     failureIsNonFatal: true,
@@ -93,8 +103,7 @@ export const securityFeature: Feature = {
         // `NUXT_RATE_LIMIT_DISABLED=true` disables the per-IP limiter. Dev and e2e only.
         const cfgPath = path.join(ctx.projectDir, 'nuxt.config.ts')
         const raw = await readFile(cfgPath, 'utf8')
-        const gated
-            = 'process.env.NUXT_RATE_LIMIT_DISABLED === \'true\' ? false : { tokensPerInterval: 100, interval: 60_000 }'
+        const gated = `${RATE_LIMIT_GATE}{ tokensPerInterval: 100, interval: 60_000 }`
         await writeFile(
             cfgPath,
             raw.replace(new RegExp(String.raw`(['"])${RATE_LIMITER_SENTINEL}\1`), gated),
@@ -110,6 +119,14 @@ export const securityFeature: Feature = {
                 }
             }),
         )
-        return { written: ['nuxt.config.ts'], skipped: [], notes: [] }
+        const cfgPath = path.join(ctx.projectDir, 'nuxt.config.ts')
+        const raw = await readFile(cfgPath, 'utf8')
+        const gated = gateRateLimiter(raw)
+        const notes: string[] = []
+        if (gated !== raw) {
+            await writeFile(cfgPath, gated, 'utf8')
+            notes.push('security: rateLimiter now turns off with NUXT_RATE_LIMIT_DISABLED=true (dev and e2e only)')
+        }
+        return { written: ['nuxt.config.ts'], skipped: [], notes }
     },
 }

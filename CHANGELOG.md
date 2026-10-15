@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `pull` now gates a hardcoded `security.rateLimiter` in `nuxt.config.ts` on
+  `NUXT_RATE_LIMIT_DISABLED`, keeping its values. Projects scaffolded before the
+  gate existed could not switch the nuxt-security limiter off for e2e runs.
+
 ## v1.4.0 (2026-10-15)
 
 - Keep the generated `AGENTS.md` short: feature sections move to
