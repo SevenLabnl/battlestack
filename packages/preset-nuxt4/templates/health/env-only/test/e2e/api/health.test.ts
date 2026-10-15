@@ -9,7 +9,7 @@ interface HealthResponse {
     commit: string
     builtAt: string
     checks: {
-        env: { ok: boolean; missing?: string[] }
+        env: { ok: boolean, missing?: string[] }
     }
 }
 

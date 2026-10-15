@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const dbStart = Date.now()
-    let dbCheck: { ok: boolean; latencyMs?: number; error?: string }
+    let dbCheck: { ok: boolean, latencyMs?: number, error?: string }
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
         await Promise.race([

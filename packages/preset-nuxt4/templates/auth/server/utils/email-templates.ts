@@ -52,7 +52,7 @@ const TEMPLATES: Record<EmailPurpose, Record<EmailLocale, (i: TemplateInput) => 
     },
 }
 
-const TTL_LABELS: Record<EmailLocale, { hour1: string; hour24: string }> = {
+const TTL_LABELS: Record<EmailLocale, { hour1: string, hour24: string }> = {
     en: { hour1: '1 hour', hour24: '24 hours' },
     nl: { hour1: '1 uur', hour24: '24 uur' },
 }
@@ -65,7 +65,7 @@ function pickLocale(input: string | null | undefined): EmailLocale {
 export function emailContent(
     purpose: EmailPurpose,
     locale: string | null | undefined,
-    input: { link: string; ttlMs: number },
+    input: { link: string, ttlMs: number },
 ): EmailContent {
     const loc = pickLocale(locale)
     const labels = TTL_LABELS[loc]

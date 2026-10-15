@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 401, statusMessage: 'Invalid signature' })
     }
 
-    let payload: { email?: unknown; exp?: unknown }
+    let payload: { email?: unknown, exp?: unknown }
     try {
         payload = JSON.parse(Buffer.from(token, 'base64url').toString('utf8'))
     } catch {

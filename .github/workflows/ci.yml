@@ -156,6 +156,17 @@ jobs:
           pnpm exec nuxi prepare
           pnpm run lint
 
+      # The scaffold's own `eslint --fix` pass hides a template that breaks the
+      # project's style, but `pull` merges the raw template into the user's
+      # formatted copy, so every such difference becomes a conflict. Pages and
+      # layouts sit outside the paths that exempt them from multi-word names here.
+      - name: Lint the raw templates with the project's config
+        working-directory: ${{ runner.temp }}/scaffold/ci-app
+        run: |
+          cp -r "$GITHUB_WORKSPACE/packages/preset-nuxt4/templates" __templates
+          pnpm exec eslint --rule '{"vue/multi-word-component-names":"off"}' __templates
+          rm -rf __templates
+
       - name: Typecheck
         working-directory: ${{ runner.temp }}/scaffold/ci-app
         run: pnpm run typecheck

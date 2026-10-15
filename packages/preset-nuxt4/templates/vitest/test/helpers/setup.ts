@@ -161,7 +161,7 @@ export async function loginAsAdmin(): Promise<string> {
 /** Create a user via `POST /api/users` (admin) and log in as them. */
 export async function createTestUser(
     adminCookie: string,
-    overrides: Partial<{ name: string; email: string; password: string; role: string }> = {},
+    overrides: Partial<{ name: string, email: string, password: string, role: string }> = {},
 ): Promise<TestUser> {
     const userData = {
         name: overrides.name ?? 'Test User',

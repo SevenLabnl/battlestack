@@ -1,11 +1,22 @@
 <template>
     <UCard>
         <template #header>
-            <h1 class="text-xl font-semibold">{{ t('authRecovery.forgot.title') }}</h1>
+            <h1 class="text-xl font-semibold">
+                {{ t('authRecovery.forgot.title') }}
+            </h1>
         </template>
 
-        <UForm v-if="!sent" :state="state" :schema="schema" class="space-y-4" @submit="onSubmit">
-            <UFormField :label="t('authRecovery.forgot.email')" name="email">
+        <UForm
+            v-if="!sent"
+            :state="state"
+            :schema="schema"
+            class="space-y-4"
+            @submit="onSubmit"
+        >
+            <UFormField
+                :label="t('authRecovery.forgot.email')"
+                name="email"
+            >
                 <div data-allow-mismatch>
                     <UInput
                         v-model="state.email"
@@ -15,10 +26,19 @@
                     />
                 </div>
             </UFormField>
-            <UButton type="submit" :loading="loading" block>
+            <UButton
+                type="submit"
+                :loading="loading"
+                block
+            >
                 {{ t('authRecovery.forgot.submit') }}
             </UButton>
-            <p v-if="error" class="text-sm text-error">{{ error }}</p>
+            <p
+                v-if="error"
+                class="text-sm text-error"
+            >
+                {{ error }}
+            </p>
         </UForm>
 
         <UAlert
@@ -30,7 +50,10 @@
         />
 
         <template #footer>
-            <NuxtLink to="/login" class="text-sm text-muted hover:text-primary">
+            <NuxtLink
+                to="/login"
+                class="text-sm text-muted hover:text-primary"
+            >
                 {{ t('authRecovery.forgot.backToSignIn') }}
             </NuxtLink>
         </template>

@@ -6,8 +6,8 @@ import { db } from '../client'
 
 if (process.env.NODE_ENV === 'production' && process.env.SEED_ALLOW_PRODUCTION !== 'true') {
     console.error(
-        '[seed] refusing to run with NODE_ENV=production. ' +
-            'Set SEED_ALLOW_PRODUCTION=true to override (think twice).',
+        '[seed] refusing to run with NODE_ENV=production. '
+        + 'Set SEED_ALLOW_PRODUCTION=true to override (think twice).',
     )
     process.exit(1)
 }

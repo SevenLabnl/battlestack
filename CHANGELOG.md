@@ -16,6 +16,13 @@
 - Pin generated projects to TypeScript 6: `vue-tsc` and typescript-eslint do not
   support TypeScript 7 yet. A feature's explicit dependency range now also wins
   over a peer pin that `nuxi module add` wrote into the other bucket.
+- Install the lefthook git hooks: generated projects get a
+  `prepare: lefthook install || exit 0` script, and `pull` runs it once.
+- Format the template files with the generated project's own ESLint config, so
+  `pull` no longer turns style differences into merge conflicts. CI now lints
+  the raw templates with that config.
+- `battlestack <command> --help` prints that command's usage, and `--help`
+  inside a project lists the core commands (`pull`, `own`, `doctor`, …).
 
 ## v1.3.0 (2026-09-24)
 

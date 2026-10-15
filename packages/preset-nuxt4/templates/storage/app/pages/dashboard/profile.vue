@@ -1,8 +1,12 @@
 <template>
     <div class="mx-auto max-w-2xl space-y-6">
         <div>
-            <h1 class="text-2xl font-bold tracking-tight">{{ t('dashboard.profile.title') }}</h1>
-            <p class="mt-1 text-sm text-muted">{{ t('dashboard.profile.subtitle') }}</p>
+            <h1 class="text-2xl font-bold tracking-tight">
+                {{ t('dashboard.profile.title') }}
+            </h1>
+            <p class="mt-1 text-sm text-muted">
+                {{ t('dashboard.profile.subtitle') }}
+            </p>
         </div>
 
         <UCard>
@@ -59,17 +63,37 @@
         </UCard>
 
         <UCard>
-            <UForm :state="state" :schema="profileSchema" class="space-y-5" @submit="onSubmit">
-                <UFormField :label="t('dashboard.profile.name')" name="name">
-                    <UInput v-model="state.name" size="lg" class="w-full" />
+            <UForm
+                :state="state"
+                :schema="profileSchema"
+                class="space-y-5"
+                @submit="onSubmit"
+            >
+                <UFormField
+                    :label="t('dashboard.profile.name')"
+                    name="name"
+                >
+                    <UInput
+                        v-model="state.name"
+                        size="lg"
+                        class="w-full"
+                    />
                 </UFormField>
 
                 <UFormField :label="t('dashboard.profile.email')">
-                    <UInput :model-value="user?.email ?? ''" size="lg" class="w-full" disabled />
+                    <UInput
+                        :model-value="user?.email ?? ''"
+                        size="lg"
+                        class="w-full"
+                        disabled
+                    />
                 </UFormField>
 
                 <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                    <UFormField :label="t('dashboard.profile.theme')" name="theme">
+                    <UFormField
+                        :label="t('dashboard.profile.theme')"
+                        name="theme"
+                    >
                         <USelectMenu
                             v-model="state.theme"
                             :items="themeOptions"
@@ -79,7 +103,10 @@
                         />
                     </UFormField>
 
-                    <UFormField :label="t('dashboard.profile.locale')" name="locale">
+                    <UFormField
+                        :label="t('dashboard.profile.locale')"
+                        name="locale"
+                    >
                         <USelectMenu
                             v-model="state.locale"
                             :items="localeOptions"
@@ -91,7 +118,11 @@
                 </div>
 
                 <div class="flex justify-end border-t border-default pt-4">
-                    <UButton type="submit" :loading="saving" icon="i-lucide-save">
+                    <UButton
+                        type="submit"
+                        :loading="saving"
+                        icon="i-lucide-save"
+                    >
                         {{ t('dashboard.profile.save') }}
                     </UButton>
                 </div>

@@ -21,10 +21,10 @@ export default defineNuxtModule({
             (
                 register: (options: {
                     langDir: string
-                    locales: Array<{ code: string; file: string }>
+                    locales: Array<{ code: string, file: string }>
                 }) => void,
             ) => {
-                const locales: Array<{ code: string; file: string }> = []
+                const locales: Array<{ code: string, file: string }> = []
                 for (const code of readdirSync(langDir)) {
                     const dir = resolve(langDir, code)
                     if (!statSync(dir).isDirectory()) continue
