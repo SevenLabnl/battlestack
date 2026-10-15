@@ -108,14 +108,14 @@
                 "heading": "Back-upcodes",
                 "description": "Eenmalige herstelcodes voor als je authenticator niet beschikbaar is. Elke code werkt één keer.",
                 "unused": "{count} ongebruikt",
-                "runningLow": "— bijna op; genereer binnenkort opnieuw.",
+                "runningLow": "(bijna op, genereer binnenkort opnieuw)",
                 "none": "Nog geen back-upcodes gegenereerd.",
                 "generate": "Codes genereren",
                 "regenerate": "Codes opnieuw genereren",
                 "saveTitle": "Sla deze codes nu op",
                 "saveDescription": "Ze worden niet opnieuw getoond. Bewaar ze in een wachtwoordmanager.",
                 "saved": "Ik heb ze opgeslagen",
-                "generated": "Back-upcodes gegenereerd — sla ze nu op",
+                "generated": "Back-upcodes gegenereerd. Sla ze nu op",
                 "generateError": "Back-upcodes genereren mislukt"
             },
             "auditLog": {

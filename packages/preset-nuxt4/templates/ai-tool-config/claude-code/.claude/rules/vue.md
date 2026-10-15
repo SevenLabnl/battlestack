@@ -253,7 +253,7 @@ Vue 3 and Composition API Best Practices
 - Prefer not to use <style> but instead use tailwind classes.
 - Use <script setup> syntax for concise component definitions.
 - Always prefer ref over reactive.
-- Leverage ref, and computed for reactive state management.
+- Use ref and computed for reactive state management.
 - Prever using global pinia store over provide/inject.
 - Implement custom composables for reusable logic.
 

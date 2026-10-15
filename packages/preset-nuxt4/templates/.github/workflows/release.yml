@@ -4,7 +4,7 @@ name: Release
 # big the change is. Nothing here bumps anything on its own, and no push or merge runs it.
 #
 # It writes no commit and opens no pull request. The version lives in the annotated `v*`
-# tag, and the deploy pipeline derives it from there with `git describe` — so there is no
+# tag, and the deploy pipeline derives it from there with `git describe`, so there is no
 # release commit to merge, and no `package.json` field that can fall out of step with the
 # tag. A commit past the last tag builds as `1.4.2-5-gabc1234`, which reads as "not a
 # release" at a glance, because it isn't one.
@@ -51,7 +51,7 @@ jobs:
         # Via env, not `${{ }}` in the script: a branch name may contain `$(...)`.
         env:
           REF_NAME: ${{ github.ref_name }}
-        run: echo "::warning::${REF_NAME} is not the default branch — this tag will point at code that may never be merged"
+        run: echo "::warning::${REF_NAME} is not the default branch; this tag will point at code that may never be merged"
 
       - name: Work out the next version
         id: version
@@ -83,7 +83,7 @@ jobs:
 
           tag="v${major}.${minor}.${patch}"
           if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
-            echo "::error::${tag} already exists but is not the newest tag — the tag history is not linear"
+            echo "::error::${tag} already exists but is not the newest tag; the tag history is not linear"
             exit 1
           fi
 
