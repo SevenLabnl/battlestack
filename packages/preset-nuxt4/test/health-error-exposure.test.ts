@@ -21,4 +21,10 @@ describe('health endpoints keep the database error out of the response', () => {
         expect(src).toMatch(/console\.error\([^)]*db check failed[^)]*, err\)/)
         expect(src).toContain(`error: 'db check failed'`)
     })
+
+    it('boot tasks, whose failures both endpoints return as `boot.failed`', async () => {
+        const src = await readFile(path.join(templates, 'database/server/utils/boot-tasks.ts'), 'utf8')
+        expect(src).not.toMatch(/\.message\b/)
+        expect(src).not.toMatch(/\.stack\b/)
+    })
 })
