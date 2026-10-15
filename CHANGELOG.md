@@ -45,6 +45,9 @@
   accounts), so deleting a user no longer scans each of those tables. Existing
   projects get the schema change on `battlestack pull`; run
   `battlestack db:generate` afterwards and commit the new migration.
+- Ship `test/e2e/api/auth.test.ts` with `nuxt4:auth` instead of `nuxt4:vitest`, so a
+  project without auth (`nuxt4-minimal`) no longer fails its own e2e suite. `pull`
+  removes the untouched file from such projects.
 
 ## v1.3.0 (2026-09-24)
 
