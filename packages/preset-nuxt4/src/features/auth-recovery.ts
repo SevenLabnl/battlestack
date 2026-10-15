@@ -6,7 +6,7 @@ import { STAGE } from '@battlestack/core'
 /** Forgot-password and reset-password. Tokens sha256-hashed at rest. */
 export const authRecoveryFeature: Feature = {
     id: 'nuxt4:auth-recovery',
-    version: '1.1.3',
+    version: '1.1.4',
     label: 'Password recovery',
     description: 'Forgot-password and reset flows with one-time, hashed tokens.',
     frameworks: ['nuxt4'],
