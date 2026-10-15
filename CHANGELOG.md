@@ -37,6 +37,9 @@
   `rules/skills/` duplicates of the `.claude/skills/` workflows, the inert
   `.claude/hooks/hooks.json`, and the `k8s.mdc` entry in the generated `AGENTS.md`.
   Align the index naming rule with drizzle (`<table>_<cols>_idx`).
+- Pin the production Dockerfile's `node:24-alpine` base image by digest in both
+  stages, and remove npm, npx and corepack from the runtime stage, which only
+  runs `node`. Updating the base image is now an explicit change to the digest.
 
 ## v1.3.0 (2026-09-24)
 
