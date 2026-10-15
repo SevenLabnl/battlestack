@@ -232,13 +232,30 @@ function writeChangelog(version) {
     // Today, not HEAD's committer date: --changelog runs before the release
     // commit exists, so %cs of HEAD is whenever the previous merge landed.
     const date = new Date().toISOString().slice(0, 10)
-    const compare = previous ? `\n\n[Full changelog](https://github.com/SevenLabnl/battlestack/compare/${previous}...v${version})` : ''
-    const stanza = `## v${version} (${date})\n\n${entries}${compare}\n`
+    const compareUrl = previous ? `https://github.com/SevenLabnl/battlestack/compare/${previous}...v${version}` : null
 
     const existing = existsSync(CHANGELOG) ? readFileSync(CHANGELOG, 'utf8') : '# Changelog\n'
-    const [heading, ...rest] = existing.split('\n')
-    writeFileSync(CHANGELOG, `${heading}\n\n${stanza}\n${rest.join('\n').replace(/^\n+/, '')}`)
+    writeFileSync(CHANGELOG, renderChangelog(existing, { version, date, entries, compareUrl }))
     console.log(`CHANGELOG.md: added v${version} (${entries.split('\n').length} entries since ${previous ?? 'the first commit'})`)
+}
+
+/**
+ * The new stanza goes under the title. A `## Unreleased` section's hand-written notes become its body, with the
+ * commit subjects below them under `### Commits`; without one, the stanza is the commit subjects alone.
+ */
+export function renderChangelog(existing, { version, date, entries, compareUrl }) {
+    const [heading, ...rest] = existing.split('\n')
+    let body = rest.join('\n')
+    let notes = ''
+    const unreleased = /^## Unreleased[^\n]*\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(body)
+    if (unreleased) {
+        notes = unreleased[1].trim()
+        body = body.slice(0, unreleased.index) + body.slice(unreleased.index + unreleased[0].length)
+    }
+    const compare = compareUrl ? `\n\n[Full changelog](${compareUrl})` : ''
+    const commits = notes ? `${notes}\n\n### Commits\n\n${entries}` : entries
+    const stanza = `## v${version} (${date})\n\n${commits}${compare}\n`
+    return `${heading}\n\n${stanza}\n${body.replace(/^\n+/, '')}`
 }
 
 /**

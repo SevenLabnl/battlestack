@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error plain .mjs release tooling, no declaration file
-import { bump, compare } from '../release-version.mjs'
+import { bump, compare, renderChangelog } from '../release-version.mjs'
 
 describe('bump', () => {
     it.each([
@@ -97,5 +97,30 @@ describe('compare', () => {
     it('rejects a non-semver operand', () => {
         expect(() => compare('0.1', '0.1.0')).toThrow(/not a semver version/)
         expect(() => compare('0.1.0', '1.0.0-.0')).toThrow(/not a semver version/)
+    })
+})
+
+describe('renderChangelog', () => {
+    const stanza = { version: '1.4.0', date: '2026-10-15', entries: '- fix: a (abc1234)', compareUrl: 'https://example.test/compare' }
+
+    it('folds the Unreleased notes into the new stanza, above the commits', () => {
+        const existing = '# Changelog\n\n## Unreleased\n\n- Note one.\n- Note two.\n\n## v1.3.0 (2026-09-24)\n\n- old\n'
+        expect(renderChangelog(existing, stanza)).toBe(
+            '# Changelog\n\n## v1.4.0 (2026-10-15)\n\n- Note one.\n- Note two.\n\n### Commits\n\n- fix: a (abc1234)\n\n'
+            + '[Full changelog](https://example.test/compare)\n\n## v1.3.0 (2026-09-24)\n\n- old\n',
+        )
+    })
+
+    it('writes the commits alone when there is no Unreleased section', () => {
+        const existing = '# Changelog\n\n## v1.3.0 (2026-09-24)\n\n- old\n'
+        expect(renderChangelog(existing, stanza)).toBe(
+            '# Changelog\n\n## v1.4.0 (2026-10-15)\n\n- fix: a (abc1234)\n\n[Full changelog](https://example.test/compare)\n\n'
+            + '## v1.3.0 (2026-09-24)\n\n- old\n',
+        )
+    })
+
+    it('handles an Unreleased section that is the last one in the file', () => {
+        const out = renderChangelog('# Changelog\n\n## Unreleased\n\n- Only note.\n', { ...stanza, compareUrl: null })
+        expect(out).toBe('# Changelog\n\n## v1.4.0 (2026-10-15)\n\n- Only note.\n\n### Commits\n\n- fix: a (abc1234)\n\n')
     })
 })
