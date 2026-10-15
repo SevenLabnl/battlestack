@@ -51,9 +51,9 @@ async function updateModelConfig(id: string, model: string) {
         toast.add({ title: t('mastraAdmin.updated'), color: 'success' })
         await refreshConfigs()
     } catch (error: unknown) {
-        const message =
-            (error as { data?: { statusMessage?: string } })?.data?.statusMessage ??
-            t('mastraAdmin.errorGeneric')
+        const message
+            = (error as { data?: { statusMessage?: string } })?.data?.statusMessage
+                ?? t('mastraAdmin.errorGeneric')
         toast.add({ title: t('mastraAdmin.errorTitle'), description: message, color: 'error' })
     }
 }
@@ -104,9 +104,9 @@ async function updateAgent(id: string, patch: Partial<Pick<AgentRow, 'modelConfi
         toast.add({ title: t('mastraAdmin.updated'), color: 'success' })
         await refreshAgents()
     } catch (error: unknown) {
-        const message =
-            (error as { data?: { statusMessage?: string } })?.data?.statusMessage ??
-            t('mastraAdmin.errorGeneric')
+        const message
+            = (error as { data?: { statusMessage?: string } })?.data?.statusMessage
+                ?? t('mastraAdmin.errorGeneric')
         toast.add({ title: t('mastraAdmin.errorTitle'), description: message, color: 'error' })
     }
 }
@@ -115,7 +115,9 @@ async function updateAgent(id: string, patch: Partial<Pick<AgentRow, 'modelConfi
 <template>
     <div class="space-y-6">
         <div>
-            <h1 class="text-2xl font-bold tracking-tight">{{ t('mastraAdmin.title') }}</h1>
+            <h1 class="text-2xl font-bold tracking-tight">
+                {{ t('mastraAdmin.title') }}
+            </h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {{ t('mastraAdmin.subtitle') }}
             </p>
@@ -123,14 +125,19 @@ async function updateAgent(id: string, patch: Partial<Pick<AgentRow, 'modelConfi
 
         <UCard>
             <template #header>
-                <h2 class="font-semibold">{{ t('mastraAdmin.configsHeader') }}</h2>
+                <h2 class="font-semibold">
+                    {{ t('mastraAdmin.configsHeader') }}
+                </h2>
             </template>
 
             <div
                 v-if="modelsPending && !availableModels.length"
                 class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
             >
-                <UIcon name="i-lucide-loader-circle" class="animate-spin" />
+                <UIcon
+                    name="i-lucide-loader-circle"
+                    class="animate-spin"
+                />
                 {{ t('mastraAdmin.loadingModels') }}
             </div>
 
@@ -141,14 +148,19 @@ async function updateAgent(id: string, patch: Partial<Pick<AgentRow, 'modelConfi
                 {{ t('mastraAdmin.noModels') }}
             </div>
 
-            <div v-else class="space-y-4">
+            <div
+                v-else
+                class="space-y-4"
+            >
                 <div
                     v-for="config in modelConfigs ?? []"
                     :key="config.id"
                     class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
                 >
                     <div class="sm:w-48 shrink-0">
-                        <p class="font-medium">{{ config.name }}</p>
+                        <p class="font-medium">
+                            {{ config.name }}
+                        </p>
                         <p
                             v-if="config.description"
                             class="text-xs text-gray-500 dark:text-gray-400"
@@ -176,24 +188,34 @@ async function updateAgent(id: string, patch: Partial<Pick<AgentRow, 'modelConfi
 
         <UCard>
             <template #header>
-                <h2 class="font-semibold">{{ t('mastraAdmin.agentsHeader') }}</h2>
+                <h2 class="font-semibold">
+                    {{ t('mastraAdmin.agentsHeader') }}
+                </h2>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {{ t('mastraAdmin.agentsSubtitle') }}
                 </p>
             </template>
 
-            <div v-if="!(agentRows ?? []).length" class="text-sm text-gray-500 dark:text-gray-400">
+            <div
+                v-if="!(agentRows ?? []).length"
+                class="text-sm text-gray-500 dark:text-gray-400"
+            >
                 {{ t('mastraAdmin.noAgents') }}
             </div>
 
-            <div v-else class="space-y-4">
+            <div
+                v-else
+                class="space-y-4"
+            >
                 <div
                     v-for="agent in agentRows ?? []"
                     :key="agent.id"
                     class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
                 >
                     <div class="sm:w-48 shrink-0">
-                        <p class="font-medium">{{ agent.name }}</p>
+                        <p class="font-medium">
+                            {{ agent.name }}
+                        </p>
                         <p
                             v-if="agent.description"
                             class="text-xs text-gray-500 dark:text-gray-400"

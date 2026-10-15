@@ -47,10 +47,10 @@ async function save(p: PromptRow) {
         await refresh()
         toast.add({ title: t('prompts.savedTitle', { name: p.name }), color: 'success' })
     } catch (e) {
-        const msg =
-            (e as { statusMessage?: string }).statusMessage ||
-            (e as Error).message ||
-            t('prompts.saveFailed')
+        const msg
+            = (e as { statusMessage?: string }).statusMessage
+                || (e as Error).message
+                || t('prompts.saveFailed')
         errors.value[p.id] = msg
         toast.add({ title: t('prompts.saveFailedTitle'), description: msg, color: 'error' })
     }
@@ -64,10 +64,10 @@ async function reset(p: PromptRow) {
         await refresh()
         toast.add({ title: t('prompts.resetTitle', { name: p.name }), color: 'success' })
     } catch (e) {
-        const msg =
-            (e as { statusMessage?: string }).statusMessage ||
-            (e as Error).message ||
-            t('prompts.resetFailed')
+        const msg
+            = (e as { statusMessage?: string }).statusMessage
+                || (e as Error).message
+                || t('prompts.resetFailed')
         errors.value[p.id] = msg
         toast.add({ title: t('prompts.resetFailedTitle'), description: msg, color: 'error' })
     }
@@ -77,23 +77,39 @@ async function reset(p: PromptRow) {
 <template>
     <UCard>
         <template #header>
-            <h1 class="text-lg font-medium">{{ t('prompts.title') }}</h1>
+            <h1 class="text-lg font-medium">
+                {{ t('prompts.title') }}
+            </h1>
             <p class="text-sm text-muted">
                 {{ t('prompts.subtitle') }}
             </p>
         </template>
 
-        <div v-if="pending">{{ t('prompts.loading') }}</div>
-        <div v-else class="space-y-4">
-            <UCard v-for="p in data?.rows ?? []" :key="p.id" variant="subtle">
+        <div v-if="pending">
+            {{ t('prompts.loading') }}
+        </div>
+        <div
+            v-else
+            class="space-y-4"
+        >
+            <UCard
+                v-for="p in data?.rows ?? []"
+                :key="p.id"
+                variant="subtle"
+            >
                 <template #header>
                     <div class="flex items-center justify-between">
                         <div>
-                            <div class="text-sm font-medium">{{ p.name }}</div>
+                            <div class="text-sm font-medium">
+                                {{ p.name }}
+                            </div>
                             <div class="font-mono text-xs text-muted">
                                 {{ p.key }} · {{ t('prompts.version', { n: p.version }) }}
                             </div>
-                            <div v-if="p.description" class="mt-1 text-xs text-muted">
+                            <div
+                                v-if="p.description"
+                                class="mt-1 text-xs text-muted"
+                            >
                                 {{ p.description }}
                             </div>
                         </div>
@@ -127,16 +143,36 @@ async function reset(p: PromptRow) {
                     :rows="6"
                     class="w-full font-mono text-sm"
                 />
-                <pre v-else class="whitespace-pre-wrap text-sm">{{ p.content }}</pre>
+                <pre
+                    v-else
+                    class="whitespace-pre-wrap text-sm"
+                >{{ p.content }}</pre>
 
-                <p v-if="errors[p.id]" class="mt-2 text-sm text-red-600">{{ errors[p.id] }}</p>
+                <p
+                    v-if="errors[p.id]"
+                    class="mt-2 text-sm text-red-600"
+                >
+                    {{ errors[p.id] }}
+                </p>
 
-                <template v-if="p.id in editing" #footer>
+                <template
+                    v-if="p.id in editing"
+                    #footer
+                >
                     <div class="flex justify-end gap-2">
-                        <UButton color="neutral" variant="ghost" @click="delete editing[p.id]">
+                        <UButton
+                            color="neutral"
+                            variant="ghost"
+                            @click="delete editing[p.id]"
+                        >
                             {{ t('prompts.cancel') }}
                         </UButton>
-                        <UButton color="primary" @click="save(p)">{{ t('prompts.save') }}</UButton>
+                        <UButton
+                            color="primary"
+                            @click="save(p)"
+                        >
+                            {{ t('prompts.save') }}
+                        </UButton>
                     </div>
                 </template>
             </UCard>

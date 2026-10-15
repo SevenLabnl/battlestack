@@ -7,7 +7,7 @@ import { applyColorAliases } from './battlestack-theme.js'
 /** Frontend shell: `app.vue`, `app.config.ts`, layouts, landing page. All emitted files are structural. */
 export const landingShellFeature: Feature = {
     id: 'nuxt4:landing-shell',
-    version: '1.4.0',
+    version: '1.4.1',
     label: 'Landing shell (layouts, public landing page)',
     description: 'Public landing page, layouts, and frontend app shell.',
     frameworks: ['nuxt4'],

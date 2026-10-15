@@ -7,17 +7,23 @@ import {
     type RunContext,
     type PackageManager,
 } from '@battlestack/core'
-import { writeFileEnsured } from '@battlestack/core/utils/fs.js'
+import { readJson, writeFileEnsured, writeJson } from '@battlestack/core/utils/fs.js'
+import { run } from '@battlestack/core/utils/run.js'
 import { templatesDir } from '@battlestack/core/utils/templates.js'
 import { applyVars, renderPmVars } from '../utils/pm-template.js'
 import { STAGE } from '@battlestack/core/constants/stages.js'
 
 const FILES = ['lefthook.yml'] as const
 
+// lefthook's own postinstall runs at scaffold time, before the project has a `.git`.
+// `|| exit 0` keeps installs without a `.git` (Docker) or without dev deps from failing.
+const PREPARE = 'lefthook install || exit 0'
+const PREPARE_TAKEN = 'package.json has its own `prepare` script, so `lefthook install` was not added; make sure it runs it.'
+
 /** Lefthook git hooks: pre-commit eslint. Typecheck runs in CI, not on push. */
 export const ciFeature: Feature = {
     id: 'shared:ci',
-    version: '1.1.1',
+    version: '1.1.2',
     label: 'Git hooks (lefthook)',
     description: 'Pre-commit eslint on staged files via lefthook.',
     stage: STAGE.GITIGNORE,
@@ -43,10 +49,17 @@ export const ciFeature: Feature = {
 
     async execute(ctx) {
         await emit(ctx)
+        await wirePrepare(ctx)
     },
 
     async update(ctx, _prev) {
         await emit(ctx)
+        if (!await wirePrepare(ctx)) {
+            return { written: [...FILES], skipped: [], notes: [PREPARE_TAKEN] }
+        }
+        // pull's install takes pnpm's up-to-date fast path, which skips `prepare`.
+        const pm = String(ctx.state.packageManager ?? 'pnpm') as PackageManager
+        await run(pm, ['run', 'prepare'], { cwd: ctx.projectDir, inherit: ctx.debug }).catch(() => {})
         return { written: [...FILES], skipped: [], notes: [] }
     },
 }
@@ -63,4 +76,16 @@ async function emit(ctx: RunContext): Promise<void> {
         await writeFileEnsured(dest, out)
         recordFile(ctx, 'shared:ci', rel, await hashFile(dest))
     }
+}
+
+/** Adds the `prepare` hook installer. False when the project's own `prepare` is in the way. */
+async function wirePrepare(ctx: RunContext): Promise<boolean> {
+    const pkgPath = path.join(ctx.projectDir, 'package.json')
+    const pkg = await readJson<Record<string, unknown>>(pkgPath)
+    const scripts = (pkg.scripts as Record<string, string> | undefined) ?? {}
+    if (scripts.prepare) return scripts.prepare === PREPARE
+    scripts.prepare = PREPARE
+    pkg.scripts = scripts
+    await writeJson(pkgPath, pkg)
+    return true
 }

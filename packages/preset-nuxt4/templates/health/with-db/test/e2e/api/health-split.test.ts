@@ -9,9 +9,9 @@ interface LiveResponse {
 
 interface ReadyResponse {
     status: 'ok' | 'degraded'
-    env: { ok: boolean; missing?: string[] }
+    env: { ok: boolean, missing?: string[] }
     boot?: { ok: boolean, pending?: string[], failed?: Record<string, string> }
-    db?: { ok: boolean; latencyMs?: number; error?: string }
+    db?: { ok: boolean, latencyMs?: number, error?: string }
 }
 
 describe('e2e: /api/health/live (with-db)', () => {

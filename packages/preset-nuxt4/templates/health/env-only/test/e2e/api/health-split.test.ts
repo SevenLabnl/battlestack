@@ -9,7 +9,7 @@ interface LiveResponse {
 
 interface ReadyResponse {
     status: 'ok' | 'degraded'
-    env: { ok: boolean; missing?: string[] }
+    env: { ok: boolean, missing?: string[] }
 }
 
 describe('e2e: /api/health/live (env-only)', () => {

@@ -1,7 +1,7 @@
 ---
-description: Realtime patterns, Nitro experimental WebSocket
-globs: server/**/*.ts, app/composables/**/*.ts
-alwaysApply: false
+paths:
+  - "server/**/*.ts"
+  - "app/composables/**/*.ts"
 ---
 
 # Realtime Patterns (ws-nitro transport)

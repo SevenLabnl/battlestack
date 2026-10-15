@@ -27,13 +27,13 @@ function classifyMode(id: string): Mode {
         return 'embedding'
     }
     if (
-        lower.includes('whisper') ||
-        lower.includes('tts') ||
-        lower.includes('dall-e') ||
-        lower.includes('moderation') ||
-        lower.includes('transcribe') ||
-        lower.includes('gpt-image') ||
-        lower.includes('sora')
+        lower.includes('whisper')
+        || lower.includes('tts')
+        || lower.includes('dall-e')
+        || lower.includes('moderation')
+        || lower.includes('transcribe')
+        || lower.includes('gpt-image')
+        || lower.includes('sora')
     ) {
         return 'unknown'
     }

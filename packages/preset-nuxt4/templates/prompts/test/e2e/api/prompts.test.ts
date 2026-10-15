@@ -30,7 +30,7 @@ describe('e2e: prompts management', () => {
     it.skipIf(!serverUp)('list returns seeded prompts for an authed user', async () => {
         const adminCookie = await loginAsAdmin()
         const user = await createTestUser(adminCookie)
-        const { status, data } = await apiGet<{ rows: Prompt[]; total: number }>(
+        const { status, data } = await apiGet<{ rows: Prompt[], total: number }>(
             '/api/prompts',
             user.cookie,
         )
@@ -42,7 +42,7 @@ describe('e2e: prompts management', () => {
     it.skipIf(!serverUp)('non-admin is forbidden from PUT /api/prompts/:id', async () => {
         const adminCookie = await loginAsAdmin()
         const user = await createTestUser(adminCookie)
-        const list = await apiGet<{ rows: Prompt[]; total: number }>('/api/prompts', user.cookie)
+        const list = await apiGet<{ rows: Prompt[], total: number }>('/api/prompts', user.cookie)
         const target = list.data?.rows?.[0]
         if (!target) {
             // No seeded prompts → skip the gating assertion. Not a failure.
@@ -58,7 +58,7 @@ describe('e2e: prompts management', () => {
 
     it.skipIf(!serverUp)('admin can update + reset a prompt', async () => {
         const adminCookie = await loginAsAdmin()
-        const list = await apiGet<{ rows: Prompt[]; total: number }>('/api/prompts', adminCookie)
+        const list = await apiGet<{ rows: Prompt[], total: number }>('/api/prompts', adminCookie)
         const target = list.data?.rows?.[0]
         if (!target) return
 

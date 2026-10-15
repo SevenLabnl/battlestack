@@ -18,7 +18,7 @@ import {
 import { installUiPort, ui } from '@battlestack/tui'
 import { parseArgs, stripCommandToken } from './cli/args.js'
 import { dispatchPluginCommand } from './cli/plugin-commands.js'
-import { printHelp } from './cli/help.js'
+import { printCommandHelp, printHelp } from './cli/help.js'
 import { bootstrapProject } from './commands/install.js'
 import { doctorCommand } from './commands/doctor.js'
 import { gatewayUp, registerProject } from './commands/gateway.js'
@@ -149,6 +149,10 @@ async function main(): Promise<void> {
 
     // Runs inside a project or not: it upgrades the globally-installed CLI, not deps.
     if (args.projectName === 'self-update' || args.projectName === 'update') {
+        if (args.help) {
+            printCommandHelp('self-update')
+            return
+        }
         try {
             await selfUpdateCommand({
                 packageManager: args.packageManager,
@@ -247,13 +251,9 @@ async function main(): Promise<void> {
         }
 
         if (args.help) {
-            if (!projectRoot) {
-                ui.banner(VERSION)
-                await printHelp('scaffold', registries)
-                return
-            }
-            // Inside a project, `--help` lists rather than executes.
-            await projectCommand({ ...args, projectName: undefined }, loader, projectRoot, registries, rawArgv)
+            if (printCommandHelp(args.projectName)) return
+            ui.banner(VERSION)
+            await printHelp(projectRoot ? 'project' : 'scaffold', registries, projectRoot ?? undefined)
             return
         }
 

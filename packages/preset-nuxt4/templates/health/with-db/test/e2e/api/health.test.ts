@@ -9,8 +9,8 @@ interface HealthResponse {
     commit: string
     builtAt: string
     checks: {
-        env: { ok: boolean; missing?: string[] }
-        db?: { ok: boolean; latencyMs?: number; error?: string }
+        env: { ok: boolean, missing?: string[] }
+        db?: { ok: boolean, latencyMs?: number, error?: string }
     }
 }
 

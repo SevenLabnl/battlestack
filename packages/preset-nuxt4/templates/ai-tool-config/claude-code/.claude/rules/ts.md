@@ -1,8 +1,8 @@
 ---
-description: TypeScript
-globs: *.ts
-alwaysApply: false
+paths:
+  - "**/*.ts"
 ---
+
 This comprehensive guide outlines best practices when using TypeScript with conventions and standards for development with modern web technologies like Vue 3, Nuxt UI, Pinia, VueUse, and Tailwind.
 
 Development Philosophy

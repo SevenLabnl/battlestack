@@ -102,10 +102,18 @@ async function destroy() {
     <UCard>
         <template #header>
             <div class="flex items-center justify-between">
-                <h1 class="text-lg font-medium">{{ t('userAdmin.edit.title') }}</h1>
-                <UButton variant="ghost" icon="i-lucide-arrow-left" to="/dashboard/users">{{
-                    t('userAdmin.edit.back')
-                }}</UButton>
+                <h1 class="text-lg font-medium">
+                    {{ t('userAdmin.edit.title') }}
+                </h1>
+                <UButton
+                    variant="ghost"
+                    icon="i-lucide-arrow-left"
+                    to="/dashboard/users"
+                >
+                    {{
+                        t('userAdmin.edit.back')
+                    }}
+                </UButton>
             </div>
         </template>
 
@@ -132,8 +140,15 @@ async function destroy() {
                     class="w-full"
                 />
             </UFormField>
-            <UFormField :label="t('userAdmin.create.name')" name="name" eager-validation>
-                <UInput v-model="form.name" class="w-full" />
+            <UFormField
+                :label="t('userAdmin.create.name')"
+                name="name"
+                eager-validation
+            >
+                <UInput
+                    v-model="form.name"
+                    class="w-full"
+                />
             </UFormField>
             <UFormField
                 :label="t('userAdmin.edit.passwordPlaceholder')"
@@ -149,9 +164,18 @@ async function destroy() {
                 />
             </UFormField>
             <UFormField :label="t('userAdmin.create.role')">
-                <USelect v-model="form.role" :items="roleItems" />
+                <USelect
+                    v-model="form.role"
+                    :items="roleItems"
+                />
             </UFormField>
-            <p v-if="formError" role="alert" class="text-sm text-error">{{ formError }}</p>
+            <p
+                v-if="formError"
+                role="alert"
+                class="text-sm text-error"
+            >
+                {{ formError }}
+            </p>
             <div class="flex gap-2 justify-between">
                 <UButton
                     v-if="!isSelf"
@@ -163,26 +187,49 @@ async function destroy() {
                     {{ t('userAdmin.edit.delete') }}
                 </UButton>
                 <span v-else />
-                <UButton type="submit" color="primary" loading-auto>{{ t('userAdmin.edit.save') }}</UButton>
+                <UButton
+                    type="submit"
+                    color="primary"
+                    loading-auto
+                >
+                    {{ t('userAdmin.edit.save') }}
+                </UButton>
             </div>
         </UForm>
 
         <UModal v-model:open="showDelete">
             <template #content>
                 <UCard>
-                    <template #header>{{ t('userAdmin.edit.deleteTitle') }}</template>
-                    <i18n-t keypath="userAdmin.edit.deleteConfirm" tag="p">
+                    <template #header>
+                        {{ t('userAdmin.edit.deleteTitle') }}
+                    </template>
+                    <i18n-t
+                        keypath="userAdmin.edit.deleteConfirm"
+                        tag="p"
+                    >
                         <template #email>
                             <b>{{ user?.email }}</b>
                         </template>
                     </i18n-t>
                     <div class="mt-4 flex gap-2 justify-end">
-                        <UButton color="neutral" variant="ghost" @click="showDelete = false">{{
-                            t('userAdmin.edit.cancel')
-                        }}</UButton>
-                        <UButton color="error" loading-auto @click="destroy">{{
-                            t('userAdmin.edit.deleteConfirmAction')
-                        }}</UButton>
+                        <UButton
+                            color="neutral"
+                            variant="ghost"
+                            @click="showDelete = false"
+                        >
+                            {{
+                                t('userAdmin.edit.cancel')
+                            }}
+                        </UButton>
+                        <UButton
+                            color="error"
+                            loading-auto
+                            @click="destroy"
+                        >
+                            {{
+                                t('userAdmin.edit.deleteConfirmAction')
+                            }}
+                        </UButton>
                     </div>
                 </UCard>
             </template>

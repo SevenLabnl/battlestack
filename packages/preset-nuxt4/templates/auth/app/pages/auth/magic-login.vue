@@ -6,16 +6,36 @@
             </h1>
         </template>
 
-        <div v-if="error" class="space-y-3 text-center">
-            <p class="text-sm text-muted">{{ error }}</p>
+        <div
+            v-if="error"
+            class="space-y-3 text-center"
+        >
+            <p class="text-sm text-muted">
+                {{ error }}
+            </p>
         </div>
-        <div v-else class="flex items-center gap-3 justify-center py-2">
-            <UIcon name="i-lucide-loader-2" class="h-5 w-5 animate-spin text-primary" />
-            <p class="text-sm text-muted">{{ t('auth.magicLogin.signingIn') }}</p>
+        <div
+            v-else
+            class="flex items-center gap-3 justify-center py-2"
+        >
+            <UIcon
+                name="i-lucide-loader-2"
+                class="h-5 w-5 animate-spin text-primary"
+            />
+            <p class="text-sm text-muted">
+                {{ t('auth.magicLogin.signingIn') }}
+            </p>
         </div>
 
-        <template v-if="error" #footer>
-            <UButton to="/login" variant="soft" block>
+        <template
+            v-if="error"
+            #footer
+        >
+            <UButton
+                to="/login"
+                variant="soft"
+                block
+            >
                 {{ t('auth.magicLogin.toLogin') }}
             </UButton>
         </template>

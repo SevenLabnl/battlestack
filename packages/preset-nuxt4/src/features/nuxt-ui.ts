@@ -6,7 +6,7 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
 /** Nuxt UI v4 + Tailwind v4. Registers `@nuxt/ui` module and wires `assets/css/main.css`. */
 export const nuxtUiFeature: Feature = {
     id: 'nuxt4:nuxt-ui',
-    version: '1.2.2',
+    version: '1.2.3',
     label: 'Nuxt UI v4 + Tailwind v4',
     frameworks: ['nuxt4'],
     stage: STAGE.STYLING,

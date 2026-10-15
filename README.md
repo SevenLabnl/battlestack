@@ -283,21 +283,23 @@ differs from what it expects, including missing config and moved files.
 
 ## Ready for AI coding agents
 
-Every project gets an `AGENTS.md` generated from the features you enabled. If
-you skip auth, there's no auth section. If you turn on Mastra, the Mastra
-conventions are included. `CLAUDE.md` is a one-line pointer to `AGENTS.md`, so
-Claude Code and other agents all read the same file.
+Every project gets an `AGENTS.md` generated from the features you enabled. It
+stays short: the house rules every change needs, plus one line per enabled
+feature pointing at its reference notes in `docs/battlestack/`, which agents read
+on demand. If you skip auth, there's no auth file. `CLAUDE.md` is a one-line
+pointer to `AGENTS.md`, so Claude Code and other agents all read the same file.
 
 `.mcp.json` is generated too. It registers MCP servers only for what you turned
 on: Nuxt UI when `nuxt-ui` is enabled, Mastra when Mastra is, Playwright when
 Playwright is.
 
 The rule files in `.claude/rules/` are different: every project gets the same
-set. Each rule declares a glob in its frontmatter, and your agent loads it only
-while editing matching files. `drizzle.mdc` covers `server/database/**/*.ts` and
-`drizzle.config.ts`; `vue.mdc` covers `*.vue`. So a project without a database
-still has `drizzle.mdc` and `postgres.mdc`, but they never load because no
-files match.
+set. Each rule lists globs under `paths:` in its frontmatter, and Claude Code
+loads it only once it reads a matching file. `drizzle.md` covers
+`server/database/**` and `drizzle.config.ts`; `vue.md` covers `**/*.vue`. So a
+project without a database still has `drizzle.md` and `postgres.md`, but they
+never load because no files match. Workflow skills (brainstorming, planning,
+debugging) live in `.claude/skills/` and load on demand.
 
 ## Deployment
 

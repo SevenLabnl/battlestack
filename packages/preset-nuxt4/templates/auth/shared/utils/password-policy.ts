@@ -34,9 +34,9 @@ export function isPasswordPolicyCode(value: unknown): value is PasswordPolicyCod
     return (PASSWORD_POLICY_CODES as readonly unknown[]).includes(value)
 }
 
-export type PasswordCheck =
-    | { valid: true }
-    | { valid: false; code: PasswordPolicyCode; error: string }
+export type PasswordCheck
+    = | { valid: true }
+        | { valid: false, code: PasswordPolicyCode, error: string }
 
 export function checkPasswordPolicy(password: string): PasswordCheck {
     if (password.length < PASSWORD_MIN_LENGTH) {

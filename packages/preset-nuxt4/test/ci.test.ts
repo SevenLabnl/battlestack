@@ -1,18 +1,23 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { run } from '@battlestack/core/utils/run.js'
 import { ciFeature } from '../src/features/ci.js'
 import type { PackageManager } from '@battlestack/core'
 import { mockRunContext } from './test-utils.js'
+
+vi.mock('@battlestack/core/utils/run.js', () => ({ run: vi.fn(async () => ({ stdout: '', stderr: '' })) }))
 
 let projectDir: string
 
 beforeEach(async () => {
     projectDir = await mkdtemp(path.join(os.tmpdir(), 'battlestack-ci-test-'))
+    await writeFile(path.join(projectDir, 'package.json'), '{}')
 })
 
 afterEach(async () => {
+    vi.mocked(run).mockClear()
     await rm(projectDir, { recursive: true, force: true })
 })
 
@@ -47,6 +52,26 @@ describe('ciFeature', () => {
         await ciFeature.execute(ctx('npm'))
         content = await readFile(path.join(projectDir, 'lefthook.yml'), 'utf8')
         expect(content).toContain('npx')
+    })
+
+    it('installs the hooks from a prepare script', async () => {
+        await ciFeature.execute(ctx())
+        const pkg = JSON.parse(await readFile(path.join(projectDir, 'package.json'), 'utf8'))
+        expect(pkg.scripts.prepare).toBe('lefthook install || exit 0')
+    })
+
+    it('keeps an existing prepare script and notes the missing hook install', async () => {
+        await writeFile(path.join(projectDir, 'package.json'), JSON.stringify({ scripts: { prepare: 'husky' } }))
+        const report = await ciFeature.update!(ctx(), null)
+        const pkg = JSON.parse(await readFile(path.join(projectDir, 'package.json'), 'utf8'))
+        expect(pkg.scripts.prepare).toBe('husky')
+        expect(report.notes[0]).toContain('lefthook install')
+        expect(run).not.toHaveBeenCalled()
+    })
+
+    it('update() runs prepare, which pull\'s up-to-date install skips', async () => {
+        await ciFeature.update!(ctx(), null)
+        expect(run).toHaveBeenCalledWith('pnpm', ['run', 'prepare'], expect.objectContaining({ cwd: projectDir }))
     })
 
     it('update() reports lefthook.yml as written', async () => {

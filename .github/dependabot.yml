@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # This repo's own dev tooling. Not the scaffold payload under
+  # This repo's own dev tooling. Not the npm payload under
   # packages/preset-nuxt4/templates/, which is copied verbatim into generated
   # projects and is versioned by the features that emit it.
   - package-ecosystem: npm
@@ -24,3 +24,16 @@ updates:
       interval: monthly
     commit-message:
       prefix: "ci"
+
+  # The digest-pinned base image the scaffold emits. These PRs fail the bump check
+  # until `shared:docker`'s version in src/features/docker.ts is bumped by hand.
+  - package-ecosystem: docker
+    directory: /packages/preset-nuxt4/templates/docker
+    schedule:
+      interval: weekly
+    ignore:
+      # Stay on the 24 LTS line; a major Node move is a deliberate template change.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "fix(docker)"

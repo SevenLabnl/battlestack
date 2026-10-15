@@ -1,6 +1,8 @@
 ---
-description: Security best practices for the application
-globs: "server/**/*.ts, app/**/*.ts, app/**/*.vue"
+paths:
+  - "server/**/*.ts"
+  - "app/**/*.ts"
+  - "app/**/*.vue"
 ---
 
 # Security

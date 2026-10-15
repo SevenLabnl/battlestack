@@ -166,7 +166,7 @@ catalog is complete and so `battlestack doctor` output makes sense.
 | `nuxt4:naming` | Sets `package.json#name`. |
 | `nuxt4:gitignore` | Enforces ignore patterns for git, Nuxt and ESLint. |
 | `nuxt4:essentials` | Nuxt essentials: ESLint, fonts, image, iconify, datepicker, nodemailer. |
-| `nuxt4:docs` | Generates `README.md`, `AGENTS.md` and `CLAUDE.md` from the enabled features. |
+| `nuxt4:docs` | Generates `README.md`, `AGENTS.md`, `CLAUDE.md` and `docs/battlestack/` from the enabled features. |
 | `nuxt4:finalize` | Writes the project manifest. |
 | `shared:formatting` | Formatting config and `.dockerignore`. |
 | `shared:env` | Writes `.env` and `.env.example` from the enabled features. |

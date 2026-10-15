@@ -1,7 +1,12 @@
 <!-- Use VuePic (@vuepic/vue-datepicker) for all date/calendar needs; NEVER use the Nuxt UI calendar component.
      Docs: https://vue3datepicker.com/ -->
 <template>
-    <VueDatePicker v-model="date" :enable-time-picker="false" auto-apply v-bind="$attrs" />
+    <VueDatePicker
+        v-model="date"
+        :enable-time-picker="false"
+        auto-apply
+        v-bind="$attrs"
+    />
 </template>
 
 <script setup lang="ts">

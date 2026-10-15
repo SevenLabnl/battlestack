@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { apiGet, apiPost, isServerUp, loginAsAdmin, BASE_URL } from '~~/test/helpers/setup'
+import { apiDelete, apiGet, apiPost, isServerUp, loginAsAdmin, BASE_URL } from '~~/test/helpers/setup'
 
 // Headless / no-server-up runs skip the suite entirely. Run `pnpm dev` in
 // another terminal to exercise these locally.
@@ -34,8 +34,8 @@ describe('e2e: auth flow', () => {
         if (registrationOn) return // registration was deliberately opened; nothing to assert here
         // Runs exactly when "signup succeeds without auto-login" self-skips; surface why, so the skip isn't silent in the vitest output.
         console.warn(
-            '[auth.e2e] "signup succeeds without auto-login" was SKIPPED: self-service registration is OFF. ' +
-                'Set NUXT_PUBLIC_ALLOW_REGISTRATION=true in .env to exercise the signup happy path.',
+            '[auth.e2e] "signup succeeds without auto-login" was SKIPPED: self-service registration is OFF. '
+            + 'Set NUXT_PUBLIC_ALLOW_REGISTRATION=true in .env to exercise the signup happy path.',
         )
         const { status } = await apiPost('/api/auth/signup', {
             email: `gate-probe-${Date.now()}@example.com`,
@@ -55,6 +55,19 @@ describe('e2e: auth flow', () => {
         const cookie = await loginAsAdmin()
         const logout = await apiPost('/api/auth/logout', {}, cookie)
         expect(logout.status).toBeLessThan(400)
+        // The sealed cookie outlives its `sessions` row, so the server must refuse it, not just the client forget it.
+        expect((await apiGet('/api/auth/sessions', cookie)).status).toBe(401)
+    })
+
+    it.skipIf(!serverUp)('a session revoked from another device stops authenticating', async () => {
+        const revoked = await loginAsAdmin()
+        const other = await loginAsAdmin()
+        const list = await apiGet<{ rows: { id: string, current: boolean }[] }>('/api/auth/sessions', revoked)
+        const current = list.data?.rows.find((r) => r.current)
+        expect(current).toBeTruthy()
+        expect((await apiDelete(`/api/auth/sessions/${current!.id}`, other)).status).toBeLessThan(400)
+        expect((await apiGet('/api/auth/sessions', revoked)).status).toBe(401)
+        expect((await apiGet('/api/auth/sessions', other)).status).toBe(200)
     })
 
     if (!serverUp) {

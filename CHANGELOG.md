@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Keep the generated `AGENTS.md` short: feature sections move to
+  `docs/battlestack/<feature>.md`, and `AGENTS.md` keeps the house rules plus one
+  pointer line per file (60 KB to 6.5 KB for a full-featured project). On `pull`,
+  an edited generated doc is backed up under `.battlestack/pull/`, an owned one
+  is left alone, and a disabled feature's pristine doc is removed.
 - Show localized inline email/password validation in user-admin create/edit and
   signup forms; reuse the canonical password policy and display API error details.
 - Run emitted password-policy and Nuxt form regression tests in generated projects.
@@ -16,6 +21,25 @@
 - Pin generated projects to TypeScript 6: `vue-tsc` and typescript-eslint do not
   support TypeScript 7 yet. A feature's explicit dependency range now also wins
   over a peer pin that `nuxi module add` wrote into the other bucket.
+- Install the lefthook git hooks: generated projects get a
+  `prepare: lefthook install || exit 0` script, and `pull` runs it once.
+- Format the template files with the generated project's own ESLint config, so
+  `pull` no longer turns style differences into merge conflicts. CI now lints
+  the raw templates with that config.
+- `battlestack <command> --help` prints that command's usage, and `--help`
+  inside a project lists the core commands (`pull`, `own`, `doctor`, …).
+- `/api/health` and `/api/health/ready` no longer return the database driver's
+  error message, which could name the host or user; it goes to the server log.
+  The same holds for a failed boot task such as the migration on boot: `boot.failed`
+  now names the task, not its error.
+- Ship Claude Code rules as `.claude/rules/*.md` with `paths:` frontmatter instead
+  of Cursor-format `.mdc` files that Claude Code never loaded. Drop the always-on
+  `rules/skills/` duplicates of the `.claude/skills/` workflows, the inert
+  `.claude/hooks/hooks.json`, and the `k8s.mdc` entry in the generated `AGENTS.md`.
+  Align the index naming rule with drizzle (`<table>_<cols>_idx`).
+- Pin the production Dockerfile's `node:24-alpine` base image by digest in both
+  stages, and remove npm, npx and corepack from the runtime stage, which only
+  runs `node`. Updating the base image is now an explicit change to the digest.
 - Index every `user_id` foreign key in the scaffold's schema (sessions, files,
   audit events, backup codes, passkeys, reset and verification tokens, OAuth
   accounts), so deleting a user no longer scans each of those tables. Existing

@@ -145,3 +145,30 @@ describe('shared:docker (npm-aliased deps)', () => {
         expect(dockerfile).toContain('process.exit(1)')
     })
 })
+
+describe('shared:docker (base image and runtime stage)', () => {
+    async function emitDockerfile(pm: 'pnpm' | 'npm' | 'bun'): Promise<string> {
+        const ctx = mockRunContext({
+            projectDir,
+            enabledFeatures: new Set(['shared:docker']),
+            state: { packageManager: pm },
+            registries: registryWith([dockerFeature]),
+        })
+        await dockerFeature.execute(ctx)
+        return readFile(path.join(projectDir, 'Dockerfile'), 'utf8')
+    }
+
+    it('pins every stage\'s base image by digest', async () => {
+        const froms = (await emitDockerfile('pnpm')).split('\n').filter((l) => l.startsWith('FROM '))
+        expect(froms).toHaveLength(2)
+        for (const from of froms) expect(from).toMatch(/^FROM node:24-alpine@sha256:[0-9a-f]{64} AS \w+$/)
+    })
+
+    it.each(['pnpm', 'npm', 'bun'] as const)('strips npm and corepack from the runtime stage only (%s)', async (pm) => {
+        const dockerfile = await emitDockerfile(pm)
+        const [build = '', runtime = ''] = dockerfile.split(/^# Runtime stage$/m)
+        expect(runtime).toContain('rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack')
+        expect(runtime).toContain('/usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack')
+        expect(build).not.toContain('rm -rf /usr/local/lib/node_modules/npm')
+    })
+})

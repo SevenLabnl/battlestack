@@ -156,6 +156,17 @@ jobs:
           pnpm exec nuxi prepare
           pnpm run lint
 
+      # The scaffold's own `eslint --fix` pass hides a template that breaks the
+      # project's style, but `pull` merges the raw template into the user's
+      # formatted copy, so every such difference becomes a conflict. Pages and
+      # layouts sit outside the paths that exempt them from multi-word names here.
+      - name: Lint the raw templates with the project's config
+        working-directory: ${{ runner.temp }}/scaffold/ci-app
+        run: |
+          cp -r "$GITHUB_WORKSPACE/packages/preset-nuxt4/templates" __templates
+          pnpm exec eslint --rule '{"vue/multi-word-component-names":"off"}' __templates
+          rm -rf __templates
+
       - name: Typecheck
         working-directory: ${{ runner.temp }}/scaffold/ci-app
         run: pnpm run typecheck
@@ -183,6 +194,71 @@ jobs:
       - name: Build the production image
         working-directory: ${{ runner.temp }}/scaffold/ci-app
         run: docker build -t ci-app:ci .
+
+  # `nuxt4:battlestack-theme` is default-off, and enabled it would install the
+  # published theme, not this checkout. This job links the local package in.
+  scaffold-theme:
+    name: Scaffold with the theme layer and build it
+    runs-on: ubuntu-latest
+    needs: bump-check
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the CLI
+        run: pnpm build
+
+      - name: Scaffold
+        run: |
+          mkdir -p "$RUNNER_TEMP/scaffold"
+          node packages/cli/dist/index.js theme-app nuxt4-minimal -y --skip-install --features nuxt4:battlestack-theme --cwd "$RUNNER_TEMP/scaffold"
+
+      - name: Point the theme at this checkout
+        working-directory: ${{ runner.temp }}/scaffold/theme-app
+        env:
+          THEME_DIR: ${{ github.workspace }}/packages/theme
+        run: |
+          node -e '
+            const fs = require("fs")
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"))
+            if (!pkg.dependencies?.["@battlestack/theme"]) throw new Error("scaffold did not add @battlestack/theme")
+            pkg.dependencies["@battlestack/theme"] = "link:" + process.env.THEME_DIR
+            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n")
+          '
+          # `--skip-install` leaves the starter's lockfile behind; CI would otherwise install frozen.
+          pnpm install --no-frozen-lockfile
+
+      # `--skip-install` also skips the post-install format pass.
+      - name: Format
+        working-directory: ${{ runner.temp }}/scaffold/theme-app
+        run: pnpm exec eslint . --fix --no-warn-ignored
+
+      - name: Lint
+        working-directory: ${{ runner.temp }}/scaffold/theme-app
+        run: |
+          pnpm exec nuxi prepare
+          pnpm run lint
+
+      - name: Typecheck
+        working-directory: ${{ runner.temp }}/scaffold/theme-app
+        run: pnpm run typecheck
+
+      - name: Build
+        working-directory: ${{ runner.temp }}/scaffold/theme-app
+        run: pnpm run build
 
   # Native Windows is a supported target, not just WSL. Kept as its own job
   # rather than a matrix leg on `verify` so a Windows failure is legible at a

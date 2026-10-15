@@ -1,7 +1,8 @@
 ---
-description: Mastra AI runtime conventions
-globs: server/mastra/**/*.ts, server/api/chat*.ts, server/api/rag/**/*.ts
-alwaysApply: false
+paths:
+  - "server/mastra/**/*.ts"
+  - "server/api/chat*.ts"
+  - "server/api/rag/**/*.ts"
 ---
 
 # Mastra Conventions

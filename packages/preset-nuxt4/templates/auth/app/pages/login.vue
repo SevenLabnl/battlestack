@@ -11,7 +11,10 @@
             class="space-y-4"
             @submit="onSubmit"
         >
-            <UFormField :label="t('auth.login.email')" name="email">
+            <UFormField
+                :label="t('auth.login.email')"
+                name="email"
+            >
                 <!-- data-allow-mismatch: password managers (LastPass, 1Password, etc.) inject sibling DOM into credential
                          inputs after SSR lands and before hydration, which otherwise prints cascading mismatch warnings. -->
                 <div data-allow-mismatch>
@@ -23,7 +26,10 @@
                     />
                 </div>
             </UFormField>
-            <UFormField :label="t('auth.login.password')" name="password">
+            <UFormField
+                :label="t('auth.login.password')"
+                name="password"
+            >
                 <div data-allow-mismatch>
                     <UInput
                         v-model="state.password"
@@ -48,9 +54,23 @@
                     </UInput>
                 </div>
             </UFormField>
-            <UButton type="submit" :loading="loading" block>{{ t('auth.login.submit') }}</UButton>
-            <p v-if="error" class="text-sm text-error">{{ error }}</p>
-            <p v-if="needsVerification && verificationSent" class="text-sm text-muted">
+            <UButton
+                type="submit"
+                :loading="loading"
+                block
+            >
+                {{ t('auth.login.submit') }}
+            </UButton>
+            <p
+                v-if="error"
+                class="text-sm text-error"
+            >
+                {{ error }}
+            </p>
+            <p
+                v-if="needsVerification && verificationSent"
+                class="text-sm text-muted"
+            >
                 {{ t('auth.login.verification.sent') }}
             </p>
             <UButton
@@ -64,7 +84,10 @@
                 {{ t('auth.login.verification.resend') }}
             </UButton>
 
-            <div v-if="passkeysEnabled || anyOauthEnabled" class="space-y-2 pt-2">
+            <div
+                v-if="passkeysEnabled || anyOauthEnabled"
+                class="space-y-2 pt-2"
+            >
                 <div class="flex items-center gap-3 text-xs text-muted">
                     <div class="h-px flex-1 bg-default" />
                     <span>{{ t('auth.login.orSeparator') }}</span>
@@ -106,7 +129,13 @@
             </div>
         </UForm>
 
-        <UForm v-else :state="mfaState" :schema="mfaSchema" class="space-y-4" @submit="onMfaSubmit">
+        <UForm
+            v-else
+            :state="mfaState"
+            :schema="mfaSchema"
+            class="space-y-4"
+            @submit="onMfaSubmit"
+        >
             <UFormField
                 :label="t('auth.login.mfaCode')"
                 name="code"
@@ -119,10 +148,21 @@
                     class="w-full font-mono"
                 />
             </UFormField>
-            <UButton type="submit" :loading="loading" block>{{
-                t('auth.login.mfaSubmit')
-            }}</UButton>
-            <p v-if="error" class="text-sm text-error">{{ error }}</p>
+            <UButton
+                type="submit"
+                :loading="loading"
+                block
+            >
+                {{
+                    t('auth.login.mfaSubmit')
+                }}
+            </UButton>
+            <p
+                v-if="error"
+                class="text-sm text-error"
+            >
+                {{ error }}
+            </p>
         </UForm>
 
         <div class="flex items-center justify-between gap-4">
@@ -165,8 +205,8 @@ const mfaSchema = z.object({
         .min(6)
         .refine(
             (v) =>
-                /^\d{6}$/.test(v) ||
-                /^[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}$/i.test(v),
+                /^\d{6}$/.test(v)
+                || /^[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}$/i.test(v),
             t('auth.login.validation.mfaCode'),
         ),
 })

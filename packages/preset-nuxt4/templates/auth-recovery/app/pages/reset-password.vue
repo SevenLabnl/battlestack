@@ -1,10 +1,18 @@
 <template>
     <UCard>
         <template #header>
-            <h1 class="text-xl font-semibold">{{ t('authRecovery.reset.title') }}</h1>
+            <h1 class="text-xl font-semibold">
+                {{ t('authRecovery.reset.title') }}
+            </h1>
         </template>
 
-        <UForm v-if="!done" :state="state" :schema="schema" class="space-y-4" @submit="onSubmit">
+        <UForm
+            v-if="!done"
+            :state="state"
+            :schema="schema"
+            class="space-y-4"
+            @submit="onSubmit"
+        >
             <UFormField
                 :label="t('authRecovery.reset.newPassword')"
                 name="password"
@@ -34,7 +42,10 @@
                     </UInput>
                 </div>
             </UFormField>
-            <UFormField :label="t('authRecovery.reset.confirmPassword')" name="confirmPassword">
+            <UFormField
+                :label="t('authRecovery.reset.confirmPassword')"
+                name="confirmPassword"
+            >
                 <div data-allow-mismatch>
                     <UInput
                         v-model="state.confirmPassword"
@@ -44,10 +55,19 @@
                     />
                 </div>
             </UFormField>
-            <UButton type="submit" :loading="loading" block>
+            <UButton
+                type="submit"
+                :loading="loading"
+                block
+            >
                 {{ t('authRecovery.reset.submit') }}
             </UButton>
-            <p v-if="error" class="text-sm text-error">{{ error }}</p>
+            <p
+                v-if="error"
+                class="text-sm text-error"
+            >
+                {{ error }}
+            </p>
         </UForm>
 
         <UAlert
