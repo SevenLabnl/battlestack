@@ -184,8 +184,8 @@ jobs:
         working-directory: ${{ runner.temp }}/scaffold/ci-app
         run: docker build -t ci-app:ci .
 
-  # `nuxt4:battlestack-theme` is default-off and the theme is not on npm, so the
-  # scaffold job above never loads the layer. This one links the local package in.
+  # `nuxt4:battlestack-theme` is default-off, and enabled it would install the
+  # published theme, not this checkout. This job links the local package in.
   scaffold-theme:
     name: Scaffold with the theme layer and build it
     runs-on: ubuntu-latest
