@@ -2,6 +2,7 @@
 
 - Default package manager is **pnpm**. `bun`, `npm`, `yarn` also work; match the project's `packageManager` field. Use `pnpm add`, `pnpm dlx`, `pnpm run`.
 - Always run `pnpm run lint` and `pnpm test` before considering work complete.
+- The workflows in `.claude/skills/` only load when invoked, so reach for them yourself: `task-arbiter` before a task, `brainstorming` before a new feature, `test-driven-development` while coding, `systematic-debugging` for a bug, `verification-before-completion` before calling it done.
 
 ## Pending upstream merges: `.battlestack/pull/`
 
