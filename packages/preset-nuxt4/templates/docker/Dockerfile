@@ -124,7 +124,7 @@ ENV HOST=0.0.0.0
 # Declared in the RUNTIME stage on purpose. They change on every commit, and an ARG the
 # build stage read would invalidate the dependency install and the Nuxt build each time;
 # here only this last, tiny layer is rebuilt. Nitro reads NUXT_PUBLIC_* at server start,
-# so baking them as ENV is enough — nothing has to be inlined at build time, and a
+# so baking them as ENV is enough: nothing has to be inlined at build time, and a
 # deployment can still override any of them.
 ARG APP_VERSION=dev
 ARG GIT_SHA=""

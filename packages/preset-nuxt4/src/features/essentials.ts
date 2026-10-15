@@ -57,7 +57,7 @@ export const essentialsFeature: Feature = {
                 body: [
                     'The scaffold ships SevenLab branding at `public/favicon.ico`, `public/favicon.svg` and `public/apple-touch-icon.png`, wired into `nuxt.config.ts#app.head.link`. They replace the Nuxt-logo favicon that `nuxi init` leaves behind.',
                     '',
-                    'These three paths are **user-owned**: once they exist, `battlestack pull` never touches them. Replace them with the client\'s own branding and the update path will leave your version alone. Keep the filenames — the `<link>` tags in `nuxt.config.ts` point at them. A project scaffolded before the icon pack shipped gets them written once, on the pull that introduces them, and they are user-owned from then on.',
+                    'These three paths are **user-owned**: once they exist, `battlestack pull` never touches them. Replace them with the client\'s own branding and the update path will leave your version alone. Keep the filenames: the `<link>` tags in `nuxt.config.ts` point at them. A project scaffolded before the icon pack shipped gets them written once, on the pull that introduces them, and they are user-owned from then on.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },

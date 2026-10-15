@@ -19,7 +19,7 @@ export function sessionPasswordFrom(config: unknown): string | undefined {
  *
  * `undefined` means auth is not installed, and MUST short-circuit to "nothing missing": `nuxt4:auth` requires
  * `nuxt4:database`, and this variant ships exactly when the database is absent, so demanding a session password
- * here is unsatisfiable by construction — wired to a readiness probe it would keep every pod out of the Service.
+ * here is unsatisfiable by construction: wired to a readiness probe it would keep every pod out of the Service.
  */
 export function checkEnvVars(sessionPassword: string | undefined): string[] {
     if (sessionPassword === undefined) return []

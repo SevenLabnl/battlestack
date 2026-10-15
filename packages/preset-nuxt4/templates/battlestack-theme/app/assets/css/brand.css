@@ -7,8 +7,8 @@
    already valued by @battlestack/theme. A name this file invents is a name no
    component reads.
 
-   Loaded last in app/assets/css/main.css — after Tailwind, after Nuxt UI and
-   after the theme's tokens.css — so a value set here wins.
+   Loaded last in app/assets/css/main.css (after Tailwind, after Nuxt UI and
+   after the theme's tokens.css), so a value set here wins.
 
    Dark mode is the `.dark` class. Any name you set on `:root` must be restated
    in `.dark`, otherwise your light value silently wins in dark mode too
@@ -18,7 +18,7 @@
    they are `ui.colors` in app/app.config.ts. This file is for value-level
    tuning; a full re-brand is a client theme package.
 
-   Re-verify contrast after any colour change — text >= 4.5:1, non-text
+   Re-verify contrast after any colour change: text >= 4.5:1, non-text
    (focus ring, control borders) >= 3:1, in both modes.
 
    `battlestack pull` never touches this file. See DESIGN_SYSTEM.md in the

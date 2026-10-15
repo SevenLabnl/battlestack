@@ -19,7 +19,7 @@ export function sessionPasswordFrom(config: unknown): string | undefined {
  *
  * `undefined` means auth is not installed and the session check is not-applicable: `nuxt4:database` does not
  * require `nuxt4:auth`, so a db-without-auth scaffold is valid and must not fail readiness over a password
- * nothing reads. The database URL is always required — this variant ships exactly when the db feature is on.
+ * nothing reads. The database URL is always required, because this variant ships exactly when the db feature is on.
  */
 export function checkEnvVars(sessionPassword: string | undefined, databaseUrl: string): string[] {
     const missing: string[] = []

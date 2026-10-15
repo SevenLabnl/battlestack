@@ -5,7 +5,7 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
 /** Authenticated app shell under `/dashboard/*`. */
 export const dashboardShellFeature: Feature = {
     id: 'nuxt4:dashboard-shell',
-    version: '1.3.2',
+    version: '1.3.3',
     label: 'Authenticated app shell (/dashboard/*)',
     frameworks: ['nuxt4'],
     stage: STAGE.AUTH,
