@@ -283,10 +283,11 @@ differs from what it expects, including missing config and moved files.
 
 ## Ready for AI coding agents
 
-Every project gets an `AGENTS.md` generated from the features you enabled. If
-you skip auth, there's no auth section. If you turn on Mastra, the Mastra
-conventions are included. `CLAUDE.md` is a one-line pointer to `AGENTS.md`, so
-Claude Code and other agents all read the same file.
+Every project gets an `AGENTS.md` generated from the features you enabled. It
+stays short: the house rules every change needs, plus one line per enabled
+feature pointing at its reference notes in `docs/battlestack/`, which agents read
+on demand. If you skip auth, there's no auth file. `CLAUDE.md` is a one-line
+pointer to `AGENTS.md`, so Claude Code and other agents all read the same file.
 
 `.mcp.json` is generated too. It registers MCP servers only for what you turned
 on: Nuxt UI when `nuxt-ui` is enabled, Mastra when Mastra is, Playwright when

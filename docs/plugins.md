@@ -207,7 +207,7 @@ the feature that owns it.
 | `collectDeps` | the install feature | npm dependencies, prod and dev. |
 | `collectModules` | the scaffold feature | Nuxt module identifiers. |
 | `collectEnv` | the env feature | `.env` entries. Features must never write env files themselves. |
-| `collectDocs` | the docs feature | Sections merged into `README.md` and `AGENTS.md`. |
+| `collectDocs` | the docs feature | Sections written to `docs/battlestack/<feature>.md`, with one pointer line each in `AGENTS.md`. |
 | `collectSkills` | the install feature | AI-agent skills to install. |
 | `collectBuildSecrets` | the docker feature | Docker BuildKit build-time secrets. |
 | `projectCommands` | the CLI | `battlestack <name>` commands, live only while the feature is enabled. |
