@@ -32,7 +32,7 @@ describe('boot tasks', () => {
         const { runBootTask, bootState } = await freshModule()
         vi.spyOn(console, 'error').mockImplementation(() => {})
         await runBootTask('migrate', fail, { fatal: true })
-        expect(bootState()).toEqual({ ready: false, pending: [], failed: { migrate: 'boom' } })
+        expect(bootState()).toEqual({ ready: false, pending: [], failed: { migrate: 'failed' } })
     })
 
     it('only logs a non-fatal failure', async () => {

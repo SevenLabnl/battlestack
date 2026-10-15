@@ -28,6 +28,10 @@
   the raw templates with that config.
 - `battlestack <command> --help` prints that command's usage, and `--help`
   inside a project lists the core commands (`pull`, `own`, `doctor`, …).
+- `/api/health` and `/api/health/ready` no longer return the database driver's
+  error message, which could name the host or user; it goes to the server log.
+  The same holds for a failed boot task such as the migration on boot: `boot.failed`
+  now names the task, not its error.
 
 ## v1.3.0 (2026-09-24)
 

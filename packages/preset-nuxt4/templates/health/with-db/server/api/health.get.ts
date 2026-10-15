@@ -53,10 +53,9 @@ export default defineEventHandler(async (event) => {
         ])
         dbCheck = { ok: true, latencyMs: Date.now() - dbStart }
     } catch (err) {
-        dbCheck = {
-            ok: false,
-            error: err instanceof Error ? err.message : 'db check failed',
-        }
+        // Public route: the driver's message can name the database host, so it only goes to the log.
+        console.error('[health] db check failed:', err)
+        dbCheck = { ok: false, error: 'db check failed' }
     } finally {
         clearTimeout(timer)
     }
