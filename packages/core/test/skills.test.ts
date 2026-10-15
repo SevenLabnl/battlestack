@@ -15,8 +15,9 @@ vi.mock('../src/utils/package-manager.js', async (importOriginal) => {
     return { ...actual, resolveProjectPM: vi.fn(async (o: { fallback?: string }) => o?.fallback ?? 'pnpm') }
 })
 
-const { installSkills, collectSkillSources, nonInteractiveGitEnv } = await import('../src/utils/skills.js')
+const { installSkills, collectSkillSources, nonInteractiveGitEnv, skillsOutcome } = await import('../src/utils/skills.js')
 const { BattlestackRegistries } = await import('../src/registry.js')
+const { getUiPort } = await import('../src/ui-port.js')
 const { STAGE } = await import('../src/constants/stages.js')
 
 const origin = { plugin: 'test-plugin', namespace: 'test' }
@@ -111,6 +112,19 @@ describe('installSkills', () => {
         await expect(installSkills(ctx(), ['mastra-ai/skills'])).resolves.toBeUndefined()
     })
 
+    it('records each failed source and points at access, not the registry', async () => {
+        const warn = vi.spyOn(getUiPort(), 'warn').mockImplementation(() => {})
+        runMock.mockRejectedValueOnce(new Error('Authentication failed'))
+        const c = ctx()
+        await installSkills(c, ['owner/private-repo/skills/a', 'mastra-ai/skills'])
+        expect(c.state.skippedSkills).toEqual(['owner/private-repo/skills/a'])
+        const message = String(warn.mock.calls[0]?.[0])
+        expect(message).toContain('gh auth login')
+        expect(message).toContain('battlestack pull --skills-only')
+        expect(message).not.toContain('registry')
+        warn.mockRestore()
+    })
+
     it('re-runs even when the skill already exists: `skills add` is the update/cleanup path', async () => {
         await mkdir(path.join(projectDir, '.claude', 'skills', 'mastra-ai'), { recursive: true })
         await installSkills(ctx(), ['mastra-ai/skills'])
@@ -180,5 +194,25 @@ describe('nonInteractiveGitEnv', () => {
     it('leaves GIT_SSH (plink and friends) alone', async () => {
         const env = await nonInteractiveGitEnv(projectDir, await gitEnv({ GIT_SSH: 'plink.exe' }))
         expect(env).toEqual({ GIT_TERMINAL_PROMPT: '0' })
+    })
+})
+
+describe('skillsOutcome', () => {
+    it('passes the closing line through when every skill installed', () => {
+        expect(skillsOutcome(ctx(), 'Scaffold complete')).toEqual({ ok: true, line: 'Scaffold complete' })
+    })
+
+    it('names what is missing when a skill was skipped', () => {
+        const { ok, line } = skillsOutcome(ctx({ skippedSkills: ['owner/repo/skills/a'] }), 'Scaffold complete')
+        expect(ok).toBe(false)
+        expect(line).toBe(
+            'Scaffold complete, but 1 skill was not installed: `owner/repo/skills/a`. '
+            + 'Fix access, then run `battlestack pull --skills-only`.',
+        )
+    })
+
+    it('counts several', () => {
+        expect(skillsOutcome(ctx({ skippedSkills: ['a', 'b'] }), 'Update complete').line)
+            .toContain('2 skills were not installed: `a`, `b`')
     })
 })
