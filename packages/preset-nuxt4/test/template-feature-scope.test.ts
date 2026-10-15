@@ -33,15 +33,21 @@ const WRITTEN_BY_CODE: Record<string, string> = {
 
 /** Calls into a feature that isn't required, each guarded where it is made. `subtree/file -> feature`. */
 const OPTIONAL_CALLS = new Set([
-    'auth/app/pages/login.vue -> nuxt4:oauth', // v-if on the configured providers
-    'auth/app/pages/login.vue -> nuxt4:auth-verification', // only after the server reports an unverified email
-    'auth/app/composables/useAuth.ts -> nuxt4:auth-2fa', // only after login answers with an MFA challenge
-    'dashboard-shell/app/pages/dashboard/security.vue -> nuxt4:auth-passkeys', // v-if="passkeysAvailable"
-    'dashboard-shell/app/pages/dashboard/security.vue -> nuxt4:audit-log', // runtimeConfig.public.auditLog
-    'landing-shell/app/layouts/default.vue -> nuxt4:storage', // avatar menu only when storage is on
-    'mastra-admin/app/pages/dashboard/settings/ai.vue -> nuxt4:prompts', // tolerates the 404
-    'vitest/test/helpers/setup.ts -> nuxt4:auth', // loginAsAdmin, called only by auth-dependent tests
-    'vitest/test/helpers/setup.ts -> nuxt4:user-admin', // createUser, called only by user-admin-dependent tests
+    // Buttons render only for providers in runtimeConfig.public.oauthProviders, which nuxt4:oauth sets.
+    'auth/app/pages/login.vue -> nuxt4:oauth',
+    // Only after login answers EMAIL_NOT_VERIFIED, which needs nuxt4:auth-verification's table.
+    'auth/app/pages/login.vue -> nuxt4:auth-verification',
+    // Only after login answers requiresMfa, which needs an enabled totp_secrets row.
+    'auth/app/composables/useAuth.ts -> nuxt4:auth-2fa',
+    // Probed on load; a 404 hides the card.
+    'dashboard-shell/app/pages/dashboard/security.vue -> nuxt4:auth-passkeys',
+    'dashboard-shell/app/pages/dashboard/security.vue -> nuxt4:audit-log',
+    // Fetched in a try/catch; a missing route keeps the default avatar.
+    'landing-shell/app/layouts/default.vue -> nuxt4:storage',
+    // `.catch` falls back to an empty list.
+    'mastra-admin/app/pages/dashboard/settings/ai.vue -> nuxt4:prompts',
+    // loginAs/loginAsAdmin: every caller's feature requires nuxt4:auth.
+    'vitest/test/helpers/setup.ts -> nuxt4:auth',
 ])
 
 /** Known violations awaiting a fix. Remove an entry when it is fixed; the test fails on a stale one. */
@@ -49,6 +55,8 @@ const KNOWN_VIOLATIONS = new Set([
     // Health's session-secret check imports auth's helper; database without auth does not build.
     'health/with-db/server/utils/health-checks.ts -> nuxt4:auth',
     'health/with-db/test/unit/health.test.ts -> nuxt4:auth',
+    // createTestUser posts /api/users, but auth-2fa's and storage's tests call it without requiring user-admin.
+    'vitest/test/helpers/setup.ts -> nuxt4:user-admin',
 ])
 
 interface Template { subtree: string, rel: string }
