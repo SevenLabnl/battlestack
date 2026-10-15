@@ -270,7 +270,7 @@ async function main(): Promise<void> {
                 throw new CLIError(
                     ErrorCode.SCAFFOLD_FAILED,
                     `\`${args.projectName}\` runs inside a battlestack project, and there is none here or in a parent directory.`
-                    + (migrate ? ' A project made with another tool can be converted first: battlestack migrate --help' : ''),
+                    + (migrate ? ' A project made with another tool can be converted first: battlestack migrate' : ''),
                 )
             }
             if (!asCommand) {

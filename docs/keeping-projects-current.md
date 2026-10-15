@@ -37,7 +37,7 @@ your changes from the pull's.
 
 A project without `.battlestack/manifest.json` is not a battlestack project yet.
 `pull` says so instead of starting a new project. If a plugin can convert it from
-another tool, `battlestack migrate --help` lists how.
+another tool, `battlestack migrate` lists the conversions on offer.
 
 ## What pull actually does per file
 

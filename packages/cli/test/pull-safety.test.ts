@@ -80,7 +80,7 @@ describe('preflight', () => {
         await write('a.txt', 'changed\n')
         const manifest = manifestWith({})
         await expect(preflight(projectDir, manifest, { allowDirty: false })).rejects.toThrow(/uncommitted changes/)
-        await expect(preflight(projectDir, manifest, { allowDirty: true })).resolves.toEqual({ git: true })
+        await expect(preflight(projectDir, manifest, { allowDirty: true })).resolves.toEqual({ git: true, clean: false })
     })
 
     it('refuses to start while a merged file still has conflict markers', async () => {
@@ -90,7 +90,7 @@ describe('preflight', () => {
     })
 
     it('runs outside git, reporting that it could not check', async () => {
-        await expect(preflight(projectDir, manifestWith({}), { allowDirty: false })).resolves.toEqual({ git: false })
+        await expect(preflight(projectDir, manifestWith({}), { allowDirty: false })).resolves.toEqual({ git: false, clean: false })
     })
 })
 
@@ -111,6 +111,8 @@ describe('repairOverwrites', () => {
         expect(await read('Dockerfile')).toBe('FROM node\nCOPY patches/ ./patches/\n')
         expect(await read('.battlestack/pull/Dockerfile.new')).toBe('FROM node:24\n')
         expect(updateLedger(ctx).staged).toContain('Dockerfile')
+        // Unmerged, so the next pull must still see the old upstream as the base.
+        expect((ctx.state['files:test:feat'] as Record<string, string>).Dockerfile).toBe(sha256('FROM node\n'))
     })
 
     it('leaves a file alone that was pristine before the pull', async () => {
@@ -142,5 +144,20 @@ describe('report', () => {
         expect(text).toContain('.battlestack/pull/<path>.new')
         expect(text).toContain('- Set `X`.')
         expect(text).not.toMatch(/—/)
+    })
+})
+
+describe('pull with --allow-dirty', () => {
+    it('skips the overwrite check, so an uncommitted edit is never treated as feature output', async () => {
+        git('init', '-q')
+        await write('a.ts', 'committed, already edited\n')
+        git('add', '-A')
+        git('commit', '-q', '-m', 'init')
+        await write('a.ts', 'uncommitted edit\n')
+
+        const safety = await preflight(projectDir, manifestWith({ 'a.ts': sha256('scaffold\n') }), { allowDirty: true })
+        expect(safety.clean).toBe(false)
+        // pull runs repairOverwrites only when `clean`, so the uncommitted bytes stay as they are.
+        expect(await read('a.ts')).toBe('uncommitted edit\n')
     })
 })
