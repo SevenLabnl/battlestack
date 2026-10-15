@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.4.0 (2026-10-15)
+
+- fix(preset-nuxt4): patch nuxt.config.ts without reformatting it (cec625c)
+- fix(add): run the eslint --fix pass after adding a feature (fa91019)
+- fix(user-admin): drop outstanding reset links on an email or password change (29cfcfa)
+- fix(nuxt4): pin generated projects to TypeScript 6 (295bbc8)
+- fix(nuxt4): address review on user form validation (943d0b6)
+- fix(nuxt4): explain and validate email and password requirements (ce0c0c6)
+- fix(core): preserve explicitly owned obsolete template files (85ca934)
+- fix(admin): type async-data fetch responses explicitly (dddd0ac)
+- fix(mastra): bump past current main feature version (2afd8c2)
+- fix(mastra): type admin fetch responses to avoid recursive route inference (f6d2aff)
+- fix(auth-2fa): type fetch responses to avoid recursive Nuxt route inference (eac4964)
+- fix(docs): bump writer for release workflow documentation update (b30dd65)
+- fix(mastra): turn Mastra's PostHog telemetry off by default (f7d6371)
+- chore(deps): bump vite from 8.3.1 to 8.3.2 (178a01c)
+- fix(docker): pin pnpm to a major in the generated Dockerfile (361ead2)
+- fix(release): pass when a retried POST finds the release already created (cd2c879)
+- fix(core): keep the recorded project name inside a git worktree (2bfd5c6)
+- docs(readme): cover plugin outdated, update and auto-update (68f6f65)
+- docs(readme): rewrite in plain language and add a quick start section (cd08363)
+- docs(readme): add npm, CI, node and license badges; list all six packages (b65becf)
+- fix(release): keep the token out of argv and report every publish failure (6a677d3)
+- fix(release): survive old curl and transient API errors when publishing (fe54c02)
+- fix(release): publish the release through the REST API, not the gh CLI (a5c2799)
+- fix(docs): say what pull really does to an edited file (0c78ea1)
+- fix(core): run `skills add` with git and ssh unable to prompt (d7eded3)
+- chore(deps): bump the dev-tooling group across 1 directory with 2 updates (b203217)
+- feat(cli): plugin update, outdated and an auto-update policy (8b5d5f9)
+- chore(deps): bump vite from 8.3.0 to 8.3.1 (5396f15)
+
+[Full changelog](https://github.com/SevenLabnl/battlestack/compare/v1.3.0...v1.4.0)
+
 ## Unreleased
 
 - Show localized inline email/password validation in user-admin create/edit and
