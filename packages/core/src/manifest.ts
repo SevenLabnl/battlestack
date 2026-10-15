@@ -10,7 +10,7 @@ import type { RunContext } from './types/run-context.js'
 import type { BattlestackRegistries } from './registry.js'
 import { getUiPort } from './ui-port.js'
 import { migrateStateDir, STATE_DIR } from './utils/state-dir.js'
-import { isLinkedWorktree, resolveProjectName } from './project-name.js'
+import { resolveProjectName } from './project-name.js'
 
 export const MANIFEST_PATH = `${STATE_DIR}/manifest.json`
 
@@ -197,25 +197,33 @@ export async function writeManifest(
     await writeJson(target, manifest)
 }
 
-/** Restamps `projectName` after a directory rename. Returns the previous name, or null. A linked worktree is never a rename. */
-export async function reconcileProjectName(
+/** Records the directory name as `projectName` when the manifest has none. Never renames a named project. */
+export async function stampProjectName(
     projectDir: string,
     manifest: ProjectManifest,
-): Promise<string | null> {
-    const current = path.basename(projectDir)
-    const recorded = manifest.projectName
-    if (recorded === current) return null
-    if (recorded && isLinkedWorktree(projectDir)) return null
-    manifest.projectName = current
-    if (recorded) {
-        const prev = new Set(manifest.previousNames ?? [])
-        prev.add(recorded)
-        prev.delete(current)
-        manifest.previousNames = [...prev]
-    }
+): Promise<void> {
+    if (manifest.projectName) return
+    manifest.projectName = path.basename(projectDir)
     manifest.updatedAt = new Date().toISOString()
     await writeJson(path.join(projectDir, MANIFEST_PATH), manifest)
-    return recorded ?? null
+}
+
+/** Renames the project in the manifest, keeping the old name in `previousNames`. Returns the old name, or null when unchanged. */
+export async function renameProject(
+    projectDir: string,
+    manifest: ProjectManifest,
+    name: string,
+): Promise<string | null> {
+    const recorded = resolveProjectName(projectDir, manifest)
+    if (recorded === name) return null
+    const prev = new Set(manifest.previousNames ?? [])
+    prev.add(recorded)
+    prev.delete(name)
+    manifest.projectName = name
+    manifest.previousNames = [...prev]
+    manifest.updatedAt = new Date().toISOString()
+    await writeJson(path.join(projectDir, MANIFEST_PATH), manifest)
+    return recorded
 }
 
 /** A file matching its recorded hash is unmodified and safe to overwrite. */

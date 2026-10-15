@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { hashFile, readManifest, reconcileProjectName, recordFile, writeManifest } from '../src/manifest.js'
+import { hashFile, readManifest, recordFile, stampProjectName, writeManifest } from '../src/manifest.js'
 import { BattlestackRegistries } from '../src/registry.js'
 import type { Feature } from '../src/types/feature.js'
 import type { ProjectManifest } from '../src/types/project-manifest.js'
@@ -392,7 +392,7 @@ describe('manifest', () => {
         expect(m.cliVersion).toBe('9.9.9')
     })
 
-    it('reconcileProjectName returns the old name on rename and restamps', async () => {
+    it('stampProjectName never overwrites a recorded name', async () => {
         registries.features.register(fakeFeature('test:manifest-e'), origin)
         const ctx = makeCtx(['test:manifest-e'])
         await writeManifest(ctx)
@@ -400,14 +400,11 @@ describe('manifest', () => {
         const m = (await readManifest(tmpDir)) as ProjectManifest
         m.projectName = 'old-name'
 
-        expect(await reconcileProjectName(tmpDir, m)).toBe('old-name')
-        const after = (await readManifest(tmpDir)) as ProjectManifest
-        expect(after.projectName).toBe(path.basename(tmpDir))
-        // Second run: quiet.
-        expect(await reconcileProjectName(tmpDir, after)).toBeNull()
+        await stampProjectName(tmpDir, m)
+        expect(m.projectName).toBe('old-name')
     })
 
-    it('reconcileProjectName stamps legacy manifests silently', async () => {
+    it('stampProjectName stamps legacy manifests with the directory name', async () => {
         registries.features.register(fakeFeature('test:manifest-f'), origin)
         const ctx = makeCtx(['test:manifest-f'])
         await writeManifest(ctx)
@@ -415,7 +412,7 @@ describe('manifest', () => {
         const m = (await readManifest(tmpDir)) as ProjectManifest
         delete m.projectName
 
-        expect(await reconcileProjectName(tmpDir, m)).toBeNull()
+        await stampProjectName(tmpDir, m)
         const after = (await readManifest(tmpDir)) as ProjectManifest
         expect(after.projectName).toBe(path.basename(tmpDir))
     })

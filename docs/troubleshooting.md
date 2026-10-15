@@ -338,18 +338,22 @@ compromised. For a one-off exception, pass the package manager's
 
 ## Cleaning up
 
-### I renamed the project directory
+### I want to rename the project
+
+The project's name is the `projectName` in `.battlestack/manifest.json`, not the
+directory name. A clone, a CI checkout or a worktree under another directory
+name keeps the recorded name; commands print a one-line note about the
+mismatch. To rename on purpose:
 
 ```bash
-battlestack cleanup old-name
+battlestack rename new-name
+battlestack pull         # regenerate the files that use the name
+battlestack cleanup      # reconcile what ran under the old name
 ```
 
-Reconciles what was registered under the old name: Docker resources, hosts
-entries, gateway routes.
-
-A git worktree (`git worktree add`) is not a rename. Inside one, battlestack
-keeps the project name from the manifest, so the worktree shares the main
-checkout's Docker Compose project and port defaults.
+`cleanup` finds Docker resources, hosts entries and gateway routes registered
+under every earlier name the manifest records. For a name it does not record,
+pass it: `battlestack cleanup old-name`.
 
 ### Removing everything for a project
 

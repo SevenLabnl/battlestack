@@ -295,7 +295,7 @@ describe('projectCommand', () => {
         expect(out).not.toContain('scaffold-only command')
     })
 
-    it('stamps projectName into the manifest on first run (rename reconciliation)', async () => {
+    it('stamps the directory name into a manifest that records no projectName', async () => {
         await projectCommand(args('hello'), loader, projectDir, registries, ['hello'])
         const manifest = JSON.parse(
             await import('node:fs/promises').then((fs) =>
@@ -303,5 +303,20 @@ describe('projectCommand', () => {
             ),
         )
         expect(manifest.projectName).toBe(path.basename(projectDir))
+    })
+
+    it('keeps a recorded name that differs from the directory name, and says so', async () => {
+        const file = path.join(projectDir, '.battlestack', 'manifest.json')
+        const fs = await import('node:fs/promises')
+        await fs.writeFile(file, JSON.stringify({ ...JSON.parse(await fs.readFile(file, 'utf8')), projectName: 'my-app' }))
+        const lines: string[] = []
+        vi.mocked(console.log).mockImplementation((...a: unknown[]) => {
+            lines.push(a.join(' '))
+        })
+        await projectCommand(args('hello'), loader, projectDir, registries, ['hello'])
+        const manifest = JSON.parse(await fs.readFile(file, 'utf8'))
+        expect(manifest.projectName).toBe('my-app')
+        expect(manifest.previousNames).toBeUndefined()
+        expect(lines.join('\n')).toContain('battlestack rename <name>')
     })
 })

@@ -7,9 +7,9 @@ export interface ProjectManifest {
     framework: string
     template: string
     packageManager: string
-    /** Directory basename the project last ran under. A mismatch is a rename. */
+    /** The project's name. A different directory name does not change it; `battlestack rename` does. */
     projectName?: string
-    /** Prior directory basenames, appended by `reconcileProjectName` on each rename. */
+    /** Prior project names, appended by `renameProject`. */
     previousNames?: string[]
     createdAt: string
     updatedAt: string

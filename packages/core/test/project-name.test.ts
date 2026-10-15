@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promise
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { MANIFEST_PATH, readManifest, reconcileProjectName, writeManifest } from '../src/manifest.js'
+import { MANIFEST_PATH, readManifest, renameProject, stampProjectName, writeManifest } from '../src/manifest.js'
 import { isLinkedWorktree, resolveProjectName } from '../src/project-name.js'
 import { BattlestackRegistries } from '../src/registry.js'
 import { buildRunContext } from '../src/run-context.js'
@@ -94,9 +94,9 @@ describe('project name in a linked worktree', () => {
         expect(resolveProjectName(worktreeDir, { projectName: undefined })).toBe('my-app-feature')
     })
 
-    it('reconcileProjectName leaves the manifest alone', async () => {
+    it('stampProjectName leaves the manifest alone', async () => {
         const m = (await readManifest(worktreeDir, registries)) as ProjectManifest
-        expect(await reconcileProjectName(worktreeDir, m)).toBeNull()
+        await stampProjectName(worktreeDir, m)
         const after = await readRaw(worktreeDir)
         expect(after.projectName).toBe('my-app')
         expect(after.previousNames).toBeUndefined()
@@ -112,15 +112,57 @@ describe('project name in a linked worktree', () => {
     })
 })
 
-describe('project name in the main checkout', () => {
-    it('still restamps after a real rename', async () => {
+describe('project name outside a worktree', () => {
+    async function cloneInto(dirName: string): Promise<string> {
+        const clone = path.join(root, dirName)
+        execFileSync('git', ['clone', '-q', mainDir, clone], { stdio: 'ignore' })
+        return clone
+    }
+
+    it('keeps the recorded name in a clone under another directory name', async () => {
+        const clone = await cloneInto('demo')
+        const m = (await readManifest(clone, registries)) as ProjectManifest
+        expect(resolveProjectName(clone, m)).toBe('my-app')
+        await stampProjectName(clone, m)
+        const ctx = buildRunContext({ projectDir: clone, manifest: m }, registries)
+        expect(ctx.projectName).toBe('my-app')
+        await writeManifest(ctx, { cliVersion: '2.0.0' })
+        const after = await readRaw(clone)
+        expect(after.projectName).toBe('my-app')
+        expect(after.previousNames).toBeUndefined()
+    })
+
+    it('keeps the recorded name after the directory is renamed', async () => {
         const renamed = path.join(root, 'my-renamed-app')
         await rename(mainDir, renamed)
         const m = (await readManifest(renamed, registries)) as ProjectManifest
-        expect(resolveProjectName(renamed, m)).toBe('my-renamed-app')
-        expect(await reconcileProjectName(renamed, m)).toBe('my-app')
-        const after = await readRaw(renamed)
-        expect(after.projectName).toBe('my-renamed-app')
+        expect(resolveProjectName(renamed, m)).toBe('my-app')
+        await stampProjectName(renamed, m)
+        expect((await readRaw(renamed)).projectName).toBe('my-app')
+    })
+})
+
+describe('renameProject', () => {
+    it('renames and keeps the old name in previousNames', async () => {
+        const m = (await readManifest(mainDir, registries)) as ProjectManifest
+        expect(await renameProject(mainDir, m, 'shop')).toBe('my-app')
+        const after = await readRaw(mainDir)
+        expect(after.projectName).toBe('shop')
         expect(after.previousNames).toEqual(['my-app'])
+    })
+
+    it('renaming back drops the name from previousNames', async () => {
+        const m = (await readManifest(mainDir, registries)) as ProjectManifest
+        await renameProject(mainDir, m, 'shop')
+        expect(await renameProject(mainDir, m, 'my-app')).toBe('shop')
+        const after = await readRaw(mainDir)
+        expect(after.projectName).toBe('my-app')
+        expect(after.previousNames).toEqual(['shop'])
+    })
+
+    it('is a no-op for the current name', async () => {
+        const m = (await readManifest(mainDir, registries)) as ProjectManifest
+        expect(await renameProject(mainDir, m, 'my-app')).toBeNull()
+        expect((await readRaw(mainDir)).previousNames).toBeUndefined()
     })
 })
