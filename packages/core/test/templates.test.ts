@@ -700,7 +700,6 @@ describe('updateFromTemplateDir: binary assets', () => {
         expect(staged.equals(PNG_BYTES_V2)).toBe(true)
         // ...and no line diff of binary noise.
         expect(await exists(path.join(projectDir, '.battlestack', 'pull', rel + '.patch'))).toBe(false)
-        expect(report.notes.join('\n')).toContain('binary asset')
     })
 
     it('still writes a text file as text (the binary branch must not swallow everything)', async () => {

@@ -12,7 +12,7 @@ const FEATURE_ID = 'shared:github'
 /** GitHub Actions gate: lint, typecheck, coverage, dependency audit. `<pm> audit` is advisory. */
 export const githubFeature: Feature = {
     id: 'shared:github',
-    version: '3.1.1',
+    version: '3.1.2',
     label: 'GitHub Actions workflows',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,
@@ -26,7 +26,7 @@ export const githubFeature: Feature = {
                 body: [
                     '`.github/workflows/lint-test.yml` runs lint, typecheck, test coverage and a dependency audit on pushes/PRs (plus a weekly scheduled run). Runs on `ubuntu-latest` by default, so it needs no self-hosted runner.',
                     '',
-                    '`.github/workflows/release.yml` cuts a version number: **Actions → Release → Run workflow**, pick `patch`, `minor` or `major`. It reads the highest `v*` tag, bumps it, pushes the new annotated tag and publishes a GitHub release with generated notes. Dispatch-only — no push or merge triggers it, because the number is a human decision.',
+                    '`.github/workflows/release.yml` cuts a version number: **Actions → Release → Run workflow**, pick `patch`, `minor` or `major`. It reads the highest `v*` tag, bumps it, pushes the new annotated tag and publishes a GitHub release with generated notes. Dispatch-only: no push or merge triggers it, because the number is a human decision.',
                     '',
                     'It writes no commit and opens no pull request, so it needs no PAT and never argues with a protected branch. The version is a property of the tagged commit; the deploy pipeline derives it with `git describe` and bakes it into the image. Tagging does not deploy.',
                     '',
@@ -59,11 +59,11 @@ export const githubFeature: Feature = {
         const written = await emit(ctx)
         const { removed, kept } = await dropObsolete(ctx)
         const notes: string[] = []
-        if (removed.length > 0) notes.push(`removed (SonarQube left this feature): ${removed.join(', ')}`)
+        if (removed.length > 0) notes.push(`removed, no longer shipped by this feature: ${removed.join(', ')}`)
         for (const rel of kept) {
             notes.push(`${rel}: edited since install, so left in place and no longer managed; delete it by hand if unused`)
         }
-        return { written, skipped: [], notes }
+        return { written, skipped: [], notes, unmanaged: kept }
     },
 }
 
@@ -100,13 +100,25 @@ async function emit(ctx: RunContext): Promise<string[]> {
     return written
 }
 
-/** Paths this feature emitted before 3.0.0 and no longer owns. */
-const OBSOLETE_PATHS = ['.github/workflows/lint-test-sonarqube.yml', 'sonar-project.properties']
+/** Paths this feature emitted in earlier versions and no longer owns. */
+const OBSOLETE_PATHS = [
+    '.github/workflows/lint-test-sonarqube.yml',
+    'sonar-project.properties',
+    '.github/workflows/development.yml',
+    '.github/workflows/staging.yml',
+    '.github/workflows/production.yml',
+]
+
+function trackedByAnotherFeature(ctx: RunContext, rel: string): boolean {
+    return Object.entries(ctx.state).some(([key, value]) =>
+        key.startsWith('files:') && key !== `files:${FEATURE_ID}`
+        && Boolean(value) && typeof value === 'object' && rel in (value as Record<string, string>))
+}
 
 /**
- * Drops the pre-3.0.0 SonarQube files. An untouched file is deleted; an edited
- * one is left on disk and merely unrecorded, so a project that customised it
- * keeps it and owns it.
+ * Drops files earlier versions shipped. One another feature now writes is only unrecorded
+ * here. Otherwise an untouched file is deleted, and an edited one is left on disk unrecorded,
+ * so a project that customised it keeps it and owns it.
  */
 async function dropObsolete(ctx: RunContext): Promise<{ removed: string[], kept: string[] }> {
     const recorded = (ctx.state[`files:${FEATURE_ID}`] as Record<string, string> | undefined) ?? {}
@@ -114,7 +126,7 @@ async function dropObsolete(ctx: RunContext): Promise<{ removed: string[], kept:
     const kept: string[] = []
     for (const rel of OBSOLETE_PATHS) {
         const abs = path.join(ctx.projectDir, rel)
-        if (!(await exists(abs))) {
+        if (!(await exists(abs)) || trackedByAnotherFeature(ctx, rel)) {
             dropRecordedFile(ctx, FEATURE_ID, rel)
             continue
         }

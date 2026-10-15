@@ -22,6 +22,7 @@ import {
     type ReservedCommand,
     type RunContext,
     resolveProjectName,
+    UPDATING_STATE_KEY,
     type ProjectManifest,
 } from '@battlestack/core'
 import { applyEnv, collectEnvForFeature } from '@battlestack/preset-nuxt4'
@@ -369,7 +370,7 @@ function buildCtx(
         framework: registries.frameworks.get(manifest.framework),
         template: registries.templates.get(manifest.template),
         enabledFeatures: new Set(enabled),
-        state: { packageManager: pm, skipInstall: args.skipInstall },
+        state: { packageManager: pm, skipInstall: args.skipInstall, [UPDATING_STATE_KEY]: !args.dryRun },
         debug: args.debug,
         dryRun: args.dryRun,
         registries,
