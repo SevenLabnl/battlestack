@@ -35,8 +35,10 @@ export class NuxtConfig {
         // as-is, `pushUnique` would call `.push` on it and throw. Modules/css are
         // array-only in Nuxt, so extends is the one key needing this.
         if (typeof this.config.extends === 'string') this.config.extends = [this.config.extends]
+        const created = this.config.extends === undefined
         this.config.extends ||= []
         pushUnique(this.config.extends, layer)
+        if (created) moveAfterIds(this.config.$ast, 'extends')
         return this
     }
 
@@ -172,11 +174,12 @@ export class NuxtConfig {
     }
 
     async save(): Promise<void> {
-        // Matches the project's ESLint style: single quotes, indent 4.
+        // Matches the project's ESLint style: single quotes, indent 4. magicast only honours styles
+        // under `format`, and detects the rest from the file, never wider than 2.
         const { code } = generateCode(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             this.mod as any,
-            { quote: 'single', tabWidth: 4 },
+            { format: { quote: 'single', tabWidth: 4, useTabs: false } },
         )
         const withTrailingNewline = code.endsWith('\n') ? code : code + '\n'
         await fsWriteFile(this.filePath, withTrailingNewline, 'utf8')
@@ -190,6 +193,19 @@ export async function patchNuxtConfig(
     const cfg = await NuxtConfig.load(projectDir)
     await fn(cfg)
     await cfg.save()
+}
+
+// magicast appends a new key last; `nuxt/nuxt-config-keys-order` puts `extends` right after the ids.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function moveAfterIds(object: any, key: string): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nameOf = (prop: any): string | undefined => prop.key?.name ?? prop.key?.value
+    const props = object.properties as unknown[]
+    const from = props.findIndex((prop) => nameOf(prop) === key)
+    if (from === -1) return
+    const [moved] = props.splice(from, 1)
+    const to = props.findIndex((prop) => !['appId', 'buildId'].includes(nameOf(prop) ?? ''))
+    props.splice(to === -1 ? props.length : to, 0, moved)
 }
 
 // Arrays are replaced wholesale (no concat).

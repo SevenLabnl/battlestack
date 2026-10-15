@@ -45,7 +45,7 @@
         "access": "public"
     },
     "dependencies": {
-        "@nuxt/kit": "^4.5.2"
+        "@nuxt/kit": "^4.6.1"
     },
     "scripts": {
         "check:contrast": "node scripts/check-contrast.mjs",

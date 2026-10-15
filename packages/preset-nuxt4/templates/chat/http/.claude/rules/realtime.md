@@ -1,7 +1,7 @@
 ---
-description: Realtime patterns, HTTP chunked-stream (legacy / non-Cloudflare)
-globs: server/**/*.ts, app/composables/**/*.ts
-alwaysApply: false
+paths:
+  - "server/**/*.ts"
+  - "app/composables/**/*.ts"
 ---
 
 # Realtime Patterns (http transport)

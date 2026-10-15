@@ -12,7 +12,7 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
  */
 export const buildInfoFeature: Feature = {
     id: 'nuxt4:build-info',
-    version: '1.0.0',
+    version: '1.0.1',
     label: 'Build info (version + commit in the footer)',
     description: 'Version and commit sha in the app footer, from the image\'s build args.',
     frameworks: ['nuxt4'],

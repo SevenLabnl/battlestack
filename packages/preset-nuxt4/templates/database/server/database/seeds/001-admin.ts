@@ -41,9 +41,9 @@ export default async function seed(db: typeof Db): Promise<void> {
     const stillValid = await verify(existing.passwordHash, password)
     if (!stillValid) {
         console.warn(
-            `  ! admin ${email} exists but stored hash != .env password.\n` +
-                `    Login with the password you originally seeded with, or\n` +
-                `    SEED_ADMIN_RESET_PASSWORD=true battlestack db:reseed to rotate.`,
+            `  ! admin ${email} exists but stored hash != .env password.\n`
+            + `    Login with the password you originally seeded with, or\n`
+            + `    SEED_ADMIN_RESET_PASSWORD=true battlestack db:reseed to rotate.`,
         )
     } else {
         console.log(`  admin already up to date: ${email}`)

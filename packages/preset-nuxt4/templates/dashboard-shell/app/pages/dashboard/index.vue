@@ -1,18 +1,33 @@
 <template>
     <div class="space-y-6">
         <div>
-            <h1 class="text-2xl font-bold tracking-tight">{{ t('dashboard.home.title') }}</h1>
+            <h1 class="text-2xl font-bold tracking-tight">
+                {{ t('dashboard.home.title') }}
+            </h1>
             <p class="mt-1 text-muted">
                 {{ t('dashboard.home.welcome', { name: user?.name || user?.email || '' }) }}
             </p>
-            <p class="mt-1 text-sm text-muted">{{ t('dashboard.home.subtitle') }}</p>
+            <p class="mt-1 text-sm text-muted">
+                {{ t('dashboard.home.subtitle') }}
+            </p>
         </div>
 
-        <div v-if="quickLinks.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <NuxtLink v-for="link in quickLinks" :key="link.to" :to="link.to" class="group">
+        <div
+            v-if="quickLinks.length > 0"
+            class="grid grid-cols-1 sm:grid-cols-2 gap-4"
+        >
+            <NuxtLink
+                v-for="link in quickLinks"
+                :key="link.to"
+                :to="link.to"
+                class="group"
+            >
                 <UCard class="h-full transition hover:ring-primary hover:shadow-sm">
                     <div class="flex items-start gap-3">
-                        <UIcon :name="link.icon" class="text-2xl text-primary shrink-0 mt-0.5" />
+                        <UIcon
+                            :name="link.icon"
+                            class="text-2xl text-primary shrink-0 mt-0.5"
+                        />
                         <div class="min-w-0">
                             <p class="font-semibold group-hover:text-primary">
                                 {{ link.label }}

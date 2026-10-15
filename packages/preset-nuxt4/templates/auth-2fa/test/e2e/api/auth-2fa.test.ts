@@ -27,7 +27,7 @@ describe('e2e: auth-2fa', () => {
     it.skipIf(!serverUp)('setup returns a secret + provisioning URL', async () => {
         const adminCookie = await loginAsAdmin()
         const user = await createTestUser(adminCookie)
-        const { status, data } = await apiPost<{ secret: string; otpauthUrl: string }>(
+        const { status, data } = await apiPost<{ secret: string, otpauthUrl: string }>(
             '/api/auth/2fa/setup',
             {},
             user.cookie,

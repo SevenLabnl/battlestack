@@ -7,8 +7,12 @@
                 class="rounded-md p-3"
                 :class="m.role === 'user' ? 'bg-primary-50' : 'bg-muted'"
             >
-                <div class="text-xs uppercase tracking-wide text-muted">{{ m.role }}</div>
-                <div class="whitespace-pre-wrap">{{ m.content }}</div>
+                <div class="text-xs uppercase tracking-wide text-muted">
+                    {{ m.role }}
+                </div>
+                <div class="whitespace-pre-wrap">
+                    {{ m.content }}
+                </div>
             </div>
         </div>
 
@@ -21,7 +25,10 @@
             icon="i-lucide-triangle-alert"
         />
 
-        <form class="flex gap-2" @submit.prevent="onSubmit">
+        <form
+            class="flex gap-2"
+            @submit.prevent="onSubmit"
+        >
             <UInput
                 ref="inputRef"
                 v-model="input"

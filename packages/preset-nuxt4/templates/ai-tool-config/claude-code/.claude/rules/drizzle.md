@@ -1,7 +1,7 @@
 ---
-description: Drizzle ORM
-globs: server/database/**/*.ts, drizzle.config.ts
-alwaysApply: false
+paths:
+  - "server/database/**"
+  - "drizzle.config.ts"
 ---
 
 # Drizzle ORM Conventions
@@ -80,7 +80,7 @@ Then commit the generated `server/database/migrations/NNNN_*.sql` file AND the u
 - `battlestack db:generate` / `battlestack db:migrate` / `battlestack db:push` are equivalents that wrap the same package.json scripts; use `pnpm run db:*` if `battlestack` is not on PATH
 - `pnpm run db:push` (direct schema sync, no SQL files) is for quick local prototyping only; production deploys apply the committed SQL files, so push alone never ships
 - Never use `pnpm dlx drizzle-kit ...`; it downloads an unpinned drizzle-kit; always go through the `db:*` scripts
-- Never manually edit generated migration files
+- Never manually edit generated migration files, `meta/_journal.json` or `meta/*_snapshot.json`; to change a migration, fix the schema and re-run `db:generate`
 - Never hand-write migration SQL; let `db:generate` derive it from the schema
 - If the database is not running: `pnpm run db:migrate` fails with a connection error; start it first (`battlestack db:up` or `docker compose up -d`)
 - Push-vs-migrate drift ("relation already exists" on migrate): happens when the schema was synced via `db:push` before migrations existed. The boot migrator and `migrate.mjs` auto-baseline this (record migrations as applied, run nothing); don't hand-edit `drizzle.__drizzle_migrations`

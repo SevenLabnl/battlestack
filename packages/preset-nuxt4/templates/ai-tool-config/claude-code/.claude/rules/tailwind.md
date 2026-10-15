@@ -1,6 +1,8 @@
 ---
-description: Tailwind CSS v4 conventions and design tokens
-globs: "*.vue, *.css, app.config.ts, main.css"
+paths:
+  - "**/*.vue"
+  - "**/*.css"
+  - "**/app.config.ts"
 ---
 
 # Tailwind CSS v4

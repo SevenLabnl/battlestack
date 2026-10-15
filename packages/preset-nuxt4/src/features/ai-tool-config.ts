@@ -16,34 +16,33 @@ const SUPPORTED: AiTool[] = ['claude-code', 'gemini-cli', 'cursor', 'codex']
 /** AI coding tool rules + MCP server scaffolding. Selection via `state.aiTool` (default: `claude-code`). */
 export const aiToolConfigFeature: Feature = {
     id: 'shared:ai-tool-config',
-    version: '1.1.9',
+    version: '1.2.0',
     label: 'AI coding tool config',
     stage: STAGE.AI_TOOL_CONFIG,
 
-    // Gated on the plugin's id being registered, so a public build advertises no unshipped rule file.
-    collectDocs(ctx) {
-        const hasK8s = ctx.registries.features.has('shared:k8s')
-        // Each entry matches the `globs:` frontmatter of its rule file.
+    collectDocs() {
+        // Each entry matches the `paths:` frontmatter of its rule file.
         const rules = [
-            '- `drizzle.mdc` (server/database/**/*.ts, drizzle.config.ts)',
-            '- `vue.mdc` (*.vue)',
-            '- `tailwind.mdc` (*.vue, *.css, app.config.ts, main.css)',
-            '- `ts.mdc` (*.ts)',
-            '- `i18n.mdc` (i18n/**/*.ts, *.vue)',
+            '- `drizzle.md` (server/database/**, drizzle.config.ts)',
+            '- `postgres.md` (server/database/**, **/*.sql)',
+            '- `vue.md` (**/*.vue)',
+            '- `tailwind.md` (**/*.vue, **/*.css, **/app.config.ts)',
+            '- `ts.md` (**/*.ts)',
+            '- `i18n.md` (i18n/**, **/*.vue)',
+            '- `security.md` (server/**/*.ts, app/**/*.ts, app/**/*.vue)',
+            '- `global.md` (always loaded)',
         ]
-        if (hasK8s) rules.push('- `k8s.mdc` (k8s/**)')
-        rules.push('- `postgres.mdc`, `security.mdc`, `global.mdc`')
         return [
             {
                 heading: 'AI coding tool',
                 body: [
-                    'Curated rules for context-aware AI assistance live in `.claude/rules/` (or your tool\'s equivalent). Each rule has a glob pattern and is loaded by the assistant only when files matching the pattern are open.',
+                    'Curated rules for context-aware AI assistance live in `.claude/rules/`. Each rule lists glob patterns under `paths:` in its frontmatter, and Claude Code loads it only once it reads a matching file. Workflow skills live in `.claude/skills/` and load on demand.',
                     '',
                     'Currently shipping rules:',
                     '',
                     ...rules,
                     '',
-                    'Feature-gated rules ship from the relevant feature: `mastra.mdc` (mastra), `realtime.mdc` (chat).',
+                    'Feature-gated rules ship from the relevant feature: `mastra.md` (mastra), `realtime.md` (chat).',
                     '',
                     'MCP servers live in `.mcp.json` at the project root (Claude Code picks them up automatically). Entries are gated by the enabled feature set: `nuxt` (always for Nuxt projects), `nuxt-ui` (when `nuxt:nuxt-ui` is on), `mastra` (when `nuxt:mastra` is on), `playwright` (when `shared:playwright` is on).',
                 ].join('\n'),

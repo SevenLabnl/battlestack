@@ -13,7 +13,11 @@
                 class="font-mono hover:text-primary"
                 :title="detail"
             >{{ build.shortCommit }}</a>
-            <span v-else class="font-mono" :title="detail">{{ build.shortCommit }}</span>
+            <span
+                v-else
+                class="font-mono"
+                :title="detail"
+            >{{ build.shortCommit }}</span>
         </template>
     </p>
 </template>

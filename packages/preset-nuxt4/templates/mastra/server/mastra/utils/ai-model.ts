@@ -82,7 +82,6 @@ function toRouterId(stored: string): string {
     return `gateway/${provider}/${bare}`
 }
 
-
 /**
  * Drops a model config from the cache on every replica so the next call re-reads the DB.
  * Call it after any write to `ai_model_configs`, and await it before responding.

@@ -1,7 +1,7 @@
 ---
-description: PostgreSQL
-globs: server/database/**/*.ts, *.sql
-alwaysApply: false
+paths:
+  - "server/database/**"
+  - "**/*.sql"
 ---
 
 # PostgreSQL Conventions
@@ -18,7 +18,7 @@ alwaysApply: false
 - Column names: snake_case (`created_at`, `user_id`)
 - Primary keys: `id`
 - Foreign keys: `<referenced_table_singular>_id` (`user_id`, `order_id`)
-- Indexes: `idx_<table>_<columns>` (`idx_users_email`)
+- Indexes: `<table>_<columns>_idx` (`users_email_idx`); unique indexes: `<table>_<columns>_unique` (`users_email_unique`, also what drizzle names a column `.unique()` constraint)
 - Timestamps: `created_at`, `updated_at`
 
 ## Data Types

@@ -7,7 +7,11 @@
             <template #left>
                 <!-- `/`, not `/dashboard`: this feature emits `app/pages/index.vue`, so `/` always exists while `/dashboard` only exists
                      when `nuxt4:dashboard-shell` is installed; also avoids the brand and first nav item pointing at the same destination. -->
-                <UButton variant="ghost" to="/" class="font-bold text-lg">
+                <UButton
+                    variant="ghost"
+                    to="/"
+                    class="font-bold text-lg"
+                >
                     {{ appName }}
                 </UButton>
             </template>
@@ -17,9 +21,15 @@
             <template #right>
                 <!-- `v-if`: an empty `topbar` still renders a real <nav>, so `#right`'s
                      `gap-1.5` gap gets spent on an element that draws nothing. -->
-                <UNavigationMenu v-if="topbar.length > 0" :items="topbar" />
+                <UNavigationMenu
+                    v-if="topbar.length > 0"
+                    :items="topbar"
+                />
                 <!-- battlestack:auth -->
-                <UDropdownMenu v-if="showAvatar" :items="avatarMenu">
+                <UDropdownMenu
+                    v-if="showAvatar"
+                    :items="avatarMenu"
+                >
                     <button
                         type="button"
                         :aria-label="t('shell.accountMenu')"
@@ -40,7 +50,11 @@
             </template>
 
             <template #body>
-                <UNavigationMenu :items="nav" orientation="vertical" class="-mx-2.5" />
+                <UNavigationMenu
+                    :items="nav"
+                    orientation="vertical"
+                    class="-mx-2.5"
+                />
             </template>
         </UHeader>
 
@@ -191,5 +205,4 @@ const nav = computed(() => {
         },
     ]
 })
-
 </script>

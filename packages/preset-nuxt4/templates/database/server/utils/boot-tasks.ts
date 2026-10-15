@@ -27,7 +27,8 @@ export function runBootTask(
             await work()
         } catch (err) {
             console.error(`[boot] ${name} failed:`, err)
-            if (options.fatal) failed.set(name, err instanceof Error ? err.message : String(err))
+            // Health endpoints return this map publicly; the error itself is only logged above.
+            if (options.fatal) failed.set(name, 'failed')
         } finally {
             pending.delete(name)
         }

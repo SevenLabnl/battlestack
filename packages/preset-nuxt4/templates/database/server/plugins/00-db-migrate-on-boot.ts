@@ -125,7 +125,7 @@ async function baselineIfPushManaged(
         'utf8',
     ).catch(() => null)
     if (!journalRaw) return
-    const entries = (JSON.parse(journalRaw)?.entries ?? []) as Array<{ tag: string; when: number }>
+    const entries = (JSON.parse(journalRaw)?.entries ?? []) as Array<{ tag: string, when: number }>
     if (entries.length === 0) return
 
     // Same schema/table/hash drizzle-orm's migrator uses, so it interoperates.
