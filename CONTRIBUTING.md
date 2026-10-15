@@ -81,6 +81,18 @@ a file, not the one that contributed the text. Changing your feature's
 `collectDocs` output and bumping only your own version therefore reaches new
 scaffolds and no existing project. Bump the writing feature too.
 
+## Changes that ship need a changelog entry
+
+Add a line under `## Unreleased` in `CHANGELOG.md` for any change under
+`packages/`, apart from a package's own `test/` and `README.md`. Write it for
+someone using battlestack: what changes for them, and what they have to do, if
+anything. Prepare release turns the section into the release's notes and lists
+the commit subjects below them.
+
+The **Changelog entry** check in CI enforces this. A change with nothing to tell
+users can take the `skip-changelog` label; say why in the pull request.
+Dependabot's npm and Actions updates get the label automatically.
+
 ## Testing: a test must be able to fail
 
 Every assertion should survive one question: **if I delete the behaviour this

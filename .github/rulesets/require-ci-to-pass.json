@@ -17,6 +17,7 @@
                 "do_not_enforce_on_create": false,
                 "required_status_checks": [
                     { "context": "Feature version bump check", "integration_id": 15368 },
+                    { "context": "Changelog entry", "integration_id": 15368 },
                     { "context": "Type-check and test (Node 24)", "integration_id": 15368 },
                     { "context": "Type-check and test (Node 26)", "integration_id": 15368 },
                     { "context": "Type-check, test, build, CLI smoke (Windows, Node 24)", "integration_id": 15368 },

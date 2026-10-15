@@ -8,6 +8,7 @@
         "tsc": "tsc --noEmit && tsc --noEmit -p scripts",
         "bump": "tsx scripts/bump-check.ts",
         "bump:check": "tsx scripts/bump-check.ts --check",
+        "changelog:check": "node scripts/changelog-check.mjs",
         "check:contrast": "pnpm --filter @battlestack/theme check:contrast",
         "check:contract": "pnpm --filter @battlestack/theme check:contract",
         "check:ds": "pnpm check:contrast && pnpm check:contract",

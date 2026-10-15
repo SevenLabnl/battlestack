@@ -27,6 +27,7 @@ is the definition. It requires every job in [`ci.yml`](../.github/workflows/ci.y
 
 ```
 Feature version bump check
+Changelog entry
 Type-check and test (Node 24)
 Type-check and test (Node 26)
 Type-check, test, build, CLI smoke (Windows, Node 24)
@@ -98,6 +99,10 @@ does not extend here.
 other job still runs. Adding or removing the label reruns CI, so no push is
 needed. Use it for a change that doesn't alter what a feature emits for existing
 projects, and say why in the pull request.
+
+**`skip-changelog` does the same for the Changelog entry check**, for a change
+under `packages/` with nothing to tell users. Dependabot applies it to its npm
+and Actions updates.
 
 ## Auto-merge
 
