@@ -93,6 +93,12 @@ being surprised by.
 ruleset grants a `pull_requests_only` bypass for the approval requirement, which
 does not extend here.
 
+**The `skip-bump-check` label is the one exception.** On a pull request it sets
+`SKIP_BUMP_CHECK=1` for the Feature version bump check, which then passes; every
+other job still runs. Adding or removing the label reruns CI, so no push is
+needed. Use it for a change that doesn't alter what a feature emits for existing
+projects, and say why in the pull request.
+
 ## Auto-merge
 
 Auto-merge is currently **off** (`allow_auto_merge: false`), so the button does

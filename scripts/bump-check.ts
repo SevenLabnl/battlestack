@@ -77,7 +77,7 @@ async function main(): Promise<void> {
 /**
  * Base ref precedence: `--check <ref>` -> $BUMP_CHECK_BASE -> latest release tag
  * -> first existing of origin/main, origin/master, main, master.
- * Bypass with a truthy $SKIP_BUMP_CHECK.
+ * Bypass with a truthy $SKIP_BUMP_CHECK, which CI sets from the `skip-bump-check` PR label.
  */
 async function runCheck(argv: string[]): Promise<void> {
     if (truthy(process.env.SKIP_BUMP_CHECK)) {
@@ -114,7 +114,7 @@ async function runCheck(argv: string[]): Promise<void> {
         console.log(`  ${w.writerId} writes the file those hooks feed, and \`pull\` version-gates on the writer.`)
         console.log(`  fix:   pnpm bump ${w.writerId} patch`)
     }
-    console.log('\nbypass (sparingly): SKIP_BUMP_CHECK=1')
+    console.log('\nbypass (sparingly): SKIP_BUMP_CHECK=1, or the `skip-bump-check` label on the PR')
     process.exit(1)
 }
 

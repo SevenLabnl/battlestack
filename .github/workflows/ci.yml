@@ -9,7 +9,10 @@ name: CI
 on:
   push:
     branches: [main]
+  # `labeled`/`unlabeled` so the `skip-bump-check` label takes effect without a new push.
+  # Every job still runs on a label event: a skipped required check would count as passing.
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -50,6 +53,7 @@ jobs:
       - name: Bump check
         env:
           BUMP_CHECK_BASE: ${{ github.base_ref && format('origin/{0}', github.base_ref) || '' }}
+          SKIP_BUMP_CHECK: ${{ contains(github.event.pull_request.labels.*.name, 'skip-bump-check') && '1' || '' }}
         run: pnpm bump:check
 
       # Package versions, not feature versions. The publishable packages are published
