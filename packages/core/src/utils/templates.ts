@@ -424,10 +424,15 @@ export interface UpdateLedger {
 }
 
 export function updateLedger(ctx: RunContext): UpdateLedger {
-    const existing = ctx.state[LEDGER_STATE_KEY] as UpdateLedger | undefined
+    // Plugins on another core version may have created it with fewer fields.
+    const existing = ctx.state[LEDGER_STATE_KEY] as Partial<UpdateLedger> | undefined
     if (existing) {
+        existing.handled ??= []
+        existing.merged ??= []
+        existing.conflicts ??= []
+        existing.staged ??= []
         existing.actions ??= []
-        return existing
+        return existing as UpdateLedger
     }
     const ledger: UpdateLedger = { handled: [], merged: [], conflicts: [], staged: [], actions: [] }
     ctx.state[LEDGER_STATE_KEY] = ledger

@@ -318,7 +318,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
     const releaseLock = await acquireProjectLock(projectDir, 'battlestack pull', { dryRun: args.dryRun })
     try {
         const safety = args.dryRun || args.skillsOnly
-            ? { git: false }
+            ? { git: false, clean: false }
             : await preflight(projectDir, manifest, { allowDirty: args.allowDirty === true })
         const startRecorded = recordedAtStart(manifest)
 
@@ -403,9 +403,12 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             await pullOneFeature(ctx, record, args, loader, registries)
         }
 
-        const repairs = safety.git && !ctx.dryRun ? await repairOverwrites(ctx, startRecorded, registries) : []
-        if (!ctx.dryRun && !safety.git && !args.skillsOnly) {
-            ui.warn('Not a git repository with a commit, so local edits a feature writes over cannot be detected.')
+        // Compares against HEAD, so uncommitted edits would read as feature output.
+        const repairs = safety.clean && !ctx.dryRun ? await repairOverwrites(ctx, startRecorded, registries) : []
+        if (!ctx.dryRun && !safety.clean && !args.skillsOnly) {
+            ui.warn(safety.git
+                ? 'Uncommitted changes (--allow-dirty), so local edits a feature writes over cannot be detected.'
+                : 'Not a git repository with a commit, so local edits a feature writes over cannot be detected.')
         }
 
         if (!ctx.dryRun) {

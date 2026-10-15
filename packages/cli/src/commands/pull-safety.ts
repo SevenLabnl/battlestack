@@ -58,7 +58,7 @@ export async function preflight(
     projectDir: string,
     manifest: ProjectManifest,
     opts: { allowDirty: boolean },
-): Promise<{ git: boolean }> {
+): Promise<{ git: boolean, clean: boolean }> {
     for (const [rel, hashes] of recordedAtStart(manifest)) {
         const abs = path.join(projectDir, rel)
         if (!(await exists(abs))) continue
@@ -72,9 +72,9 @@ export async function preflight(
         }
     }
 
-    if (!isGitRepo(projectDir)) return { git: false }
-    if (opts.allowDirty) return { git: true }
+    if (!isGitRepo(projectDir)) return { git: false, clean: false }
     const status = git(projectDir, ['status', '--porcelain', '--untracked-files=normal']).out.toString().trim()
+    if (status && opts.allowDirty) return { git: true, clean: false }
     if (status) {
         throw new CLIError(
             ErrorCode.SCAFFOLD_FAILED,
@@ -82,7 +82,7 @@ export async function preflight(
             + 'Pass --allow-dirty to pull anyway.',
         )
     }
-    return { git: true }
+    return { git: true, clean: true }
 }
 
 export interface OverwriteRepair {
@@ -137,8 +137,8 @@ export async function repairOverwrites(
                 upstream: `${rel} (upstream now, ${featureId})`,
             })
             : null
-        await storeBase(ctx.projectDir, upstream)
         if (merged) {
+            await storeBase(ctx.projectDir, upstream)
             await writeFile(abs, merged.content)
             repairs.push({ rel, featureId, outcome: merged.conflicts ? 'conflicts' : 'merged' })
             if (merged.conflicts) ledger.conflicts.push(rel)
@@ -146,6 +146,11 @@ export async function repairOverwrites(
             continue
         }
         await writeFile(abs, head.out)
+        // Not merged, so the record goes back to what the file last matched, or away if nothing did.
+        const files = ctx.state[`files:${featureId}`] as Record<string, string>
+        const previous = [...before][0]
+        if (previous) files[rel] = previous
+        else delete files[rel]
         const staged = path.join(ctx.projectDir, PULL_DIR, `${rel}.new`)
         await mkdir(path.dirname(staged), { recursive: true })
         await writeFile(staged, upstream)
