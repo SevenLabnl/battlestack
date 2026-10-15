@@ -227,7 +227,8 @@ jobs:
             pkg.dependencies["@battlestack/theme"] = "link:" + process.env.THEME_DIR
             fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n")
           '
-          pnpm install
+          # `--skip-install` leaves the starter's lockfile behind; CI would otherwise install frozen.
+          pnpm install --no-frozen-lockfile
 
       # `--skip-install` also skips the post-install format pass.
       - name: Format
