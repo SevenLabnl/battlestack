@@ -79,6 +79,11 @@ export function resetFrozenPorts(): void {
 export function allocatePort(projectName: string, kind: PortKind): number {
     const override = frozen.get(freezeKey(projectName, kind))
     if (override !== undefined) return override
+    return defaultPort(projectName, kind)
+}
+
+/** The name-derived port, ignoring this machine's overrides. For defaults written into committed files. */
+export function defaultPort(projectName: string, kind: PortKind): number {
     const { base, range } = RANGES[kind]
     const digest = createHash('sha256').update(`${projectName}:${kind}`).digest()
     const offset = digest.readUInt16BE(0)

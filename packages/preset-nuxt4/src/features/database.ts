@@ -2,6 +2,7 @@ import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import {
     allocatePort,
+    defaultPort,
     CLIError,
     ErrorCode,
     hashFile,
@@ -45,8 +46,8 @@ export async function isDatabaseSeeded(projectDir: string, featureFqid: string):
 const COMPOSE_FILE = 'docker-compose.yml'
 
 function buildComposeYml(ctx: RunContext): string {
-    const dbPort = allocatePort(ctx.projectName, 'db')
-    const appPort = allocatePort(ctx.projectName, 'app')
+    const dbPort = defaultPort(ctx.projectName, 'db')
+    const appPort = defaultPort(ctx.projectName, 'app')
     const hasAuth = isFeatureEnabled(ctx, 'nuxt4:auth')
     const hasStorage = isFeatureEnabled(ctx, 'nuxt4:storage')
     const hasRedis = isFeatureEnabled(ctx, 'nuxt4:redis')
@@ -168,8 +169,8 @@ function buildComposeYml(ctx: RunContext): string {
     const volumes: string[] = ['    db_data:']
 
     if (hasAuth) {
-        const smtp = allocatePort(ctx.projectName, 'smtp')
-        const mailUi = allocatePort(ctx.projectName, 'mail-ui')
+        const smtp = defaultPort(ctx.projectName, 'smtp')
+        const mailUi = defaultPort(ctx.projectName, 'mail-ui')
         services.push(`    mailpit:
         image: axllent/mailpit:latest
         restart: unless-stopped
@@ -185,8 +186,8 @@ function buildComposeYml(ctx: RunContext): string {
     }
 
     if (hasStorage) {
-        const s3Api = allocatePort(ctx.projectName, 's3-api')
-        const s3Console = allocatePort(ctx.projectName, 's3-console')
+        const s3Api = defaultPort(ctx.projectName, 's3-api')
+        const s3Console = defaultPort(ctx.projectName, 's3-console')
         services.push(`    rustfs:
         image: rustfs/rustfs:latest
         restart: unless-stopped
@@ -205,7 +206,7 @@ function buildComposeYml(ctx: RunContext): string {
     }
 
     if (hasRedis) {
-        const redisPort = allocatePort(ctx.projectName, 'redis')
+        const redisPort = defaultPort(ctx.projectName, 'redis')
         // No named volume: rate-limit counters are short-TTL. Postgres is the durable store.
         services.push(`    redis:
         image: redis:7-alpine
@@ -251,7 +252,7 @@ async function registerRuntimeConfig(projectDir: string): Promise<void> {
 /** PostgreSQL 18 in Docker, Drizzle ORM, users schema, seed script. */
 export const databaseFeature: Feature = {
     id: 'nuxt4:database',
-    version: '1.7.3',
+    version: '1.7.4',
     label: 'PostgreSQL + Drizzle ORM (Docker)',
     frameworks: ['nuxt4'],
     stage: STAGE.DATABASE,

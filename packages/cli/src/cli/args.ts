@@ -44,6 +44,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
             'skills',
             'format',
             'skills-only',
+            'allow-dirty',
         ],
         'alias': ALIASES,
         // `--no-*` flips these to false. Everything else in `boolean` defaults off.
@@ -84,6 +85,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
         skills: raw.skills !== false,
         format: raw.format !== false,
         skillsOnly: Boolean(raw['skills-only']),
+        allowDirty: Boolean(raw['allow-dirty']),
         passthrough: (raw['--'] as string[] | undefined) ?? [],
     }
 }

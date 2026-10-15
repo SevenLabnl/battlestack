@@ -168,6 +168,10 @@ export async function writeManifest(
                 : {}),
         })
     }
+    // A feature whose plugin did not load keeps its record, so a missing plugin never unmanages files.
+    for (const prev of previous?.features ?? []) {
+        if (!ctx.registries.features.has(prev.id) && !records.some((r) => r.id === prev.id)) records.push(prev)
+    }
     // Deterministic on-disk order.
     records.sort(byId)
 
@@ -271,14 +275,14 @@ export function rebaselineRecordedFile(
          * Move only baselines that equal this hash (the file's pre-write bytes). For a
          * string-patch over a possibly user-drifted file: a feature whose baseline
          * already diverged keeps its drift visible instead of having the user's edits
-         * silently blessed into the baseline — where the next template bump would
+         * silently blessed into the baseline, where the next template bump would
          * classify the file as pristine and overwrite them without staging artifacts.
          */
         onlyIfPrevHash?: string
     } = {},
 ): void {
     // Recorded rels are platform-separated (`path.join` in the emit path), so on
-    // Windows the maps hold `app\...` keys — compare separator-insensitively and
+    // Windows the maps hold `app\...` keys, so compare separator-insensitively and
     // re-record under the exact key each map already uses.
     const posix = relativePath.replaceAll(path.sep, '/')
     for (const key of Object.keys(ctx.state)) {

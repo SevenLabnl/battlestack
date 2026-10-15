@@ -22,10 +22,13 @@ import {
  */
 export const docsFeature: Feature = {
     id: 'nuxt4:docs',
-    version: '1.1.2',
+    version: '1.1.3',
     label: 'Generate AGENTS.md + CLAUDE.md + README.md',
     frameworks: ['nuxt4'],
     stage: STAGE.DOCS,
+
+    // Regenerated in full; an edited copy is backed up under `.battlestack/pull/`.
+    selfMergedFiles: () => ['README.md', 'AGENTS.md', 'CLAUDE.md', `${DOCS_DIR}/`],
 
     collectDocs(ctx: RunContext): DocSection[] {
         return [
@@ -114,6 +117,7 @@ async function backUpLocalEdits(
     const bak = path.join(ctx.projectDir, '.battlestack', 'pull', `${rel}.bak`)
     await mkdir(path.dirname(bak), { recursive: true })
     await copyFile(dest, bak)
+    ;(report.backups ??= []).push(path.relative(ctx.projectDir, bak))
     report.notes.push(
         `${rel}: had local edits and was regenerated; your version is in ${path.relative(ctx.projectDir, bak)}. `
         + `Project-specific notes belong in ${PROJECT_CLAUDE}, or \`battlestack own ${rel}\` to keep editing it.`,
@@ -153,10 +157,11 @@ function buildOwnershipSection(): DocSection {
             'and everything under `.claude/`.',
             '',
             `\`README.md\`, \`AGENTS.md\`, \`CLAUDE.md\` and \`${DOCS_DIR}/\` are regenerated on every \`battlestack pull\`,`,
-            'so an edit to them is lost. Editing any other tracked file is drift, and `pull` keeps your',
-            'version: it stages the upstream one under `.battlestack/pull/` (`<path>.new` and',
-            '`<path>.patch`) for you to merge, and that file stops receiving upstream changes until you',
-            'do. `battlestack pull --force` takes upstream instead and saves yours as `<path>.bak`.',
+            'so an edit to them is lost. Editing any other tracked file is fine: `pull` merges upstream',
+            'changes into your version, and where you and upstream changed the same lines it leaves',
+            'conflict markers for you to resolve. What it cannot settle is listed in',
+            '`.battlestack/pull/REPORT.md`, and the `battlestack-upgrade` skill is the procedure for',
+            'finishing it. `battlestack pull --force` takes upstream instead and saves yours as a `.bak`.',
             '',
             '`nuxt.config.ts` and `package.json` are **not** tracked; edit them freely. Paths under',
             '`ownedByUser` in the manifest are written once at scaffold and never again (the icons and',
@@ -167,9 +172,9 @@ function buildOwnershipSection(): DocSection {
             '',
             '1. Add a sibling file that layers on top of the tracked one and leave the original',
             '   alone, so `pull` keeps updating the original and your file survives.',
-            '2. Edit it and merge what `pull` stages, when the change is small and upstream rarely moves.',
-            '3. `battlestack own <path...>` to claim it. `pull` then skips it without staging anything,',
-            '   and it stops receiving upstream fixes. `battlestack disown <path...>` hands it back.',
+            '2. Edit it and let `pull` merge, when the change is small and upstream rarely moves.',
+            '3. `battlestack own <path...>` to claim it. `pull` then skips it entirely, and it stops',
+            '   receiving upstream fixes. `battlestack disown <path...>` hands it back.',
             '',
             'Project-specific agent instructions belong in `CLAUDE.project.md`, which is untracked and',
             'imported by `CLAUDE.md`. Put them there rather than editing `CLAUDE.md` or `AGENTS.md`.',
@@ -452,10 +457,11 @@ function renderReadme(ctx: RunContext): string {
         '',
         '## Updating',
         '',
-        'Run `battlestack pull` (or `battlestack sync`) inside this project to pull',
-        'the latest changes from each feature. User-edited files are',
-        'preserved; pristine files are re-written. Conflicts produce',
-        '`<file>.battlestack.new` + `<file>.battlestack.patch` next to the original.',
+        'Commit your work, then run `battlestack pull` (or `battlestack sync`) to bring every',
+        'feature up to date. Files you never edited are replaced. Files you edited are merged',
+        'with the upstream changes, with conflict markers where both changed the same lines.',
+        'Anything left to do is listed in `.battlestack/pull/REPORT.md`, and the command exits',
+        'with code 2 until it is done.',
         '',
     )
 
