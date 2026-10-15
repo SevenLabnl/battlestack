@@ -3,10 +3,10 @@ import {
     apiGet,
     apiPut,
     BASE_URL,
-    createTestUser,
     isServerUp,
     loginAsAdmin,
 } from '~~/test/helpers/setup'
+import { createTestUser } from '~~/test/helpers/users'
 
 const serverUp = await isServerUp()
 
@@ -25,8 +25,7 @@ describe('e2e: ai model admin', () => {
     })
 
     it.skipIf(!serverUp)('non-admin is forbidden from /api/ai/configs', async () => {
-        const adminCookie = await loginAsAdmin()
-        const user = await createTestUser(adminCookie)
+        const user = await createTestUser()
         const { status } = await apiGet('/api/ai/configs', user.cookie)
         expect(status).toBe(403)
     })
@@ -40,7 +39,7 @@ describe('e2e: ai model admin', () => {
 
     it.skipIf(!serverUp)('non-admin is forbidden from PUT /api/ai/configs/:id', async () => {
         const adminCookie = await loginAsAdmin()
-        const user = await createTestUser(adminCookie)
+        const user = await createTestUser()
         const list = await apiGet<ModelConfig[]>('/api/ai/configs', adminCookie)
         const target = list.data?.[0]
         if (!target) return
@@ -100,8 +99,7 @@ describe('e2e: ai agents admin', () => {
     })
 
     it.skipIf(!serverUp)('non-admin is forbidden from /api/ai/agents', async () => {
-        const adminCookie = await loginAsAdmin()
-        const user = await createTestUser(adminCookie)
+        const user = await createTestUser()
         const { status } = await apiGet('/api/ai/agents', user.cookie)
         expect(status).toBe(403)
     })

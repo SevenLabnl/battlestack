@@ -5,10 +5,9 @@ import {
     apiGet,
     apiPost,
     BASE_URL,
-    createTestUser,
     isServerUp,
-    loginAsAdmin,
 } from '~~/test/helpers/setup'
+import { createTestUser } from '~~/test/helpers/users'
 
 const serverUp = await isServerUp()
 
@@ -23,8 +22,7 @@ describe('e2e: storage', () => {
     })
 
     it.skipIf(!serverUp)('upload-url rejects disallowed MIME type', async () => {
-        const adminCookie = await loginAsAdmin()
-        const user = await createTestUser(adminCookie)
+        const user = await createTestUser()
         const form = new FormData()
         form.append('file', new Blob(['x'], { type: 'application/x-msdownload' }), 'evil.exe')
         const res = await fetch(`${BASE_URL}/api/files/upload-url`, {
@@ -37,8 +35,7 @@ describe('e2e: storage', () => {
     })
 
     it.skipIf(!serverUp)('upload-url accepts a body well over 1MB', async () => {
-        const adminCookie = await loginAsAdmin()
-        const user = await createTestUser(adminCookie)
+        const user = await createTestUser()
         // Generated in memory, not a fixture: comfortably over the 1MB a reverse proxy commonly defaults its limit to, well under the route's own 100MB cap, so the test stays fast.
         // This object is never deleted (no delete path keys on a raw S3 key, only on a `files` row this route never creates); kept small to limit what accumulates in the dev bucket.
         const bytes = randomBytes(1.5 * 1024 * 1024) // 1.5 MiB
@@ -65,8 +62,7 @@ describe('e2e: storage', () => {
     })
 
     it.skipIf(!serverUp)('files list returns an array for an authed user', async () => {
-        const adminCookie = await loginAsAdmin()
-        const user = await createTestUser(adminCookie)
+        const user = await createTestUser()
         const { status, data } = await apiGet<{ rows: unknown[] }>('/api/files', user.cookie)
         expect(status).toBe(200)
         expect(Array.isArray(data?.rows)).toBe(true)
@@ -78,8 +74,7 @@ describe('e2e: storage', () => {
     })
 
     it.skipIf(!serverUp)('register 404s when the object is not in the bucket', async () => {
-        const adminCookie = await loginAsAdmin()
-        const user = await createTestUser(adminCookie)
+        const user = await createTestUser()
         const { status } = await apiPost(
             '/api/files',
             { key: 'uploads/nonexistent.bin' },

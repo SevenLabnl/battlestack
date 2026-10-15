@@ -48,6 +48,15 @@
 - Ship `test/e2e/api/auth.test.ts` with `nuxt4:auth` instead of `nuxt4:vitest`, so a
   project without auth (`nuxt4-minimal`) no longer fails its own e2e suite. `pull`
   removes the untouched file from such projects.
+- The `with-db` health check no longer imports `nuxt4:auth`'s `session-password.ts`,
+  so a template that enables `nuxt4:database` without `nuxt4:auth` builds. The
+  built-in templates always pair them; a plugin template need not.
+- `createTestUser` moved from `test/helpers/setup.ts` (`nuxt4:vitest`) to
+  `test/helpers/users.ts` (`nuxt4:auth`) and no longer takes an admin cookie: it
+  inserts the user directly instead of calling `nuxt4:user-admin`'s `POST /api/users`,
+  so the auth-2fa and storage e2e suites pass without user-admin. Update your own
+  tests to `import { createTestUser } from '~~/test/helpers/users'` and drop the
+  first argument.
 
 ## v1.3.0 (2026-09-24)
 

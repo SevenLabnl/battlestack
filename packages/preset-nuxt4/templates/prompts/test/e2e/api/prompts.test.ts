@@ -4,10 +4,10 @@ import {
     apiPost,
     apiPut,
     BASE_URL,
-    createTestUser,
     isServerUp,
     loginAsAdmin,
 } from '~~/test/helpers/setup'
+import { createTestUser } from '~~/test/helpers/users'
 
 const serverUp = await isServerUp()
 
@@ -28,8 +28,7 @@ describe('e2e: prompts management', () => {
     })
 
     it.skipIf(!serverUp)('list returns seeded prompts for an authed user', async () => {
-        const adminCookie = await loginAsAdmin()
-        const user = await createTestUser(adminCookie)
+        const user = await createTestUser()
         const { status, data } = await apiGet<{ rows: Prompt[], total: number }>(
             '/api/prompts',
             user.cookie,
@@ -40,8 +39,7 @@ describe('e2e: prompts management', () => {
     })
 
     it.skipIf(!serverUp)('non-admin is forbidden from PUT /api/prompts/:id', async () => {
-        const adminCookie = await loginAsAdmin()
-        const user = await createTestUser(adminCookie)
+        const user = await createTestUser()
         const list = await apiGet<{ rows: Prompt[], total: number }>('/api/prompts', user.cookie)
         const target = list.data?.rows?.[0]
         if (!target) {

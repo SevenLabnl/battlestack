@@ -1,4 +1,8 @@
-import { isValidSessionPassword } from '#server/utils/session-password'
+/**
+ * A copy, not an import: `nuxt4:database` does not require `nuxt4:auth`, and without auth importing its
+ * `session-password.ts` would ENOENT the Nitro build. Keep in sync by hand, as in the `env-only` variant.
+ */
+const MIN_SESSION_PASSWORD_LENGTH = 32
 
 /**
  * `undefined` = auth not installed (no `session` runtimeConfig); `checkEnvVars` treats that as not-applicable.
@@ -20,7 +24,7 @@ export function sessionPasswordFrom(config: unknown): string | undefined {
 export function checkEnvVars(sessionPassword: string | undefined, databaseUrl: string): string[] {
     const missing: string[] = []
     if (!databaseUrl) missing.push('NUXT_DATABASE_URL')
-    if (sessionPassword !== undefined && !isValidSessionPassword(sessionPassword)) {
+    if (sessionPassword !== undefined && sessionPassword.length < MIN_SESSION_PASSWORD_LENGTH) {
         missing.push('NUXT_SESSION_PASSWORD')
     }
     return missing

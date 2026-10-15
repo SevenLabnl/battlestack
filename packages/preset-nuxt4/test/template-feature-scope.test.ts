@@ -51,13 +51,7 @@ const OPTIONAL_CALLS = new Set([
 ])
 
 /** Known violations awaiting a fix. Remove an entry when it is fixed; the test fails on a stale one. */
-const KNOWN_VIOLATIONS = new Set([
-    // Health's session-secret check imports auth's helper; database without auth does not build.
-    'health/with-db/server/utils/health-checks.ts -> nuxt4:auth',
-    'health/with-db/test/unit/health.test.ts -> nuxt4:auth',
-    // createTestUser posts /api/users, but auth-2fa's and storage's tests call it without requiring user-admin.
-    'vitest/test/helpers/setup.ts -> nuxt4:user-admin',
-])
+const KNOWN_VIOLATIONS = new Set<string>([])
 
 interface Template { subtree: string, rel: string }
 

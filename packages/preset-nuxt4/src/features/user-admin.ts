@@ -6,7 +6,7 @@ import { STAGE } from '@battlestack/core'
 /** Admin-gated user CRUD + admin pages + admin route middleware. */
 export const userAdminFeature: Feature = {
     id: 'nuxt4:user-admin',
-    version: '1.0.7',
+    version: '1.0.8',
     label: 'User administration (admin-gated CRUD)',
     description: 'Admin-only /dashboard/users for listing, creating, editing, and deleting users.',
     frameworks: ['nuxt4'],

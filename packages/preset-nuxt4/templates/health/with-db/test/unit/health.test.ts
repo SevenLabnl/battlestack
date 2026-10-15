@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { checkEnvVars } from '#server/utils/health-checks'
-import { MIN_SESSION_PASSWORD_LENGTH } from '#server/utils/session-password'
+
+// Deliberately a literal 32, not an import from `nuxt4:auth`'s `session-password.ts`: a db-without-auth scaffold has no such file.
+const MIN_SESSION_PASSWORD_LENGTH = 32
 
 const VALID_PASSWORD = 'a'.repeat(MIN_SESSION_PASSWORD_LENGTH)
 const SHORT_PASSWORD = 'a'.repeat(MIN_SESSION_PASSWORD_LENGTH - 1)
