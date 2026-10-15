@@ -10,7 +10,7 @@ paths:
 ## Overview
 
 Mastra is the project's AI runtime. It talks to an OpenAI-compatible AI
-gateway (sluis.ai, a self-hosted LiteLLM proxy, or any compatible endpoint —
+gateway (sluis.ai, a self-hosted LiteLLM proxy, or any compatible endpoint,
 configured via `NUXT_AI_GATEWAY_URL`) through the AI SDK's OpenAI-compatible
 provider; agents reference models with the raw gateway model id
 (`openai/gpt-5.6-luna`, `vertex/gemini-3.1-flash`, etc). No prefix

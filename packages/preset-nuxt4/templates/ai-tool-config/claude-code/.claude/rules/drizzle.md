@@ -71,8 +71,8 @@ export default defineEventHandler(async (event) => {
 After editing ANY file in `server/database/schema/`, you MUST run the drizzle commands yourself; do not stop at editing the TypeScript:
 
 ```bash
-pnpm run db:generate   # drizzle-kit generate — emits NNNN_*.sql + updates meta/_journal.json
-pnpm run db:migrate    # drizzle-kit migrate — applies pending SQL to the local database
+pnpm run db:generate   # drizzle-kit generate: emits NNNN_*.sql + updates meta/_journal.json
+pnpm run db:migrate    # drizzle-kit migrate: applies pending SQL to the local database
 ```
 
 Then commit the generated `server/database/migrations/NNNN_*.sql` file AND the updated `meta/_journal.json` together with the schema change. A schema edit without its generated migration is incomplete work.
