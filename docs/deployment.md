@@ -111,6 +111,10 @@ Migrations track what has already been applied, so re-running one is a no-op
 rather than a second attempt at the same change. That is what makes it safe for
 a deploy pipeline to run migrations unconditionally.
 
+`battlestack pull` runs `db:generate` itself when a feature update changes a file
+under `server/database/schema/`. Commit the SQL it writes along with the rest of
+the pull.
+
 Where several replicas start at once, the migrator takes a database-level
 advisory lock, so exactly one applies a given migration and the others wait
 rather than racing.

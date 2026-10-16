@@ -705,6 +705,81 @@ describe('battlestack pull: a file moving to a later feature', () => {
     })
 })
 
+describe('battlestack pull: a schema change ships with its migration', () => {
+    // Production applies only committed SQL, so a schema file pull rewrote needs a migration.
+    // The stand-in `db:generate` drops a marker, so the real `<pm> run db:generate` path runs
+    // without drizzle-kit.
+    const schemaRel = path.join('server', 'database', 'schema', 'sessions.ts')
+    const marker = 'db-generate-ran'
+    const writesMarker = `node -e "require('fs').writeFileSync('${marker}', '')"`
+
+    async function setup(
+        v2: { schema: string, other: string },
+        dbGenerate = writesMarker,
+    ): Promise<{ projectDir: string, registriesV2: BattlestackRegistries }> {
+        const projectDir = await tmp('battlestack-pull-schema-')
+        const tplV1 = await tmp('battlestack-pull-schema-v1-')
+        const tplV2 = await tmp('battlestack-pull-schema-v2-')
+        await writeTemplateFile(tplV1, schemaRel, 'v1 schema\n')
+        await writeTemplateFile(tplV1, 'other.ts', 'v1\n')
+        await writeTemplateFile(tplV2, schemaRel, v2.schema)
+        await writeTemplateFile(tplV2, 'other.ts', v2.other)
+        await writeFile(
+            path.join(projectDir, 'package.json'),
+            JSON.stringify({ scripts: { 'db:generate': dbGenerate } }),
+        )
+
+        const registriesFor = (tplDir: string, version: string): BattlestackRegistries => buildRegistries({
+            namespace: 'nuxt4',
+            frameworks: [{ id: FW, label: FW, supportedFeatures: ['nuxt4:database'] }],
+            features: [makeFileFeature('nuxt4:database', version, tplDir, { stage: STAGE.DATABASE })],
+            templates: [{ id: TPL, label: TPL, framework: FW, requiredFeatures: ['nuxt4:database'], optionalFeatures: [] }],
+        }).registries
+        const registriesV1 = registriesFor(tplV1, '1.0.0')
+        const database = registriesV1.features.get('nuxt4:database')
+        expect(database.fqid).toBe('nuxt4:nuxt4:database')
+        const ctx = scaffoldCtx(projectDir, registriesV1, [database.fqid])
+        await database.execute(ctx)
+        await writeManifest(ctx)
+        return { projectDir, registriesV2: registriesFor(tplV2, '1.1.0') }
+    }
+
+    const pull = (projectDir: string, registries: BattlestackRegistries, overrides: Partial<ParsedArgs> = {}) =>
+        withCwdCapture(projectDir, () => pullCommand(args(overrides), silentLoader(), registries))
+    const generated = (projectDir: string) => exists(path.join(projectDir, marker))
+
+    it('runs db:generate when the pull rewrote a schema file', async () => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' })
+        const lines = await pull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, schemaRel), 'utf8')).toBe('v2 schema\n')
+        expect(await generated(projectDir)).toBe(true)
+        expect(lines.some((l) => l.includes('ran db:generate'))).toBe(true)
+    })
+
+    it.each([
+        ['--skip-install', { skipInstall: true }, writesMarker],
+        ['a failing db:generate', {}, 'node -e "process.exit(1)"'],
+    ])('warns to run db:generate by hand on %s, and the pull still completes', async (_, overrides, dbGenerate) => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' }, dbGenerate)
+        const lines = await pull(projectDir, registriesV2, overrides)
+
+        expect(await generated(projectDir)).toBe(false)
+        expect(lines.some((l) => l.includes('Run `pnpm run db:generate` and commit the SQL'))).toBe(true)
+        expect((await readManifestRaw(projectDir)).features[0].version).toBe('1.1.0')
+    })
+
+    it('generates nothing when the schema bytes are unchanged, though the update reports the file', async () => {
+        // The bump changes only `other.ts`; the schema is still reported as written (converged).
+        const { projectDir, registriesV2 } = await setup({ schema: 'v1 schema\n', other: 'v2\n' })
+        const lines = await pull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, 'other.ts'), 'utf8')).toBe('v2\n')
+        expect(await generated(projectDir)).toBe(false)
+        expect(lines.some((l) => l.includes('Schema changed'))).toBe(false)
+    })
+})
+
 describe('battlestack pull: misc plumbing', () => {
     it('keeps the record of a feature whose plugin did not load, and flags the pull', async () => {
         const projectDir = await tmp('battlestack-pull-orphan-')
