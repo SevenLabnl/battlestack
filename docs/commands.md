@@ -102,7 +102,7 @@ These work anywhere, project or not:
 
 | Command | What it does |
 | --- | --- |
-| `battlestack pull` | Re-apply template and config changes, drift-aware. |
+| `battlestack pull` | Bring every feature up to date, merging into files you edited. |
 | `battlestack upgrade` | Alias for `pull`. Named for the common case of picking up feature version bumps. |
 | `battlestack bump` | Bump npm dependencies to latest. |
 | `battlestack sync` | `pull`, then `bump`, then `doctor`. |
@@ -118,9 +118,11 @@ thing it must never do by accident:
 | `--no-skills` | Skip the AI-agent skill refresh. |
 | `--no-format` | Skip the trailing formatting pass. |
 | `--skip-install` | Skip the dependency install. |
+| `--allow-dirty` | Run in a working tree with uncommitted changes. |
 
-See [Keeping a project current](keeping-projects-current.md) for the drift model
-behind these.
+`pull` writes `.battlestack/pull/REPORT.md` and exits with code 2 when it left
+conflicts, staged files or other steps to finish. See
+[Keeping a project current](keeping-projects-current.md) for how the merge works.
 
 ### Gateway and traffic inspection
 

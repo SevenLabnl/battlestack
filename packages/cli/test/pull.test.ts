@@ -15,6 +15,7 @@ import {
     STAGE,
     updateFromTemplateDir,
     writeManifest,
+    writeRecorded,
     type Feature,
     type ParsedArgs,
     type ProjectManifest,
@@ -703,7 +704,7 @@ describe('battlestack pull: a file moving to a later feature', () => {
 })
 
 describe('battlestack pull: misc plumbing', () => {
-    it('drops an orphaned feature (removed from the CLI) from the manifest without throwing', async () => {
+    it('keeps the record of a feature whose plugin did not load, and flags the pull', async () => {
         const projectDir = await tmp('battlestack-pull-orphan-')
         const tplA = await tmp('battlestack-pull-orphan-a-')
         const tplOrphan = await tmp('battlestack-pull-orphan-o-')
@@ -725,10 +726,52 @@ describe('battlestack pull: misc plumbing', () => {
         registriesV2.features.register(makeFileFeature('test:feat-a', '1.0.0', tplA), origin)
 
         await expect(runPull(projectDir, registriesV2)).resolves.not.toThrow()
+        expect(process.exitCode).toBe(2)
+        process.exitCode = undefined
 
         const manifest = await readManifestRaw(projectDir)
-        expect(manifest.features.find((f) => f.id === fqid('test:feat-orphan'))).toBeUndefined()
-        // The orphan's file is left alone; pull only stops tracking it.
+        // A missing plugin must not unmanage its files: the record survives untouched.
+        expect(manifest.features.find((f) => f.id === fqid('test:feat-orphan'))?.files).toEqual({ 'o.ts': expect.any(String) })
         expect(await readFile(path.join(projectDir, 'o.ts'), 'utf8')).toBe('o-content\n')
+    })
+})
+
+describe('battlestack pull --allow-dirty', () => {
+    it('leaves an uncommitted edit to a tracked file exactly as it was', async () => {
+        const { execFileSync } = await import('node:child_process')
+        const projectDir = await tmp('battlestack-pull-dirty-')
+        const tplDir = await tmp('battlestack-pull-dirty-tpl-')
+        await writeTemplateFile(tplDir, 'a.ts', 'scaffold\n')
+        const git = (...a: string[]) => execFileSync('git', a, {
+            cwd: projectDir,
+            stdio: 'ignore',
+            env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
+        })
+
+        const v1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplDir)
+        v1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, v1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+        await writeFile(path.join(projectDir, 'a.ts'), 'committed edit\n')
+        git('init', '-q')
+        git('add', '-A')
+        git('commit', '-q', '-m', 'init')
+        await writeFile(path.join(projectDir, 'a.ts'), 'uncommitted edit\n')
+
+        // v2 touches only b.ts; a.ts stays recorded by the feature.
+        const v2 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        v2.features.register({
+            ...makeFileFeature('test:feat-a', '2.0.0', tplDir),
+            async update(c) {
+                await writeRecorded(c, 'test:feat-a', 'b.ts', 'new\n')
+                return { written: ['b.ts'], skipped: [], notes: [] }
+            },
+        }, origin)
+
+        await runPull(projectDir, v2, { allowDirty: true, format: false, skipInstall: true })
+        process.exitCode = undefined
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe('uncommitted edit\n')
     })
 })

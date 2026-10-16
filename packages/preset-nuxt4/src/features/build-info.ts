@@ -12,7 +12,7 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
  */
 export const buildInfoFeature: Feature = {
     id: 'nuxt4:build-info',
-    version: '1.0.1',
+    version: '1.0.2',
     label: 'Build info (version + commit in the footer)',
     description: 'Version and commit sha in the app footer, from the image\'s build args.',
     frameworks: ['nuxt4'],
@@ -26,7 +26,7 @@ export const buildInfoFeature: Feature = {
                 body: [
                     'Every deployed instance says what it is: `useBuildInfo()` returns the version, the commit and the build time, `<AppBuildInfo>` renders them in the footer, and `/api/health` reports the same values as JSON.',
                     '',
-                    'The values live in `runtimeConfig.public` — `appVersion`, `appCommit`, `appBuiltAt`, `appRepoUrl` — and the production image sets them from its build args:',
+                    'The values live in `runtimeConfig.public` (`appVersion`, `appCommit`, `appBuiltAt`, `appRepoUrl`), and the production image sets them from its build args:',
                     '',
                     '| Build arg | Env var | Shown as |',
                     '| --- | --- | --- |',
@@ -39,7 +39,7 @@ export const buildInfoFeature: Feature = {
                     '',
                     '**Cutting a version.** Actions → **Release** → Run workflow, pick `patch`, `minor` or `major`. It reads the highest existing `v*` tag, bumps it and pushes the new annotated tag plus a GitHub release. The number is yours to choose: nothing bumps it on its own.',
                     '',
-                    'It writes no commit and opens no pull request. The version is a property of the tagged commit, and the deploy pipeline derives it with `git describe --tags --match \'v*\'` — so there is no release commit to merge, and no `package.json` field that can drift out of step with the tag.',
+                    'It writes no commit and opens no pull request. The version is a property of the tagged commit, and the deploy pipeline derives it with `git describe --tags --match \'v*\'`, so there is no release commit to merge, and no `package.json` field that can drift out of step with the tag.',
                     '',
                     'A commit past the last tag builds as `1.4.2-5-gabc1234`: five commits after `v1.4.2`. That is deliberate. It reads as "not a release" at a glance, which is what it is.',
                     '',

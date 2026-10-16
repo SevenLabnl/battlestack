@@ -9,6 +9,7 @@ import type { Feature, InstalledFeatureRecord } from '../types/feature.js'
 import type { RunContext } from '../types/run-context.js'
 import type { UpdateReport } from '../types/update-report.js'
 import { writeFileEnsured, exists } from './fs.js'
+import { findBase, storeBase, threeWayMerge } from './merge.js'
 
 function templatesRootFor(callerUrl: string): string {
     return path.dirname(fileURLToPath(callerUrl))
@@ -211,6 +212,10 @@ export async function copyTemplateDirRecorded(
     for await (const { src, rel } of walkTemplateFiles(srcDir)) {
         if (opts.exclude?.(rel)) continue
         const dest = path.join(ctx.projectDir, rel)
+        if (isUpdating(ctx)) {
+            await writeGuarded(ctx, featureId, rel, await readFile(src))
+            continue
+        }
         await mkdir(path.dirname(dest), { recursive: true })
         const preexisted = await exists(dest)
         const buf = await readFile(src)
@@ -287,6 +292,10 @@ export async function writeRecorded(
     relPath: string,
     content: string,
 ): Promise<void> {
+    if (isUpdating(ctx)) {
+        await writeGuarded(ctx, featureId, relPath, Buffer.from(content, 'utf8'))
+        return
+    }
     const dest = path.join(ctx.projectDir, relPath)
     const preexisted = await exists(dest)
     await writeFileEnsured(dest, content)
@@ -312,7 +321,7 @@ interface SharedRelOwnership {
 /**
  * Consults the other enabled features' `files:` state maps (pre-seeded from the manifest
  * by `pull`/`add`) plus the scaffold execution order. Features missing from the registry,
- * or a `featureId` that isn't registered, degrade to empty results — the update then
+ * or a `featureId` that isn't registered, degrade to empty results, and the update then
  * behaves as if the file were unshared.
  */
 function sharedRelOwnership(ctx: RunContext, featureId: string): SharedRelOwnership {
@@ -368,7 +377,7 @@ async function classifyForUpdate(
     rel: string,
     newContent: Buffer,
     ownedSet: Set<string>,
-    recordedHash: string | undefined,
+    recordedHashes: Set<string>,
 ): Promise<{ state: UpdateState, newHash: string }> {
     const newHash = sha256(newContent)
     if (ownedSet.has(rel)) return { state: 'owned', newHash }
@@ -376,8 +385,83 @@ async function classifyForUpdate(
 
     const currentHash = await hashFile(dest)
     if (currentHash === newHash) return { state: 'converged', newHash }
-    if (recordedHash && recordedHash === currentHash) return { state: 'pristine', newHash }
+    // Matching any feature's last write means nobody edited it since.
+    if (recordedHashes.has(currentHash)) return { state: 'pristine', newHash }
     return { state: 'drifted', newHash }
+}
+
+/** Every hash any feature recorded for `rel`, this run's writes included. */
+function recordedHashesFor(ctx: RunContext, rel: string, extra?: string): Set<string> {
+    const hashes = new Set<string>()
+    if (extra) hashes.add(extra)
+    const posix = toPosix(rel)
+    for (const [key, value] of Object.entries(ctx.state)) {
+        if (!key.startsWith('files:') || !value || typeof value !== 'object') continue
+        for (const [r, h] of Object.entries(value as Record<string, string>)) {
+            if (toPosix(r) === posix && typeof h === 'string') hashes.add(h)
+        }
+    }
+    return hashes
+}
+
+/** Set by `pull` and `add`: writes into an existing project go through the drift check. */
+export const UPDATING_STATE_KEY = 'updating'
+const LEDGER_STATE_KEY = 'update:ledger'
+
+function isUpdating(ctx: RunContext): boolean {
+    return ctx.state[UPDATING_STATE_KEY] === true
+}
+
+/** What the drift-aware writers did this run, across every feature and plugin. */
+export interface UpdateLedger {
+    /** Every rel a drift-aware writer classified. The pull-level overwrite check skips these. */
+    handled: string[]
+    merged: string[]
+    conflicts: string[]
+    staged: string[]
+    /** Steps a person has to take, reported by features whose `execute` has no report to return. */
+    actions: string[]
+}
+
+export function updateLedger(ctx: RunContext): UpdateLedger {
+    // Plugins on another core version may have created it with fewer fields.
+    const existing = ctx.state[LEDGER_STATE_KEY] as Partial<UpdateLedger> | undefined
+    if (existing) {
+        existing.handled ??= []
+        existing.merged ??= []
+        existing.conflicts ??= []
+        existing.staged ??= []
+        existing.actions ??= []
+        return existing as UpdateLedger
+    }
+    const ledger: UpdateLedger = { handled: [], merged: [], conflicts: [], staged: [], actions: [] }
+    ctx.state[LEDGER_STATE_KEY] = ledger
+    return ledger
+}
+
+function pushOnce(list: string[], rel: string): void {
+    if (!list.includes(rel)) list.push(rel)
+}
+
+/**
+ * Writes one file into an existing project without losing local edits: a pristine or
+ * missing file is written, an edited or untracked one is merged three-way, or staged
+ * under `.battlestack/pull/` when no base is known.
+ */
+export async function writeGuarded(
+    ctx: RunContext,
+    featureId: string,
+    rel: string,
+    content: Buffer,
+    report: UpdateReport = { written: [], skipped: [], notes: [] },
+    ownedSet: Set<string> = new Set(),
+): Promise<UpdateReport> {
+    const dest = path.join(ctx.projectDir, rel)
+    const recordedHashes = recordedHashesFor(ctx, rel)
+    const { state, newHash } = await classifyForUpdate(dest, rel, content, ownedSet, recordedHashes)
+    const recorded = (ctx.state[`files:${featureId}`] as Record<string, string> | undefined)?.[rel]
+    await applyUpdateState(ctx, featureId, { state, dest, rel, newContent: content, newHash, recordedHash: recorded, recordedHashes, report })
+    return report
 }
 
 async function applyUpdateState(
@@ -385,21 +469,22 @@ async function applyUpdateState(
     featureId: string,
     args: {
         state: UpdateState
-        src: string
         dest: string
         rel: string
         newContent: Buffer
         newHash: string
         recordedHash: string | undefined
+        recordedHashes: Set<string>
         report: UpdateReport
     },
 ): Promise<void> {
-    const { state, src, dest, rel, newContent, newHash, recordedHash, report } = args
+    const { state, dest, rel, newContent, newHash, recordedHash, recordedHashes, report } = args
     const overwrite = ctx.state.overwrite === true
+    pushOnce(updateLedger(ctx).handled, toPosix(rel))
 
     // Every branch that changes (or blesses) the on-disk bytes also moves the baseline
     // of every OTHER feature tracking this rel (their maps are pre-seeded by pull/add),
-    // mirroring the scaffold path — otherwise a shared file drifts for them permanently.
+    // mirroring the scaffold path; otherwise a shared file drifts for them permanently.
 
     // `--overwrite` ignores every protection.
     if (overwrite) {
@@ -418,13 +503,13 @@ async function applyUpdateState(
     }
     if (state === 'missing') {
         await mkdir(path.dirname(dest), { recursive: true })
-        await copyFile(src, dest)
-        const writtenHash = await hashFile(dest)
-        recordFile(ctx, featureId, rel, writtenHash)
-        rebaselineRecordedFile(ctx, rel, writtenHash)
+        await writeFile(dest, newContent)
+        recordFile(ctx, featureId, rel, newHash)
+        rebaselineRecordedFile(ctx, rel, newHash)
         report.written.push(rel)
         // A recorded hash means the user deleted a tracked file.
         if (recordedHash) (report.restoredDeleted ??= []).push(rel)
+        else recordCreated(ctx, featureId, rel)
         return
     }
     if (state === 'converged') {
@@ -461,7 +546,10 @@ async function applyUpdateState(
         report.notes.push(`${rel}: overwritten (--force); prior content saved to ${bakRel}`)
         return
     }
-    // drifted: stage the new version and a patch for manual merge.
+    if (!isBinaryPath(rel) && await mergeInPlace(ctx, featureId, { dest, rel, newContent, newHash, recordedHashes, report })) return
+
+    // drifted, no base to merge against: stage the new version and a patch.
+    pushOnce(updateLedger(ctx).staged, toPosix(rel))
     const newPath = stagedArtifact(ctx, rel, '.new')
     await mkdir(path.dirname(newPath), { recursive: true })
     await writeFile(newPath, newContent)
@@ -473,9 +561,6 @@ async function applyUpdateState(
     // A textual diff of a binary asset is noise, so stage only the `.new` there.
     if (isBinaryPath(rel)) {
         await rmIfExists(stagedArtifact(ctx, rel, '.patch'))
-        report.notes.push(
-            `${rel}: binary asset, see ${path.relative(ctx.projectDir, newPath)} to compare (re-run with \`battlestack pull --force\` to overwrite)`,
-        )
         return
     }
 
@@ -483,14 +568,49 @@ async function applyUpdateState(
     const patchPath = stagedArtifact(ctx, rel, '.patch')
     const patch = createPatch(rel, currentContent, newContent.toString('utf8'), 'current', 'new')
     await writeFile(patchPath, patch, 'utf8')
-    report.notes.push(
-        `${rel}: see ${path.relative(ctx.projectDir, newPath)} and ${path.relative(ctx.projectDir, patchPath)} to merge (re-run with \`battlestack pull --force\` to overwrite)`,
-    )
+}
+
+/**
+ * Merges upstream into an edited file against the upstream bytes it started from. The
+ * result is written in place, with diff3 conflict markers where both sides changed the
+ * same lines. False when no base is known or git is unavailable.
+ */
+async function mergeInPlace(
+    ctx: RunContext,
+    featureId: string,
+    args: { dest: string, rel: string, newContent: Buffer, newHash: string, recordedHashes: Set<string>, report: UpdateReport },
+): Promise<boolean> {
+    const { dest, rel, newContent, newHash, recordedHashes, report } = args
+    const base = await findBase(ctx.projectDir, rel, recordedHashes)
+    if (!base) return false
+    const current = await readFile(dest)
+    const merged = await threeWayMerge(current, base, newContent, {
+        current: `${rel} (yours)`,
+        base: `${rel} (upstream before, ${featureId})`,
+        upstream: `${rel} (upstream now, ${featureId})`,
+    })
+    if (!merged) return false
+
+    await writeFile(dest, merged.content)
+    await storeBase(ctx.projectDir, newContent)
+    // The recorded hash is the upstream bytes, so the next pull merges against them again.
+    recordFile(ctx, featureId, rel, newHash)
+    rebaselineRecordedFile(ctx, rel, newHash)
+    await clearArtifacts(ctx, dest, rel)
+    const ledger = updateLedger(ctx)
+    if (merged.conflicts) {
+        pushOnce(ledger.conflicts, toPosix(rel))
+        ;(report.conflicts ??= []).push(rel)
+    } else {
+        pushOnce(ledger.merged, toPosix(rel))
+        ;(report.merged ??= []).push(rel)
+    }
+    return true
 }
 
 /** Deletes pristine files no longer shipped. User-owned or modified ones stay, with a note.
  *  A rel another enabled feature still tracks is only dropped from this feature's
- *  records — the file is that feature's to keep. */
+ *  records, because the file is that feature's to keep. */
 export async function deleteObsoleteFiles(
     ctx: RunContext,
     featureId: string,
@@ -526,6 +646,7 @@ export async function deleteObsoleteFiles(
             report.notes.push(
                 `file no longer shipped but user-modified, left in place: ${rel}`,
             )
+            ;(report.unmanaged ??= []).push(rel)
         }
     }
 }
@@ -576,8 +697,8 @@ export async function updateFromTemplateDirs(
             if (laterOwner !== undefined) {
                 // Repair an already-stale baseline while deferring: when disk matches the
                 // later owner's own baseline (pristine from its perspective), the stale
-                // hashes other features carry — from before shared-rel re-baselining
-                // existed, or where neither feature is bumped this release — can safely
+                // hashes other features carry (from before shared-rel re-baselining
+                // existed, or where neither feature is bumped this release) can safely
                 // move to the on-disk bytes, and stale merge artifacts go with them.
                 // User-drifted bytes are left for the later owner's update to classify.
                 const dest = path.join(ctx.projectDir, rel)
@@ -596,22 +717,23 @@ export async function updateFromTemplateDirs(
             }
             const dest = path.join(ctx.projectDir, rel)
             const recordedHash = prev?.files[rel]
+            const recordedHashes = recordedHashesFor(ctx, rel, recordedHash)
             const newContent = await readFile(src)
             const { state, newHash } = await classifyForUpdate(
                 dest,
                 rel,
                 newContent,
                 ownedSet,
-                recordedHash,
+                recordedHashes,
             )
             await applyUpdateState(ctx, featureId, {
                 state,
-                src,
                 dest,
                 rel,
                 newContent,
                 newHash,
                 recordedHash,
+                recordedHashes,
                 report,
             })
         }

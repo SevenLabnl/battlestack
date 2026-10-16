@@ -16,7 +16,7 @@ Verify the applicable items before finishing.
 - [ ] Contrast gate passed after color changes (see theming-accessibility.md)
 
 **States**
-- [ ] default / hover / focus-visible / active / selected / disabled / loading / error correct where applicable (they come from Nuxt UI — verify they weren't styled away)
+- [ ] default / hover / focus-visible / active / selected / disabled / loading / error correct where applicable (they come from Nuxt UI; verify they weren't styled away)
 
 **Accessibility**
 - [ ] Keyboard operable; visible focus intact; overlay focus return untouched

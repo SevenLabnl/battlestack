@@ -6,26 +6,26 @@ import { patchNuxtConfig } from '../utils/nuxt-config.js'
 
 /**
  * Battlestack Design System Nuxt. Nuxt UI is the component library; this feature only
- * themes it — there is deliberately no component package to install.
+ * themes it. There is deliberately no component package to install.
  *
  * What it wires:
  *
- * - `extends: ['@battlestack/theme']` — the theme layer (fonts, `<BsLogo>`, assets).
+ * - `extends: ['@battlestack/theme']`: the theme layer (fonts, `<BsLogo>`, assets).
  * - Two `@import`s appended to `app/assets/css/main.css`, in this order after
  *   `@import "@nuxt/ui"`: the layer's `tokens.css` (`@theme` ramps + `--ui-*` values,
- *   which must compile inside the project's Tailwind root — a layer cannot load them),
+ *   which must compile inside the project's Tailwind root; a layer cannot load them),
  *   then the project-owned `brand.css`.
  * - The semantic alias map in `app/app.config.ts`: `primary: 'brand'`,
  *   `secondary: 'lilac'`, `neutral: 'stone'`. Only the scaffold defaults are rewritten;
  *   a value the project changed stays untouched on `pull`.
  *
  * `requires` rather than `after`: without `nuxt4:nuxt-ui` there is no `main.css`, no
- * `app.config.ts` and nothing that reads a `--ui-*` variable — a theme for a component
+ * `app.config.ts` and nothing that reads a `--ui-*` variable, and a theme for a component
  * library that isn't there is meaningless.
  */
 export const battlestackThemeFeature: Feature = {
     id: 'nuxt4:battlestack-theme',
-    version: '1.0.0',
+    version: '1.0.1',
     label: 'Battlestack theme (design system on Nuxt UI)',
     description: 'Battlestack tokens + brand for Nuxt UI, as a Nuxt layer.',
     frameworks: ['nuxt4'],
@@ -60,13 +60,13 @@ export const battlestackThemeFeature: Feature = {
                     '',
                     'The design system itself is only a theme, delivered by the `@battlestack/theme` Nuxt layer:',
                     '',
-                    '- `tokens.css` — Tailwind `@theme` ramps (brand / lilac / warm-stone) and the `--ui-*` values for light and dark, imported in `app/assets/css/main.css` after `@import "@nuxt/ui"`.',
+                    '- `tokens.css`: Tailwind `@theme` ramps (brand / lilac / warm-stone) and the `--ui-*` values for light and dark, imported in `app/assets/css/main.css` after `@import "@nuxt/ui"`.',
                     '- the semantic alias map in `app/app.config.ts` (`ui.colors`: `primary: \'brand\'`, `secondary: \'lilac\'`, `neutral: \'stone\'`).',
-                    '- `<BsLogo>` — the Battlestack lockup, the only component the layer ships (brand, not UI).',
+                    '- `<BsLogo>`: the Battlestack lockup, the only component the layer ships (brand, not UI).',
                     '',
-                    'Branding lives in tokens, only in tokens. This project\'s own overrides go in `app/assets/css/brand.css`, which is yours to edit and which `battlestack pull` never touches. Re-value existing `--ui-*` names there (both `:root` and `.dark`); never invent a name — nothing reads an invented name.',
+                    'Branding lives in tokens, only in tokens. This project\'s own overrides go in `app/assets/css/brand.css`, which is yours to edit and which `battlestack pull` never touches. Re-value existing `--ui-*` names there (both `:root` and `.dark`); never invent a name, because nothing reads an invented name.',
                     '',
-                    'In screens, use the semantic utilities Nuxt UI generates from the theme — `text-muted`, `bg-elevated`, `border-default`, `text-primary`, `rounded-md` — never raw hex, arbitrary px, or Tailwind palette classes (`text-blue-600`) when a semantic name exists.',
+                    'In screens, use the semantic utilities Nuxt UI generates from the theme (`text-muted`, `bg-elevated`, `border-default`, `text-primary`, `rounded-md`), never raw hex, arbitrary px, or Tailwind palette classes (`text-blue-600`) when a semantic name exists.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },
@@ -96,12 +96,12 @@ async function wireTheme(ctx: RunContext): Promise<void> {
 /**
  * Appends the theme imports to `nuxt4:nuxt-ui`'s `main.css`. String-patched rather than
  * template-owned: two features owning one file would fight on every `pull`, and the CSS
- * has to live in this exact file — `@theme` only takes effect inside the stylesheet that
+ * has to live in this exact file: `@theme` only takes effect inside the stylesheet that
  * imports `tailwindcss`. Idempotent: each line is added once, order fixed by insertion.
  *
  * Exported for `nuxt4:nuxt-ui`: its update re-emits `main.css` from the template (the
  * spliced copy hashes as pristine, so it is overwritten), and only the bumped feature's
- * `update()` runs on a pull — so it re-applies the splice itself when the theme is enabled.
+ * `update()` runs on a pull, so it re-applies the splice itself when the theme is enabled.
  */
 export async function importThemeCss(ctx: RunContext): Promise<void> {
     const rel = 'app/assets/css/main.css'
@@ -137,7 +137,7 @@ export async function importThemeCss(ctx: RunContext): Promise<void> {
  *
  * Exported for `nuxt4:landing-shell`: `battlestack add nuxt4:landing-shell` re-emits
  * `app/app.config.ts` with the scaffold defaults, and only the added feature's
- * `execute()` runs — so it re-applies the aliases itself when the theme is enabled.
+ * `execute()` runs, so it re-applies the aliases itself when the theme is enabled.
  */
 export async function applyColorAliases(ctx: RunContext): Promise<void> {
     const rel = 'app/app.config.ts'
@@ -158,7 +158,7 @@ export async function applyColorAliases(ctx: RunContext): Promise<void> {
  * The theme string-patches files that other features emitted and recorded
  * (`nuxt4:nuxt-ui` records both paths; `nuxt4:landing-shell` also records
  * `app/app.config.ts`). Every feature tracking the file gets its baseline moved to
- * the patched bytes — otherwise the recorded hash never matches disk again, and every
+ * the patched bytes; otherwise the recorded hash never matches disk again, and every
  * `pull` stages a conflict and every `doctor` reports drift, permanently.
  *
  * Gated on `preHash` (the bytes before this patch): a baseline that already diverged

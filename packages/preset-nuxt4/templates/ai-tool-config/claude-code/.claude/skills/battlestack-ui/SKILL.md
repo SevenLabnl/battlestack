@@ -5,7 +5,7 @@ description: Apply the Battlestack design system when building, modifying, revie
 
 # Battlestack UI
 
-**Nuxt UI is the component library.** The design system is a theme on top of it — the `@battlestack/theme` Nuxt layer — never a parallel component set. Building a custom UI component is the one move that is almost always wrong.
+**Nuxt UI is the component library.** The design system is a theme on top of it (the `@battlestack/theme` Nuxt layer), never a parallel component set. Building a custom UI component is the one move that is almost always wrong.
 
 `DESIGN_SYSTEM.md` in the repo root is the binding authority; this skill is the working procedure.
 
@@ -16,7 +16,7 @@ description: Apply the Battlestack design system when building, modifying, revie
 - Read `DESIGN_SYSTEM.md`, `app/app.config.ts` (the `ui` key), `app/assets/css/main.css` and `app/assets/css/brand.css` before proposing anything.
 - Find the Nuxt UI component first: https://ui.nuxt.com/docs/components covers layout, forms, tables, overlays, navigation, dashboard shells, chat, auth, pricing and marketing pages. Never assume a gap without checking.
 
-### 2. Classify the change — pick the earliest valid option
+### 2. Classify the change: pick the earliest valid option
 
 1. Use an existing Nuxt UI component.
 2. Compose Nuxt UI components (`UCard + UBadge + UButton`) in the app layer.
@@ -30,7 +30,7 @@ State the classification in one line before implementing. For 6–7, read `refer
 
 ### 3. Implement with tokens
 
-- Semantic utilities only in screens: `text-muted`, `bg-elevated`, `border-default`, `text-primary`, `rounded-md` — never raw hex, arbitrary px, or Tailwind palette classes (`text-blue-600`) where a semantic name exists.
+- Semantic utilities only in screens: `text-muted`, `bg-elevated`, `border-default`, `text-primary`, `rounded-md`. Never raw hex, arbitrary px, or Tailwind palette classes (`text-blue-600`) where a semantic name exists.
 - Token names come from Nuxt UI (`--ui-*`) and the theme's ramps; never invent a name. Contract and token list: `references/design-system.md`.
 - Dark mode is the `.dark` class: any `:root` token override needs its `.dark` restatement.
 
@@ -38,7 +38,7 @@ State the classification in one line before implementing. For 6–7, read `refer
 
 Run repo lint/typecheck/tests when available. For work touching colors, themes, forms, overlays, keyboard, or motion: `references/theming-accessibility.md`. Before finishing: `references/review-checklist.md`.
 
-## Guardrails — never
+## Guardrails: never
 
 - Create a custom component (or wrapper whose only job is styling) when Nuxt UI has the component or the composition.
 - Hardcode brand values in screens; put client logic in shared theme code.
@@ -47,4 +47,4 @@ Run repo lint/typecheck/tests when available. For work touching colors, themes, 
 
 ## Sanctioned exceptions
 
-Exactly two, listed in `DESIGN_SYSTEM.md`: charts (no Nuxt UI equivalent — use the per-project chart library, themed with `--ui-color-*`) and complex date entry (`@vuepic/vue-datepicker`). Neither is a precedent.
+Exactly two, listed in `DESIGN_SYSTEM.md`: charts (no Nuxt UI equivalent; use the per-project chart library, themed with `--ui-color-*`) and complex date entry (`@vuepic/vue-datepicker`). Neither is a precedent.

@@ -108,14 +108,14 @@
                 "heading": "Backup codes",
                 "description": "Single-use recovery codes for when your authenticator device is unavailable. Each code works once.",
                 "unused": "{count} unused",
-                "runningLow": "— running low; regenerate soon.",
+                "runningLow": "(running low, regenerate soon)",
                 "none": "No backup codes generated yet.",
                 "generate": "Generate codes",
                 "regenerate": "Regenerate codes",
                 "saveTitle": "Save these codes now",
                 "saveDescription": "They won't be shown again. Store them in a password manager.",
                 "saved": "I've saved them",
-                "generated": "Backup codes generated — save them now",
+                "generated": "Backup codes generated. Save them now",
                 "generateError": "Could not generate backup codes"
             },
             "auditLog": {
