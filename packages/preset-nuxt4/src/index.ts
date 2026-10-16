@@ -47,6 +47,7 @@ import { initCommand } from './commands/init.js'
 // Re-exported for `packages/cli`.
 export { applyEnv, collectEnvForFeature } from './features/env.js'
 export { formatProject } from './features/install.js'
+export { generatePulledMigration, hashSchemaFiles } from './utils/migrations.js'
 
 /** The shared cross-cutting features, the Nuxt-framework features, and the three templates. */
 

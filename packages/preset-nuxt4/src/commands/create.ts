@@ -9,8 +9,6 @@ import {
     probeAndFreezePorts,
     projectPorts,
     resolvePackageManager,
-    resolveProjectPM,
-    run,
     runFeatures,
     writeLocalState,
     type BattlestackRegistries,
@@ -21,6 +19,7 @@ import {
 } from '@battlestack/core'
 import { describePortAttribution } from '@battlestack/core/utils/port-diagnosis.js'
 import { formatProject } from '../features/install.js'
+import { generateMigration } from '../utils/migrations.js'
 import { validateBaseDir, validateProjectName } from '@battlestack/core/utils/validation.js'
 import { enforcePreflight, runEnvPreflight } from '@battlestack/core/utils/preflight.js'
 import { describeStale, detectStale, recreateProject } from '@battlestack/core/utils/recreate.js'
@@ -257,25 +256,18 @@ export async function createCommand(context: CommandContext): Promise<void> {
 
 /**
  * Emits the initial `0000_*.sql` migration at scaffold time, so a fresh project deploys to
- * production without a manual `db:generate` first. `drizzle-kit generate` is offline (no
- * database needed), but it does need node_modules, hence the skipInstall guard.
+ * production without a manual `db:generate` first.
  */
 async function generateInitialMigration(ctx: RunContext, enabled: Set<string>): Promise<void> {
     // `enabled` holds canonicalized fqids, so a bare `enabled.has('nuxt4:database')` never matches.
     if (!enabledHas(enabled, 'nuxt4:database', ctx.registries)) return
     if (ctx.dryRun || ctx.state.skipInstall) return
-    const pm = await resolveProjectPM({
-        projectDir: ctx.projectDir,
-        fallback: String(ctx.state.packageManager ?? 'pnpm'),
-    })
-    try {
-        await run(pm, ['run', 'db:generate'], { cwd: ctx.projectDir, inherit: ctx.debug })
+    if (await generateMigration(ctx)) {
         ui.ok('Initial migration generated (server/database/migrations/)')
-    } catch (err) {
+    } else {
         ui.warn(
             'db:generate failed (non-fatal). Run `pnpm run db:generate` once before your first deploy',
         )
-        if (ctx.debug) console.error(err)
     }
 }
 
