@@ -7,6 +7,11 @@
   not installed. The warning points at access (`gh auth login` or git
   credentials for the source's host) and `battlestack pull --skills-only`, not at
   the registry.
+- `battlestack pull` runs `db:generate` when it changes a file under
+  `server/database/schema/`. Before, the schema change came without a
+  migration and never reached production, which applies only committed SQL.
+  Commit the new SQL in `server/database/migrations/`. With `--skip-install`,
+  or if generating fails, pull tells you to run `pnpm run db:generate` yourself.
 
 ## v1.4.0 (2026-10-15)
 
