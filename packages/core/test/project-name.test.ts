@@ -149,6 +149,20 @@ describe('renameProject', () => {
         const after = await readRaw(mainDir)
         expect(after.projectName).toBe('shop')
         expect(after.previousNames).toEqual(['my-app'])
+        expect(after.renderedName).toBe('my-app')
+    })
+
+    it('keeps the name the files were rendered with across renames until a pull settles it', async () => {
+        const m = (await readManifest(mainDir, registries)) as ProjectManifest
+        await renameProject(mainDir, m, 'shop')
+        await renameProject(mainDir, m, 'store')
+        expect((await readRaw(mainDir)).renderedName).toBe('my-app')
+
+        const ctx = buildRunContext({ projectDir: mainDir, manifest: m }, registries)
+        await writeManifest(ctx)
+        expect((await readRaw(mainDir)).renderedName).toBe('my-app')
+        await writeManifest(ctx, { rendered: true })
+        expect((await readRaw(mainDir)).renderedName).toBeUndefined()
     })
 
     it('renaming back drops the name from previousNames', async () => {
@@ -158,6 +172,7 @@ describe('renameProject', () => {
         const after = await readRaw(mainDir)
         expect(after.projectName).toBe('my-app')
         expect(after.previousNames).toEqual(['shop'])
+        expect(after.renderedName).toBeUndefined()
     })
 
     it('is a no-op for the current name', async () => {

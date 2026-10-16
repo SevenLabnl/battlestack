@@ -44,6 +44,7 @@ describe('battlestack rename', () => {
         const after = await readRaw()
         expect(after.projectName).toBe('my-app')
         expect(after.previousNames).toEqual(['demo'])
+        expect(after.renderedName).toBe('demo')
     })
 
     it('rejects an invalid name and writes nothing', async () => {

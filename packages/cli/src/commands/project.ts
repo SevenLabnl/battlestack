@@ -234,7 +234,8 @@ async function runPreChecks(projectRoot: string, args: ParsedArgs, registries: B
     if (!args.dryRun) await stampProjectName(projectRoot, manifest)
     const projectName = resolveProjectName(projectRoot, manifest)
     const dirName = path.basename(projectRoot)
-    if (dirName !== projectName && args.projectName !== 'rename' && !isLinkedWorktree(projectRoot)) {
+    // CI checks out under the repository name, which often differs, so the note would only be noise there.
+    if (dirName !== projectName && args.projectName !== 'rename' && !process.env.CI && !isLinkedWorktree(projectRoot)) {
         ui.dim(`Project name is ${projectName} (from the manifest), not the directory name ${dirName}. To rename the project: battlestack rename <name>`)
     }
 

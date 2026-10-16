@@ -133,7 +133,8 @@ function normalizeManifest(manifest: ProjectManifest): { manifest: ProjectManife
 
 export async function writeManifest(
     ctx: RunContext,
-    opts: { incomplete?: boolean, cliVersion?: string } = {},
+    /** `rendered`: every feature just ran under the current name, so a pending `renderedName` is settled. */
+    opts: { incomplete?: boolean, cliVersion?: string, rendered?: boolean } = {},
 ): Promise<void> {
     const target = path.join(ctx.projectDir, MANIFEST_PATH)
     const { manifest: previous, needsRewrite } = await loadAndMigrate(ctx.projectDir, ctx.registries)
@@ -176,14 +177,18 @@ export async function writeManifest(
     const optedOut
         = (ctx.state.optedOut as string[] | undefined) ?? previous?.optedOut
 
+    const projectName = resolveProjectName(ctx.projectDir, previous)
+    const renderedName = opts.rendered ? undefined : previous?.renderedName
+
     const manifest: ProjectManifest = {
         schemaVersion: 1,
         cliVersion: opts.cliVersion ?? FALLBACK_CORE_VERSION,
         framework: ctx.framework.id,
         template: ctx.template.id,
         packageManager: String(ctx.state.packageManager ?? 'pnpm'),
-        projectName: resolveProjectName(ctx.projectDir, previous),
+        projectName,
         ...(previous?.previousNames?.length ? { previousNames: previous.previousNames } : {}),
+        ...(renderedName && renderedName !== projectName ? { renderedName } : {}),
         createdAt: previous?.createdAt ?? new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         ...(opts.incomplete ? { incomplete: true } : {}),
@@ -208,7 +213,10 @@ export async function stampProjectName(
     await writeJson(path.join(projectDir, MANIFEST_PATH), manifest)
 }
 
-/** Renames the project in the manifest, keeping the old name in `previousNames`. Returns the old name, or null when unchanged. */
+/**
+ * Renames the project in the manifest, keeping the old name in `previousNames`. Returns the old name, or null when unchanged.
+ * `renderedName` keeps the name the files were generated with, so the next pull re-renders them even at unchanged versions.
+ */
 export async function renameProject(
     projectDir: string,
     manifest: ProjectManifest,
@@ -219,8 +227,11 @@ export async function renameProject(
     const prev = new Set(manifest.previousNames ?? [])
     prev.add(recorded)
     prev.delete(name)
+    const rendered = manifest.renderedName ?? recorded
     manifest.projectName = name
     manifest.previousNames = [...prev]
+    if (rendered === name) delete manifest.renderedName
+    else manifest.renderedName = rendered
     manifest.updatedAt = new Date().toISOString()
     await writeJson(path.join(projectDir, MANIFEST_PATH), manifest)
     return recorded

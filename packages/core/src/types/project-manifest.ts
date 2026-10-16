@@ -11,6 +11,8 @@ export interface ProjectManifest {
     projectName?: string
     /** Prior project names, appended by `renameProject`. */
     previousNames?: string[]
+    /** The name generated files still carry after `battlestack rename`. Set until a pull re-renders them. */
+    renderedName?: string
     createdAt: string
     updatedAt: string
     /** True while a scaffold or pull is mid-flight, and after one crashes. */

@@ -351,6 +351,11 @@ battlestack pull         # regenerate the files that use the name
 battlestack cleanup      # reconcile what ran under the old name
 ```
 
+The first pull after a rename re-renders every feature, also at unchanged
+versions. Files you edited get a patch in `.battlestack/pull/` as usual, and
+files you own are left alone; pull lists the tracked files that still contain
+the old name.
+
 `cleanup` finds Docker resources, hosts entries and gateway routes registered
 under every earlier name the manifest records. For a name it does not record,
 pass it: `battlestack cleanup old-name`.

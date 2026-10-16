@@ -6,11 +6,14 @@
   the directory name. Before, any project command in a clone, CI checkout or
   renamed directory silently renamed the project to the directory name, and
   `pull` then rendered that name into compose projects, hostnames, secrets and
-  image names. A mismatch now prints a one-line note. Renaming the
+  image names. A mismatch now prints a one-line note, except under CI, where
+  the checkout directory is usually the repository name. Renaming the
   directory no longer renames the project: use the new `battlestack rename
   <name>`. A project already renamed this way gets its name back with
   `battlestack rename <old-name>` (the old name is in the manifest's
-  `previousNames`).
+  `previousNames`). The first `pull` after a rename re-renders every feature,
+  also at unchanged versions, without touching owned or edited files, and lists
+  the tracked files that still contain the old name.
 
 - A skill whose `skills add` fails no longer ends the run on a plain "Scaffold
   complete" or "Update complete": the closing line names the skills that were
