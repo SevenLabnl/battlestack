@@ -22,7 +22,8 @@
                     { "context": "Type-check and test (Node 26)", "integration_id": 15368 },
                     { "context": "Type-check, test, build, CLI smoke (Windows, Node 24)", "integration_id": 15368 },
                     { "context": "Type-check, test, build, CLI smoke (Windows, Node 26)", "integration_id": 15368 },
-                    { "context": "Scaffold a project and run its own gates", "integration_id": 15368 }
+                    { "context": "Scaffold a project and run its own gates", "integration_id": 15368 },
+                    { "context": "Scaffold with the theme layer and build it", "integration_id": 15368 }
                 ]
             }
         }
