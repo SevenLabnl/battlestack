@@ -14,6 +14,10 @@
   `pull` reset.
   For preset authors, `mergeShallow` in `@battlestack/core/utils/ts-file.js` is
   now `mergeDefaults`.
+- A logged-out or revoked session could still sign in when its sealed cookie
+  value was sent as an `x-nuxt-session-session` header, which the revocation
+  check never sees. The auth feature now sets
+  `runtimeConfig.session.sessionHeader: false`; run `battlestack pull`.
 
 ## v1.4.0 (2026-10-15)
 
