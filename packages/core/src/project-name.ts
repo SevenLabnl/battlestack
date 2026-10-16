@@ -21,9 +21,7 @@ export function isLinkedWorktree(dir: string): boolean {
     }
 }
 
-/** The project's name: the directory name, except in a linked worktree, where the recorded name wins. */
+/** The project's name: the recorded name, or the directory name when none is recorded yet. */
 export function resolveProjectName(projectDir: string, manifest?: Pick<ProjectManifest, 'projectName'> | null): string {
-    const recorded = manifest?.projectName
-    if (recorded && isLinkedWorktree(projectDir)) return recorded
-    return path.basename(projectDir)
+    return manifest?.projectName || path.basename(projectDir)
 }

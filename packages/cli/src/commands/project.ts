@@ -6,8 +6,10 @@ import {
     buildRunContext,
     CLIError,
     ErrorCode,
+    isLinkedWorktree,
     readManifest,
-    reconcileProjectName,
+    resolveProjectName,
+    stampProjectName,
     STAGE_ORDER,
     type BattlestackRegistries,
     type ParsedArgs,
@@ -28,6 +30,7 @@ import { syncCommand, syncReservedMeta } from './sync.js'
 import { installCommand, installReservedMeta } from './install.js'
 import { gatewayCommand, gatewayReservedMetas, mitmCommand } from './gateway.js'
 import { disownCommand, disownReservedMeta, ownCommand, ownReservedMeta } from './own.js'
+import { renameCommand, renameReservedMeta } from './rename.js'
 
 /** Reserved subcommands, outside the per-feature `projectCommands()` map. */
 export const RESERVED_COMMANDS: Array<Omit<ReservedCommand, 'run'>> = [
@@ -43,6 +46,7 @@ export const RESERVED_COMMANDS: Array<Omit<ReservedCommand, 'run'>> = [
     removeReservedMeta,
     ownReservedMeta,
     disownReservedMeta,
+    renameReservedMeta,
     ...gatewayReservedMetas,
 ]
 
@@ -64,6 +68,7 @@ function buildReservedRunners(
         'remove': (args, loader) => removeCommand({ ...args, projectName: args.secondPositional }, loader, registries),
         'own': (args, loader) => ownCommand(args, loader),
         'disown': (args, loader) => disownCommand(args, loader),
+        'rename': (args, loader) => renameCommand(args, loader),
         'gateway:up': (args, loader) => gatewayCommand({ ...args, secondPositional: 'up' }, loader),
         'gateway:down': (args, loader) => gatewayCommand({ ...args, secondPositional: 'down' }, loader),
         'gateway:status': (args, loader) => gatewayCommand({ ...args, secondPositional: 'status' }, loader),
@@ -226,15 +231,12 @@ async function runPreChecks(projectRoot: string, args: ParsedArgs, registries: B
     const manifest = await readManifest(projectRoot, registries)
     if (!manifest) return
 
-    // A detected rename warns once, then restamps. Skipped under --dry-run, which writes nothing.
-    const renamedFrom = args.dryRun ? null : await reconcileProjectName(projectRoot, manifest)
-    if (renamedFrom) {
-        ui.warn(`Project directory renamed: ${renamedFrom} → ${path.basename(projectRoot)}`)
-        ui.dim('  Names derived from the directory changed with it: the docker compose')
-        ui.dim(`  project starts fresh containers + volumes (old data stays under ${renamedFrom}_*),`)
-        ui.dim('  hash-allocated port defaults shift, and the gateway hostname follows suit.')
-        ui.dim('  Ports frozen in .env stay authoritative. Run `battlestack pull` to regenerate')
-        ui.dim('  docker-compose.yml, and check `docker volume ls` if data seems missing.')
+    if (!args.dryRun) await stampProjectName(projectRoot, manifest)
+    const projectName = resolveProjectName(projectRoot, manifest)
+    const dirName = path.basename(projectRoot)
+    // CI checks out under the repository name, which often differs, so the note would only be noise there.
+    if (dirName !== projectName && args.projectName !== 'rename' && !process.env.CI && !isLinkedWorktree(projectRoot)) {
+        ui.dim(`Project name is ${projectName} (from the manifest), not the directory name ${dirName}. To rename the project: battlestack rename <name>`)
     }
 
     const ctx = buildRunContext({

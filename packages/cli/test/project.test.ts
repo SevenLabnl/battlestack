@@ -12,6 +12,7 @@ import {
     type CommandContext,
     type Feature,
     type ParsedArgs,
+    type ProjectManifest,
     type Provenance,
 } from '@battlestack/core'
 
@@ -135,6 +136,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
     vi.restoreAllMocks()
+    vi.unstubAllEnvs()
     await rm(projectDir, { recursive: true, force: true })
 })
 
@@ -295,7 +297,7 @@ describe('projectCommand', () => {
         expect(out).not.toContain('scaffold-only command')
     })
 
-    it('stamps projectName into the manifest on first run (rename reconciliation)', async () => {
+    it('stamps the directory name into a manifest that records no projectName', async () => {
         await projectCommand(args('hello'), loader, projectDir, registries, ['hello'])
         const manifest = JSON.parse(
             await import('node:fs/promises').then((fs) =>
@@ -303,5 +305,32 @@ describe('projectCommand', () => {
             ),
         )
         expect(manifest.projectName).toBe(path.basename(projectDir))
+    })
+
+    async function runUnderAnotherName(): Promise<{ manifest: ProjectManifest, out: string }> {
+        const file = path.join(projectDir, '.battlestack', 'manifest.json')
+        const fs = await import('node:fs/promises')
+        await fs.writeFile(file, JSON.stringify({ ...JSON.parse(await fs.readFile(file, 'utf8')), projectName: 'my-app' }))
+        const lines: string[] = []
+        vi.mocked(console.log).mockImplementation((...a: unknown[]) => {
+            lines.push(a.join(' '))
+        })
+        await projectCommand(args('hello'), loader, projectDir, registries, ['hello'])
+        return { manifest: JSON.parse(await fs.readFile(file, 'utf8')) as ProjectManifest, out: lines.join('\n') }
+    }
+
+    it('keeps a recorded name that differs from the directory name, and says so', async () => {
+        vi.stubEnv('CI', '')
+        const { manifest, out } = await runUnderAnotherName()
+        expect(manifest.projectName).toBe('my-app')
+        expect(manifest.previousNames).toBeUndefined()
+        expect(out).toContain('battlestack rename <name>')
+    })
+
+    it('keeps the recorded name under CI without the note: a CI checkout is named after the repository', async () => {
+        vi.stubEnv('CI', 'true')
+        const { manifest, out } = await runUnderAnotherName()
+        expect(manifest.projectName).toBe('my-app')
+        expect(out).not.toContain('battlestack rename')
     })
 })
