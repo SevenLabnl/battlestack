@@ -11,6 +11,7 @@ import {
     readManifest,
     recordOwned,
     skillsOutcome,
+    topoOrder,
     writeManifest,
     type BattlestackRegistries,
     type EnvDiff,
@@ -244,6 +245,29 @@ async function rehydrateMissingFeatures(
     }
 }
 
+/**
+ * The records in scaffold execution order. Shared-file ownership (`sharedRelOwnership`) is decided
+ * by that order, so updating in manifest (id) order let a file moving to a later-staged feature be
+ * deleted as obsolete by its old owner after the new owner had already passed it by.
+ */
+function inUpdateOrder(
+    records: readonly InstalledFeatureRecord[],
+    registries: BattlestackRegistries,
+): InstalledFeatureRecord[] {
+    const registered = records.filter((r) => registries.features.has(r.id))
+    let ordered: Feature[]
+    try {
+        ordered = topoOrder(registered.map((r) => registries.features.get(r.id)))
+    } catch {
+        return [...records] // A cycle among installed features: no order to reason about.
+    }
+    // topoOrder keys on the bare id; records carry the fqid.
+    const rank = new Map(ordered.map((f, i) => [f.id, i]))
+    const rankOf = (r: InstalledFeatureRecord): number =>
+        (registries.features.has(r.id) ? rank.get(registries.features.get(r.id).id) : undefined) ?? ordered.length
+    return [...records].sort((a, b) => rankOf(a) - rankOf(b))
+}
+
 /** Env-aggregator findings. `.env` is never overwritten. */
 function printEnvDiff(envDiff: EnvDiff | undefined): void {
     if (!envDiff) return
@@ -366,7 +390,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             await rehydrateMissingFeatures(manifest, ctx, defaults, 'new default-on', loader, registries)
         }
 
-        for (const record of existingRecords) {
+        for (const record of inUpdateOrder(existingRecords, registries)) {
             await pullOneFeature(ctx, record, args, loader, registries)
         }
 

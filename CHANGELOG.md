@@ -8,6 +8,13 @@
   credentials for the source's host) and `battlestack pull --skills-only`, not at
   the registry.
 
+- `pull` updates features in the order a scaffold runs them, not alphabetically.
+  A file that moved to a feature with a later stage but an earlier id was
+  deleted: the new owner passed it by first, then the old owner removed it as
+  obsolete. 1.4.0 lost `test/e2e/api/auth.test.ts` this way when it moved from
+  `nuxt4:vitest` to `nuxt4:auth`. A project that already lost it gets it back
+  the next time `nuxt4:auth` is bumped, or now by copying it from the template.
+
 ## v1.4.0 (2026-10-15)
 
 - Keep the generated `AGENTS.md` short: feature sections move to
