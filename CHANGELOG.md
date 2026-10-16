@@ -7,6 +7,10 @@
   not installed. The warning points at access (`gh auth login` or git
   credentials for the source's host) and `battlestack pull --skills-only`, not at
   the registry.
+- `pull` no longer appends the template's favicon and apple-touch-icon links to
+  a project that declares its own icons in `app.head.link`: browsers take the
+  last matching icon, so those links overrode the project's branding. Remove any
+  `/favicon.ico` or `/apple-touch-icon.png` links a previous pull added.
 
 ## v1.4.0 (2026-10-15)
 
