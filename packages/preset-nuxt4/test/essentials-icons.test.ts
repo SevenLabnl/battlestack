@@ -184,6 +184,25 @@ describe('essentialsFeature: default favicon and app icons', () => {
         expect(await readNuxtConfig()).not.toContain('/favicon.svg')
     })
 
+    it('removes template links an earlier pull added once a layout sets its own', async () => {
+        await essentialsFeature.execute(ctx())
+        expect(await readNuxtConfig()).toContain('/favicon.svg')
+        await mkdir(path.join(projectDir, 'app', 'layouts'), { recursive: true })
+        await writeFile(
+            path.join(projectDir, 'app', 'layouts', 'default.vue'),
+            "<script setup lang=\"ts\">\nuseHead({ link: [{ rel: 'icon', href: '/brand.svg' }] })\n</script>\n",
+            'utf8',
+        )
+        const prev: InstalledFeatureRecord = { id: 'nuxt4:essentials', version: '1.2.2', files: {}, ownedByUser: [] }
+        const report = await essentialsFeature.update!(ctx(), prev)
+
+        const cfg = await readNuxtConfig()
+        expect(cfg).not.toContain('/favicon.ico')
+        expect(cfg).not.toContain('/favicon.svg')
+        expect(cfg).not.toContain('/apple-touch-icon.png')
+        expect(report.notes.join('\n')).toMatch(/template favicon links were removed/)
+    })
+
     it('reports the skipped links on pull', async () => {
         await writeConfigWithLinks(["{ rel: 'icon', href: '/brand.svg' }"])
         const prev: InstalledFeatureRecord = { id: 'nuxt4:essentials', version: '1.2.2', files: {}, ownedByUser: [] }

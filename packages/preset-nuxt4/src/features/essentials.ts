@@ -172,6 +172,7 @@ async function vueSourcesDeclareIcon(projectDir: string): Promise<boolean> {
 async function wireIcons(ctx: RunContext): Promise<string | undefined> {
     const iconsInVue = await vueSourcesDeclareIcon(ctx.projectDir)
     let skipped = iconsInVue
+    let removedOurs = false
     await patchNuxtConfig(ctx.projectDir, (c) => {
         const icons: Record<string, string>[] = [
             // Order follows the pack: `.ico` first for the browsers that take the first
@@ -185,9 +186,16 @@ async function wireIcons(ctx: RunContext): Promise<string | undefined> {
         )
         skipped ||= brandedInConfig
         if (!skipped) for (const icon of icons) c.addHeadLink(icon)
+        else {
+            // All three present is what an earlier pull leaves; one alone may be the project's own.
+            const same = (a: Record<string, string>, b: Record<string, string>): boolean => a.rel === b.rel && a.href === b.href
+            if (icons.every((i) => c.headLinks().some((l) => same(l, i)))) {
+                removedOurs = c.removeHeadLinks((l) => icons.some((i) => same(l, i))) > 0
+            }
+        }
         c.addHeadMeta({ name: 'theme-color', content: BRAND_NAVY })
     })
     if (!skipped) return undefined
     const where = iconsInVue ? 'app/app.vue or app/layouts/' : 'nuxt.config.ts app.head.link'
-    return `own icon links found in ${where}, so the template favicon links were not added`
+    return `own icon links found in ${where}, so the template favicon links were ${removedOurs ? 'removed' : 'not added'}`
 }
