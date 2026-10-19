@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import prompts from 'prompts'
@@ -11,6 +11,8 @@ import {
     exists,
     hashFile,
     MANIFEST_PATH,
+    readManifest,
+    renameProject,
     silentLoader,
     STAGE,
     updateFromTemplateDir,
@@ -21,7 +23,7 @@ import {
     type Provenance,
     type RunContext,
 } from '@battlestack/core'
-import { buildRegistries, defaultArgs, withCwd } from './test-utils.js'
+import { buildRegistries, defaultArgs, withCwd, withCwdCapture } from './test-utils.js'
 
 /**
  * `pullCommand` is the ONE command that rewrites files a user may have hand-edited, and
@@ -730,5 +732,112 @@ describe('battlestack pull: misc plumbing', () => {
         expect(manifest.features.find((f) => f.id === fqid('test:feat-orphan'))).toBeUndefined()
         // The orphan's file is left alone; pull only stops tracking it.
         expect(await readFile(path.join(projectDir, 'o.ts'), 'utf8')).toBe('o-content\n')
+    })
+})
+
+describe('battlestack pull: the project name', () => {
+    // The name is rendered into compose projects, hostnames, secrets and image names, so a
+    // pull that takes it from the wrong place, or never re-renders it, ships the wrong one.
+    const FEATURE = 'test:named'
+    let updates = 0
+
+    function makeNamedFeature(version: string): Feature {
+        async function render(ctx: RunContext): Promise<string> {
+            const dir = await tmp('battlestack-pull-named-tpl-')
+            await writeTemplateFile(dir, 'compose.txt', `name: ${ctx.projectName}\n`)
+            await writeTemplateFile(dir, 'routes.txt', `host: ${ctx.projectName}.localhost\n`)
+            return dir
+        }
+        return {
+            id: FEATURE,
+            label: 'named',
+            version,
+            stage: STAGE.STYLING,
+            async execute(ctx) {
+                await copyTemplateDirRecorded(ctx, FEATURE, await render(ctx))
+            },
+            async update(ctx, prev) {
+                updates++
+                return updateFromTemplateDir(ctx, FEATURE, await render(ctx), prev)
+            },
+        }
+    }
+
+    function registriesAt(version: string): BattlestackRegistries {
+        const registries = makeRegistries({ requiredFeatures: [fqid(FEATURE)] })
+        registries.features.register(makeNamedFeature(version), origin)
+        return registries
+    }
+
+    /** Scaffolds `my-app`, then moves it to a directory named `demo`, as a clone into `demo` would. */
+    async function scaffoldThenMove(): Promise<string> {
+        const parent = await tmp('battlestack-pull-named-')
+        const original = path.join(parent, 'my-app')
+        await mkdir(original)
+        const registries = registriesAt('1.0.0')
+        const ctx = scaffoldCtx(original, registries, [fqid(FEATURE)])
+        await registries.features.get(FEATURE).execute(ctx)
+        await writeManifest(ctx)
+        const moved = path.join(parent, 'demo')
+        await rename(original, moved)
+        return moved
+    }
+
+    async function pullCapturing(projectDir: string, registries: BattlestackRegistries): Promise<string> {
+        const lines = await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registries))
+        return lines.join('\n')
+    }
+
+    beforeEach(() => {
+        updates = 0
+    })
+
+    it('renders the recorded name, not the directory name, in a checkout under another name', async () => {
+        const projectDir = await scaffoldThenMove()
+        await pullCapturing(projectDir, registriesAt('2.0.0'))
+
+        expect(updates).toBe(1)
+        expect(await readFile(path.join(projectDir, 'compose.txt'), 'utf8')).toBe('name: my-app\n')
+        const manifest = await readManifestRaw(projectDir)
+        expect(manifest.projectName).toBe('my-app')
+        expect(manifest.previousNames).toBeUndefined()
+    })
+
+    it('re-renders after `rename` at an unchanged version, keeps edited files, and lists what still names the old one', async () => {
+        const projectDir = await scaffoldThenMove()
+        await writeFile(path.join(projectDir, 'routes.txt'), 'host: my-app.example.com\n', 'utf8')
+        const registries = registriesAt('1.0.0')
+        await renameProject(projectDir, (await readManifest(projectDir, registries))!, 'shop')
+
+        const out = await pullCapturing(projectDir, registries)
+
+        expect(updates).toBe(1)
+        expect(await readFile(path.join(projectDir, 'compose.txt'), 'utf8')).toBe('name: shop\n')
+        // CORE PROPERTY: a rename is no licence to overwrite an edited file.
+        expect(await readFile(path.join(projectDir, 'routes.txt'), 'utf8')).toBe('host: my-app.example.com\n')
+        expect(await exists(path.join(projectDir, '.battlestack', 'pull', 'routes.txt.patch'))).toBe(true)
+        expect(out).toContain('still name the project my-app')
+        expect(out).toContain('routes.txt')
+        expect(out).not.toMatch(/•.*compose\.txt/)
+
+        const manifest = await readManifestRaw(projectDir)
+        expect(manifest.projectName).toBe('shop')
+        expect(manifest.previousNames).toEqual(['my-app'])
+        expect(manifest.renderedName).toBeUndefined()
+
+        // Settled: the next same-version pull is a no-op again.
+        await pullCapturing(projectDir, registries)
+        expect(updates).toBe(1)
+    })
+
+    it('a dry-run after `rename` writes nothing and leaves the rename pending', async () => {
+        const projectDir = await scaffoldThenMove()
+        const registries = registriesAt('1.0.0')
+        await renameProject(projectDir, (await readManifest(projectDir, registries))!, 'shop')
+
+        await withCwd(projectDir, () => pullCommand(args({ dryRun: true }), silentLoader(), registries))
+
+        expect(await readFile(path.join(projectDir, 'compose.txt'), 'utf8')).toBe('name: my-app\n')
+        expect((await readManifestRaw(projectDir)).renderedName).toBe('my-app')
     })
 })

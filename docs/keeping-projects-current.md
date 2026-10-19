@@ -194,9 +194,9 @@ battlestack cleanup
 ```
 
 Interactive. Finds `pull` artefacts you have finished merging, stale manifest
-records, and Docker resources detached from any current project. Renamed the
-project directory? Pass the old name so it can reconcile what was registered
-under it:
+records, and Docker resources detached from any current project, including
+those under a name the project had before `battlestack rename`. For a name the
+manifest does not record, pass it:
 
 ```bash
 battlestack cleanup old-name

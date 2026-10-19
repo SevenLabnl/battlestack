@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import pc from 'picocolors'
 import type { Ora } from 'ora'
 import { confirmOverwriteOwned, ui } from '@battlestack/tui'
@@ -114,6 +116,8 @@ async function pullOneFeature(
     args: ParsedArgs,
     loader: Ora,
     registries: BattlestackRegistries,
+    /** Set after `battlestack rename`: every feature re-renders, at unchanged versions too. */
+    renamedFrom?: string,
 ): Promise<void> {
     if (!registries.features.has(record.id)) {
         ui.warn(`feature "${record.id}" is not registered by any loaded plugin, skipped`)
@@ -128,7 +132,7 @@ async function pullOneFeature(
 
     const sameVersion = feature.version === record.version
     // `--force` bypasses the version gate. `--overwrite` only sets drift policy.
-    if (sameVersion && !args.force) {
+    if (sameVersion && ((!args.force && !renamedFrom) || !feature.update)) {
         ui.skip(`${feature.label} (${feature.version}, up to date)`)
         return
     }
@@ -146,7 +150,7 @@ async function pullOneFeature(
     }
 
     const arrow = sameVersion
-        ? `${feature.version} (forced)`
+        ? `${feature.version} (${args.force ? 'forced' : 'project renamed'})`
         : `${record.version} → ${feature.version}`
     loader.start(`${feature.label} ${arrow}`)
     try {
@@ -271,6 +275,23 @@ function printEnvDiff(envDiff: EnvDiff | undefined): void {
     }
 }
 
+/** Tracked files that still name the project by `name`: owned, edited or seed-once files a re-render leaves alone. */
+async function filesStillNaming(projectDir: string, manifest: ProjectManifest, name: string): Promise<string[]> {
+    const pattern = new RegExp(`(?<![a-z0-9_-])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-z0-9_-])`)
+    const rels = new Set(manifest.features.flatMap((f) => [...Object.keys(f.files ?? {}), ...(f.ownedByUser ?? [])]))
+    const hits: string[] = []
+    for (const rel of [...rels].sort()) {
+        let content: string
+        try {
+            content = await readFile(path.join(projectDir, rel), 'utf8')
+        } catch {
+            continue // Recorded but gone from disk: nothing left to rename.
+        }
+        if (pattern.test(content)) hits.push(rel)
+    }
+    return hits
+}
+
 /** Drifted files emit `.battlestack.patch`. Pristine files are overwritten. */
 export async function pullCommand(args: ParsedArgs, loader: Ora, registries: BattlestackRegistries): Promise<void> {
     const projectDir = await findProjectRoot(process.cwd())
@@ -366,8 +387,13 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             await rehydrateMissingFeatures(manifest, ctx, defaults, 'new default-on', loader, registries)
         }
 
+        const renamedFrom = manifest.renderedName && manifest.renderedName !== ctx.projectName
+            ? manifest.renderedName
+            : undefined
+        if (renamedFrom) ui.info(`Project renamed ${renamedFrom} → ${ctx.projectName}: re-rendering every feature`)
+
         for (const record of existingRecords) {
-            await pullOneFeature(ctx, record, args, loader, registries)
+            await pullOneFeature(ctx, record, args, loader, registries, renamedFrom)
         }
 
         if (!ctx.dryRun) {
@@ -375,7 +401,18 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             if (args.format) {
                 await formatAndReconcile(ctx, manifest, registries)
             }
-            await writeManifest(ctx)
+            await writeManifest(ctx, { rendered: true })
+        }
+
+        if (renamedFrom && !ctx.dryRun) {
+            const after = await readManifest(projectDir, registries)
+            const stale = after ? await filesStillNaming(projectDir, after, renamedFrom) : []
+            if (stale.length > 0) {
+                ui.blank()
+                ui.warn(`These files still name the project ${renamedFrom}; pull leaves files you own, files you edited (patches in .battlestack/pull/) and files written only once`)
+                for (const rel of stale) ui.bullet(rel)
+                ui.dim(`  Untracked files can name it too: git grep -n ${renamedFrom}`)
+            }
         }
 
         if (orphans.length > 0) {
