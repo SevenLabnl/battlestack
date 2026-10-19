@@ -1053,6 +1053,17 @@ describe('battlestack pull: the project name', () => {
         expect((await readManifestRaw(projectDir)).renderedName).toBe('my-app')
     })
 
+    it('keeps the rename pending when a feature\'s plugin did not load', async () => {
+        const projectDir = await scaffoldThenMove()
+        await renameProject(projectDir, (await readManifest(projectDir, registriesAt('1.0.0')))!, 'shop')
+        const withoutPlugin = makeRegistries({ requiredFeatures: [] })
+
+        await pullCapturing(projectDir, withoutPlugin)
+        process.exitCode = undefined
+
+        expect((await readManifestRaw(projectDir)).renderedName).toBe('my-app')
+    })
+
     it('a dry-run after `rename` writes nothing and leaves the rename pending', async () => {
         const projectDir = await scaffoldThenMove()
         const registries = registriesAt('1.0.0')
