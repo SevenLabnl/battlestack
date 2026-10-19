@@ -355,9 +355,9 @@ battlestack cleanup      # reconcile what ran under the old name
 ```
 
 The first pull after a rename re-renders every feature, also at unchanged
-versions. Files you edited get a patch in `.battlestack/pull/` as usual, and
-files you own are left alone; pull lists the tracked files that still contain
-the old name.
+versions. Files you edited get the new name merged in like any other update
+(see `.battlestack/pull/REPORT.md`), and files you own are left alone; pull
+lists the tracked files that still contain the old name.
 
 `cleanup` finds Docker resources, hosts entries and gateway routes registered
 under every earlier name the manifest records. For a name it does not record,
