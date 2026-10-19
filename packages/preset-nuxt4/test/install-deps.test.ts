@@ -27,4 +27,11 @@ describe('keepsHigherFloor', () => {
         expect(keepsHigherFloor('~4.4.3', '^4')).toBe(false)
         expect(keepsHigherFloor('npm:other@^3.1.0', 'npm:@ai-sdk/provider-utils@^3')).toBe(false)
     })
+
+    it('treats each 0.x minor as its own line, as a caret does', () => {
+        expect(keepsHigherFloor('^0.5.0', '^0.4.2')).toBe(false)
+        expect(keepsHigherFloor('^0.0.4', '^0.0.3')).toBe(false)
+        expect(keepsHigherFloor('^0.4.5', '^0.4.2')).toBe(true)
+        expect(keepsHigherFloor('^0.5.0', '^0')).toBe(true)
+    })
 })

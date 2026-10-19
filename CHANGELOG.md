@@ -30,7 +30,8 @@
   instead of being dropped, so its files stay managed.
 - `shared:github` drops its records of the deploy workflows it no longer ships.
 - `pull` keeps a project's dependency range when it already has a higher floor
-  in the same major than the feature asks for.
+  in the same major than the feature asks for. Below 1.0 that has to be the
+  same minor, as a caret range means there.
 - Ports written into committed files (`docker-compose.yml` defaults, the
   `mastra:studio` script) depend only on the project name, so they no longer
   change between machines. `.env` still overrides them locally.
