@@ -31,6 +31,6 @@ const build = useBuildInfo()
 const detail = computed(() => {
     const parts = [t('build.commit', { commit: build.commit })]
     if (build.builtAt) parts.push(t('build.builtAt', { date: build.builtAt }))
-    return parts.join(' — ')
+    return parts.join(' · ')
 })
 </script>

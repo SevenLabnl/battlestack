@@ -9,14 +9,10 @@ Starters hand you the wiring once. From that moment your copy drifts, and a fix
 upstream never reaches you.
 
 battlestack projects carry a manifest recording which feature versions produced
-which files, along with a content hash per file. That record supports three
-questions no starter can answer:
-
-- Has this feature moved on since my project was created?
-- Has this file changed since battlestack wrote it?
-- Is this file mine now, or still battlestack's?
-
-`pull` and `doctor` are those questions made runnable.
+which files, along with a content hash per file. From that record battlestack can
+tell whether a feature has moved on since the project was created, and whether a
+file has changed since battlestack wrote it. `doctor` reports both; `pull` acts
+on them.
 
 ## The commands
 
@@ -32,32 +28,68 @@ picking up feature version bumps.
 
 Start with `doctor`. It changes nothing, so there is no reason not to.
 
+## Before you pull
+
+Commit or stash your work first. `pull` refuses to run in a working tree with
+uncommitted changes, because git is how you review what it did and undo it if
+you need to. `--allow-dirty` overrides that, and costs you the ability to tell
+your changes from the pull's.
+
+A project without `.battlestack/manifest.json` is not a battlestack project yet.
+`pull` says so instead of starting a new project. If a plugin can convert it from
+another tool, `battlestack migrate` lists the conversions on offer.
+
 ## What pull actually does per file
 
-For every file a feature owns, `pull` compares the file on disk against both the
-hash recorded at install time and the new content. Five outcomes:
+For every file a feature writes, `pull` compares the file on disk with the hash
+recorded when battlestack last wrote it, and with the new content.
 
 | Situation | What happens |
 | --- | --- |
 | **Pristine**: untouched since battlestack wrote it | Updated in place. |
-| **Missing**: you deleted a tracked file | Restored, and reported so you know. |
+| **Missing**: you deleted a tracked file | Restored, and listed in the report. |
 | **Converged**: your edit happens to match the new version | Recorded as up to date. Nothing written. |
 | **Owned**: you claimed it with `battlestack own` | Skipped entirely. |
-| **Drifted**: you edited it, and upstream changed too | **Not overwritten.** See below. |
+| **Edited**: you changed it, and upstream changed too | Merged. See below. |
 
-**A drifted file is never silently overwritten.** Instead `pull` stages two
-files for you, outside your source tree:
+An edited file is merged three ways: the version battlestack last wrote, your
+version, and the new one. Changes on different lines all land in the file. Where
+you and upstream changed the same lines, the file gets conflict markers with
+both versions and the original between them:
 
 ```
-.battlestack/pull/<path>.new      the version pull wanted to write
-.battlestack/pull/<path>.patch    a diff from your current content to that
+<<<<<<< server/utils/auth.ts (yours)
+||||||| server/utils/auth.ts (upstream before, nuxt4:auth)
+=======
+>>>>>>> server/utils/auth.ts (upstream now, nuxt4:auth)
 ```
 
-and tells you where they are. You merge what you want, delete the artefacts, and
-your edits survive.
+The version battlestack last wrote comes from `.battlestack/base/`, which
+holds those versions by content hash. Commit it with the rest of the project so
+everyone's next pull can merge. On a project's first merge, before that directory
+exists, `pull` finds the version in git history instead. When neither has it, the
+file is left as it is and the new version is staged as
+`.battlestack/pull/<path>.new` for you to compare by hand.
 
-This is the default because the alternative, discarding your work to apply an
-update, is the one behaviour that would make the whole mechanism untrustworthy.
+The same rules apply to a feature that is new to the project. If it ships a file
+at a path where you already have your own, yours stays and the feature's version
+is staged.
+
+## After the pull
+
+`pull` writes `.battlestack/pull/REPORT.md` and prints its path. The report
+lists every conflict, staged file, new file and backup, along with steps it
+cannot take for you, such as GitHub variables a deploy workflow now reads. Each
+section says how to handle its files. The command exits with code 2 while there
+is anything in it to do, so CI and scripts can tell "finished with work left"
+from a crash.
+
+Projects get a `battlestack-upgrade` skill that walks an AI agent through the
+report. The short version for people: resolve the conflict markers
+(`git diff --check` finds any left), compare each staged `.new` with your file,
+check whether each new file is something the project deleted on purpose, run
+lint, typecheck and the tests, and commit. `pull` refuses to start again while
+a conflict marker is left in a merged file.
 
 ## Moving template files
 
@@ -75,8 +107,8 @@ old helper is removed. Fresh scaffolds ship only the shared path.
 For a customized project:
 
 1. Run `battlestack doctor`, then `battlestack pull`.
-2. Merge staged changes from `.battlestack/pull/` into customized forms and API
-   handlers. Explicitly owned paths are skipped rather than staged; compare them
+2. Resolve what `.battlestack/pull/REPORT.md` lists for customized forms and API
+   handlers. Explicitly owned paths are skipped rather than merged; compare them
    with the new templates manually.
 3. If the old policy was retained, port deliberate policy changes to the shared
    helper and update every import to `#shared/utils/password-policy`.
@@ -88,7 +120,7 @@ For a customized project:
 5. Run the project's unit/Nuxt tests, typecheck and lint, then restart the dev
    server so its auto-import index reflects the moved file.
 
-`pull` records the new feature version even if a drifted or owned file was skipped.
+`pull` records the new feature version even if a staged or owned file was skipped.
 A second normal pull does not retry that version. After deliberately resolving
 those files, use `battlestack pull --force` to reapply it. `--overwrite` alone
 changes file protection, not the feature-version gate; reapplying an already
@@ -113,8 +145,8 @@ Overwrites every shipped file, keeping no artefacts at all. This is the blunt
 instrument: "put this project back to exactly what battlestack would generate".
 It confirms first if any files are owned.
 
-Reach for `--force` when you have read the patches and decided upstream is
-right. Reach for `--overwrite` when you want a clean slate.
+Reach for `--force` when you have read the conflicts and decided upstream is
+right everywhere. Reach for `--overwrite` when you want a clean slate.
 
 ## Narrowing what pull touches
 

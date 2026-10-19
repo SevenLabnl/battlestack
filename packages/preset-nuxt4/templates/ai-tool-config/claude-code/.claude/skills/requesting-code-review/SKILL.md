@@ -46,8 +46,8 @@ Write a summary that includes:
 2. <Include test credentials if needed>
 
 ## Files Changed
-- `path/to/file.ts` — <what changed and why>
-- `path/to/other.ts` — <what changed and why>
+- `path/to/file.ts`: <what changed and why>
+- `path/to/other.ts`: <what changed and why>
 
 ## Risks
 - <Anything the reviewer should pay special attention to>

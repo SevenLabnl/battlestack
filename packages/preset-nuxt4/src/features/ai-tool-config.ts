@@ -16,7 +16,7 @@ const SUPPORTED: AiTool[] = ['claude-code', 'gemini-cli', 'cursor', 'codex']
 /** AI coding tool rules + MCP server scaffolding. Selection via `state.aiTool` (default: `claude-code`). */
 export const aiToolConfigFeature: Feature = {
     id: 'shared:ai-tool-config',
-    version: '1.2.0',
+    version: '1.3.0',
     label: 'AI coding tool config',
     stage: STAGE.AI_TOOL_CONFIG,
 
@@ -72,7 +72,7 @@ export const aiToolConfigFeature: Feature = {
 /**
  * Feature-gated parts of the tool template. The `battlestack-ui` skill instructs
  * agents to read `DESIGN_SYSTEM.md`/`brand.css` and treat `@battlestack/theme` as
- * installed — confidently wrong context in a project without the theme feature.
+ * installed: confidently wrong context in a project without the theme feature.
  */
 function gatedSubtrees(ctx: RunContext): (rel: string) => boolean {
     const themed = isFeatureEnabled(ctx, 'nuxt4:battlestack-theme')

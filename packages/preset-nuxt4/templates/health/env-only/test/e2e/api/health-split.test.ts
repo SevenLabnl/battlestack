@@ -30,7 +30,7 @@ describe('e2e: /api/health/live (env-only)', () => {
 describe('e2e: /api/health/ready (env-only)', () => {
     it.skipIf(!serverUp)('checks the env and says so', async () => {
         const { status, data } = await apiGet<ReadyResponse>('/api/health/ready')
-        // 503 is a valid answer — the test asserts shape, not that this environment
+        // 503 is a valid answer: the test asserts shape, not that this environment
         // happens to be fully configured.
         expect([200, 503]).toContain(status)
         expect(data).toBeTruthy()

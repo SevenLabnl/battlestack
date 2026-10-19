@@ -12,8 +12,8 @@ import { getUiPort } from '../ui-port.js'
  * anything. Same bound the port probes in port-diagnosis.ts use.
  */
 const DOCKER_PROBE_TIMEOUT_MS = 5000
-// The teardown writes get longer ropes than the probes — a `compose down -v`
-// legitimately takes a while — but must not hang forever on the same dead socket.
+// The teardown writes get longer ropes than the probes (a `compose down -v`
+// legitimately takes a while), but must not hang forever on the same dead socket.
 const DOCKER_DOWN_TIMEOUT_MS = 60_000
 const DOCKER_RM_TIMEOUT_MS = 15_000
 
@@ -49,13 +49,13 @@ function dockerLines(args: string[]): Promise<{ lines: string[], timedOut: boole
 }
 
 /**
- * A timed-out probe is not "no containers" — the daemon may just be slow, and
+ * A timed-out probe is not "no containers": the daemon may just be slow, and
  * silently reporting the project clean lets a recreate wipe the directory while
  * the old containers and volumes survive to reattach to the fresh scaffold.
  */
 function warnSlowDocker(projectName: string): void {
     getUiPort().warn(
-        `docker did not answer within ${DOCKER_PROBE_TIMEOUT_MS / 1000}s — leftover containers or `
+        `docker did not answer within ${DOCKER_PROBE_TIMEOUT_MS / 1000}s; leftover containers or `
         + `volumes labeled "${projectName}" may survive; check with \`docker ps -a\` once the daemon responds`,
     )
 }

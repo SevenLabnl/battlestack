@@ -1,9 +1,21 @@
+import { spawnSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import pc from 'picocolors'
 import type { Ora } from 'ora'
 import { confirmOverwriteOwned, ui } from '@battlestack/tui'
 import { formatAndReconcile } from './format-project.js'
+import {
+    isGitRepo,
+    needsAttention,
+    NEEDS_ATTENTION_EXIT_CODE,
+    preflight,
+    pruneStoredBases,
+    recordedAtStart,
+    repairOverwrites,
+    writeReport,
+    type PullSummary,
+} from './pull-safety.js'
 import {
     acquireProjectLock,
     buildRunContext,
@@ -13,6 +25,8 @@ import {
     readManifest,
     recordOwned,
     skillsOutcome,
+    updateLedger,
+    UPDATING_STATE_KEY,
     writeManifest,
     type BattlestackRegistries,
     type EnvDiff,
@@ -38,6 +52,7 @@ export const pullReservedMeta: Omit<ReservedCommand, 'run'> = {
         ['battlestack pull --no-skills', 'skip the AI-agent skill refresh'],
         ['battlestack pull --no-format', 'skip the trailing prettier pass'],
         ['battlestack pull --skip-install', 'skip the dependency install'],
+        ['battlestack pull --allow-dirty', 'pull into a working tree with uncommitted changes'],
     ],
 }
 
@@ -48,23 +63,34 @@ export const upgradeReservedMeta: Omit<ReservedCommand, 'run'> = {
     group: 'Sync with upstream',
 }
 
+type Collected = Required<Pick<UpdateReport, 'backups' | 'unmanaged' | 'actions' | 'restoredDeleted'>>
+
+/** Per-feature report lists, gathered for the closing summary and `REPORT.md`. */
+function collected(ctx: RunContext): Collected {
+    const key = 'pull:collected'
+    ctx.state[key] ??= { backups: [], unmanaged: [], actions: [], restoredDeleted: [] }
+    return ctx.state[key] as Collected
+}
+
+function collect(ctx: RunContext, report: UpdateReport): void {
+    const c = collected(ctx)
+    c.backups.push(...(report.backups ?? []))
+    c.unmanaged.push(...(report.unmanaged ?? []))
+    c.actions.push(...(report.actions ?? []))
+    c.restoredDeleted.push(...(report.restoredDeleted ?? []))
+}
+
 function printReport(featureId: string, report: UpdateReport): void {
-    if (report.written.length > 0) {
-        ui.dim(`  ${featureId}: ${report.written.length} file(s) written`)
-    }
-    if (report.skipped.length > 0) {
-        console.log(
-            pc.yellow(`  ${ui.sym.warn} ${featureId}: ${report.skipped.length} file(s) skipped (manual merge):`),
-        )
-        for (const f of report.skipped) console.log(pc.yellow(`      ${f}`))
-    }
-    if (report.restoredDeleted && report.restoredDeleted.length > 0) {
-        console.log(
-            pc.yellow(
-                `  ${ui.sym.warn} ${featureId}: restored ${report.restoredDeleted.length} file(s) you had deleted. `
-                + `To drop this feature for good, run \`battlestack remove ${featureId}\` (pull won't restore it then).`,
-            ),
-        )
+    const counts = [
+        [report.written.length, 'written'],
+        [report.merged?.length ?? 0, 'merged'],
+        [report.conflicts?.length ?? 0, 'with conflicts'],
+        [report.skipped.length, 'staged'],
+    ].filter(([n]) => (n as number) > 0).map(([n, label]) => `${n} ${label}`)
+    if (counts.length > 0) {
+        const line = `  ${featureId}: ${counts.join(', ')}`
+        if ((report.conflicts?.length ?? 0) + report.skipped.length > 0) console.log(pc.yellow(line))
+        else ui.dim(line)
     }
     for (const note of report.notes) {
         ui.dim(`  ${featureId}: ${note}`)
@@ -167,6 +193,7 @@ async function pullOneFeature(
             }
         }
         loader.succeed(`${feature.label} ${arrow}`)
+        collect(ctx, report)
         printReport(feature.id, report)
     } catch (error) {
         const msg = error instanceof Error ? error.message : String(error)
@@ -311,6 +338,11 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
 
     const releaseLock = await acquireProjectLock(projectDir, 'battlestack pull', { dryRun: args.dryRun })
     try {
+        const safety = args.dryRun || args.skillsOnly
+            ? { git: false, clean: false }
+            : await preflight(projectDir, manifest, { allowDirty: args.allowDirty === true })
+        const startRecorded = recordedAtStart(manifest)
+
         // Orphan features are dropped from ctx. Warnings are deferred to the end.
         const orphans = manifest.features.filter((f) => !registries.features.has(f.id))
         if (orphans.length > 0) {
@@ -330,6 +362,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
                 overwrite: args.overwrite,
                 // `--no-skills` skips the skill refresh.
                 skipSkills: !args.skills,
+                [UPDATING_STATE_KEY]: !args.dryRun,
             },
         }, registries)
 
@@ -396,12 +429,22 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             await pullOneFeature(ctx, record, args, loader, registries, renamedFrom)
         }
 
+        // Compares against HEAD, so uncommitted edits would read as feature output.
+        const repairs = safety.clean && !ctx.dryRun ? await repairOverwrites(ctx, startRecorded, registries) : []
+        if (!ctx.dryRun && !safety.clean && !args.skillsOnly) {
+            ui.warn(safety.git
+                ? 'Uncommitted changes (--allow-dirty), so local edits a feature writes over cannot be detected.'
+                : 'Not a git repository with a commit, so local edits a feature writes over cannot be detected.')
+        }
+
         if (!ctx.dryRun) {
             // `--no-format` skips the format pass and its drift re-baseline.
             if (args.format) {
                 await formatAndReconcile(ctx, manifest, registries)
             }
             await writeManifest(ctx, { rendered: true })
+            const written = await readManifest(projectDir, registries)
+            if (written) await pruneStoredBases(projectDir, written)
         }
 
         if (renamedFrom && !ctx.dryRun) {
@@ -409,7 +452,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             const stale = after ? await filesStillNaming(projectDir, after, renamedFrom) : []
             if (stale.length > 0) {
                 ui.blank()
-                ui.warn(`These files still name the project ${renamedFrom}; pull leaves files you own, files you edited (patches in .battlestack/pull/) and files written only once`)
+                ui.warn(`These files still name the project ${renamedFrom}; pull leaves files you own, files you edited (listed in .battlestack/pull/REPORT.md) and files written only once`)
                 for (const rel of stale) ui.bullet(rel)
                 ui.dim(`  Untracked files can name it too: git grep -n ${renamedFrom}`)
             }
@@ -423,18 +466,58 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
                 // feature. Stating removal as an upstream fact invites the reader to accept
                 // it. `plugins` is the command that distinguishes the two.
                 ui.warn(
-                    `feature "${f.id}" is not registered by any loaded plugin, removed from manifest `
-                    + '(its files stay on disk). If a plugin failed to load, `battlestack plugins` says so',
+                    `feature "${f.id}" is not registered by any loaded plugin. Its record stays in the manifest `
+                    + 'and its files were not updated. `battlestack plugins` shows why a plugin failed to load',
                 )
             }
         }
 
-        ui.blank()
-        const outcome = skillsOutcome(ctx, 'Update complete')
-        if (outcome.ok) ui.ok(outcome.line)
-        else ui.warn(outcome.line)
         printEnvDiff(ctx.state['env:diff'] as EnvDiff | undefined)
+        if (ctx.dryRun) {
+            ui.blank()
+            ui.ok('Dry run complete. Nothing was written.')
+            return
+        }
+
+        const ledger = updateLedger(ctx)
+        const c = collected(ctx)
+        const summary: PullSummary = {
+            merged: ledger.merged,
+            conflicts: ledger.conflicts,
+            staged: ledger.staged,
+            backups: c.backups,
+            unmanaged: c.unmanaged,
+            restored: c.restoredDeleted,
+            added: safety.git ? await newlyAddedFiles(projectDir, registries) : [],
+            orphans: orphans.map((f) => f.id),
+            actions: [...new Set([...c.actions, ...ledger.actions])],
+            formatError: ctx.state['format:error'] as string | undefined,
+            repairs,
+        }
+        const reportPath = await writeReport(projectDir, summary)
+        ui.blank()
+        const outcome = skillsOutcome(ctx, needsAttention(summary) ? 'Update finished, with work left' : 'Update complete')
+        if (outcome.ok && !needsAttention(summary)) ui.ok(outcome.line)
+        else ui.warn(outcome.line)
+        const tally = [
+            [summary.merged.length, 'merged'],
+            [summary.conflicts.length, 'with conflicts'],
+            [summary.staged.length, 'staged'],
+            [summary.backups.length, 'backed up'],
+            [summary.added.length, 'new'],
+        ].filter(([n]) => (n as number) > 0).map(([n, label]) => `${n} ${label}`)
+        if (tally.length > 0) ui.dim(`  Files: ${tally.join(', ')}.`)
+        ui.dim(`  Next steps: ${reportPath}`)
+        if (needsAttention(summary)) process.exitCode = NEEDS_ATTENTION_EXIT_CODE
     } finally {
         await releaseLock()
     }
+}
+
+/** Tracked files this pull created that git does not know yet. */
+async function newlyAddedFiles(projectDir: string, registries: BattlestackRegistries): Promise<string[]> {
+    const r = spawnSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], { cwd: projectDir })
+    if (r.status !== 0) return []
+    const recorded = new Set((await readManifest(projectDir, registries))?.features.flatMap((f) => Object.keys(f.files)) ?? [])
+    return r.stdout.toString().split('\0').filter((f) => recorded.has(f))
 }

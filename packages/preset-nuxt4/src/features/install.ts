@@ -11,7 +11,7 @@ import { ui } from '@battlestack/tui'
 /** Aggregates `collectDeps()` into `package.json`, then installs. Runs on `pull` too. */
 export const installFeature: Feature = {
     id: 'shared:install',
-    version: '1.2.1',
+    version: '1.2.2',
     label: 'package.json + install',
     stage: STAGE.FINALIZE,
 
@@ -237,6 +237,7 @@ export async function formatProject(ctx: RunContext): Promise<void> {
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         ui.warn(`eslint --fix failed (non-fatal): ${msg}`)
+        ctx.state['format:error'] = msg
     }
 }
 
@@ -267,9 +268,33 @@ function mergeDeps(
     const out: Record<string, string> = { ...existing }
     for (const [name, version] of Object.entries(incoming)) {
         const prior = out[name]
+        if (prior && keepsHigherFloor(prior, version)) continue
         if (!prior || prior === 'latest' || version !== 'latest') {
             out[name] = version
         }
     }
     return out
+}
+
+const CARET = /^\^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/
+
+/** `npm:<pkg>@<range>` → [`npm:<pkg>@`, range]; a plain range → ['', range]. */
+function splitAlias(spec: string): [string, string] {
+    if (!spec.startsWith('npm:')) return ['', spec]
+    const at = spec.lastIndexOf('@')
+    return at > 4 ? [spec.slice(0, at + 1), spec.slice(at + 1)] : ['', spec]
+}
+
+/** A project's `^4.4.3` already satisfies a feature's `^4`; lowering the floor would allow older releases back in. */
+export function keepsHigherFloor(prior: string, incoming: string): boolean {
+    const [priorTarget, priorRange] = splitAlias(prior)
+    const [incomingTarget, incomingRange] = splitAlias(incoming)
+    if (priorTarget !== incomingTarget) return false
+    const p = CARET.exec(priorRange)
+    const i = CARET.exec(incomingRange)
+    if (!p || !i || p[1] !== i[1]) return false
+    const floor = (m: RegExpExecArray): [number, number] => [Number(m[2] ?? 0), Number(m[3] ?? 0)]
+    const [pMinor, pPatch] = floor(p)
+    const [iMinor, iPatch] = floor(i)
+    return pMinor > iMinor || (pMinor === iMinor && pPatch >= iPatch)
 }

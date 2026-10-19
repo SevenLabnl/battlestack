@@ -228,21 +228,24 @@ back to a localhost port. Install mkcert if you want the hostnames. See
 
 ## Pull and drift
 
-### pull says a file drifted and did not update it
+### pull exited with code 2
 
-Working as intended. It never overwrites your edits silently. Two files are
-staged for you:
-
-```
-.battlestack/pull/<path>.new      what pull wanted to write
-.battlestack/pull/<path>.patch    a diff from your version to that
-```
-
-Merge what you want and delete the artefacts, or:
+It finished and left work for you, listed in `.battlestack/pull/REPORT.md`.
+Usually that is conflict markers in files where you and upstream changed the
+same lines, or a file staged as `.battlestack/pull/<path>.new` because there was
+no earlier version to merge against. The report says how to handle each kind.
+To take upstream everywhere instead:
 
 ```bash
 battlestack pull --force    # take upstream, saving yours as .bak
 ```
+
+### pull refuses to start
+
+Either the working tree has uncommitted changes, or a file still has conflict
+markers from the last pull. Commit or stash your work, or resolve the markers
+(`git diff --check` lists them), and run it again. `--allow-dirty` skips the
+first check, never the second.
 
 ### I keep getting drift on a file I intend to own
 
