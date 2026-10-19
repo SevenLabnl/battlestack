@@ -853,7 +853,8 @@ describe('battlestack pull: a schema change ships with its migration', () => {
 
     it.each([
         ['drizzle-kit finds nothing to migrate', {}, `node -e "console.log('No schema changes, nothing to migrate')"`],
-        ['drizzle-kit finds nothing to migrate behind a warning', {}, `node -e "console.log('No schema changes, nothing to migrate');console.error('(node) DeprecationWarning: something')"`],
+        // Split strings: pnpm echoes the command to stderr, which must not match on its own.
+        ['drizzle-kit finds nothing to migrate behind a warning', {}, `node -e "console.log('No schema' + ' changes, nothing to migrate');process.stderr.write('(node) Deprecation' + 'Warning: something')"`],
         ['the changed file is not one drizzle-kit reads', { schema: path.join('server', 'database', 'schema', 'README.md') }, writesSql],
         ['nuxt4:database is not enabled', { featureId: 'nuxt4:other' }, writesSql],
     ])('reports nothing to do when %s', async (_, opts, dbGenerate) => {
