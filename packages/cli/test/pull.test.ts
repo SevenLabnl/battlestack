@@ -1022,6 +1022,24 @@ describe('battlestack pull: the project name', () => {
         expect(updates).toBe(1)
     })
 
+    it('keeps the rename pending when a feature fails to re-render', async () => {
+        const projectDir = await scaffoldThenMove()
+        const registries = makeRegistries({ requiredFeatures: [fqid(FEATURE)] })
+        registries.features.register({
+            ...makeNamedFeature('1.0.0'),
+            failureIsNonFatal: true,
+            async update() {
+                throw new Error('boom')
+            },
+        }, origin)
+        await renameProject(projectDir, (await readManifest(projectDir, registries))!, 'shop')
+
+        await pullCapturing(projectDir, registries)
+        process.exitCode = undefined
+
+        expect((await readManifestRaw(projectDir)).renderedName).toBe('my-app')
+    })
+
     it('a dry-run after `rename` writes nothing and leaves the rename pending', async () => {
         const projectDir = await scaffoldThenMove()
         const registries = registriesAt('1.0.0')
