@@ -62,7 +62,6 @@ export function mergeDefaults(
     return skipped
 }
 
-/** `target[key]` as an editable object literal, created when absent. */
 export function objectLiteralAt(
     target: Record<string, unknown>,
     key: string,
