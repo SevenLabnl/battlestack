@@ -26,6 +26,15 @@
 - `pull` removes a file a feature no longer ships only after every feature has
   updated. A file moving to another feature is no longer deleted and written
   back in the same run, and a pull that stops halfway leaves it in place.
+- `pull` leaves files claimed with `battlestack own` untouched when their
+  feature writes them outside its template folder, such as the Dockerfile, and
+  no longer drops a feature's `own` entries when that feature declares
+  structural files.
+- `shared:github` no longer reports a project's own `production.yml`,
+  `staging.yml` or `development.yml` as no longer managed when it never wrote
+  that file.
+- `battlestack add` no longer erases an earlier pull's unfinished items from
+  `.battlestack/pull/REPORT.md`; it puts its own section first.
 - A feature whose plugin did not load keeps its manifest record on `pull`
   instead of being dropped, so its files stay managed.
 - `shared:github` drops its records of the deploy workflows it no longer ships.
