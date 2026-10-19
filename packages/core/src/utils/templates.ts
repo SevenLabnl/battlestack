@@ -401,6 +401,10 @@ function recordedHashesFor(ctx: RunContext, rel: string, extra?: string): Set<st
             if (toPosix(r) === posix && typeof h === 'string') hashes.add(h)
         }
     }
+    // A file its old owner queued for deletion is still that owner's pristine copy to the feature taking it over.
+    for (const queued of (ctx.state[OBSOLETE_QUEUE_KEY] as QueuedObsolete[] | undefined) ?? []) {
+        if (toPosix(queued.rel) === posix) hashes.add(queued.recordedHash)
+    }
     return hashes
 }
 
