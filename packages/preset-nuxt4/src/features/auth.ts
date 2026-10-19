@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { createHmac } from 'node:crypto'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
-import { patchNuxtConfig } from '../utils/nuxt-config.js'
+import { NuxtConfig, patchNuxtConfig } from '../utils/nuxt-config.js'
 import {
     allocatePort,
     resolveAppPort,
@@ -187,6 +187,7 @@ export const authFeature: Feature = {
         const result = await emitTemplateUpdate(ctx, 'nuxt4:auth', import.meta.url, 'auth', prev)
         result.notes.push(...(await retainedPasswordPolicyNotes(ctx.projectDir)))
         await postPatches(ctx.projectDir)
+        result.notes.push(...(await sessionHeaderNotes(ctx.projectDir)))
         await emitRecoveryHookStub(ctx)
         await emitAuditStub(ctx)
         return result
@@ -219,6 +220,23 @@ async function retainedPasswordPolicyNotes(projectDir: string): Promise<string[]
             `${OLD_PASSWORD_POLICY_TEST} still exists but the policy moved to shared/utils/; move its cases to test/unit/password-policy.test.ts and delete it.`,
         )
     }
+    return notes
+}
+
+/** The merge keeps a project's own `sessionHeader`, so a value other than `false` is reported instead of reset. */
+async function sessionHeaderNotes(projectDir: string): Promise<string[]> {
+    const notes: string[] = []
+    const cfg = await NuxtConfig.load(projectDir)
+    cfg.mutate((config) => {
+        const session = config.runtimeConfig?.session
+        // A non-literal `session` is already reported by the merge.
+        if (session?.$type !== 'object' || session.sessionHeader === false) return
+        notes.push(
+            'nuxt.config.ts#runtimeConfig.session.sessionHeader is not `false`: a sealed session sent as an '
+            + '`x-nuxt-session-session` header skips the revocation check, so a logged-out or revoked session '
+            + 'is still accepted that way. Set it to `false` unless a client relies on that header.',
+        )
+    })
     return notes
 }
 
