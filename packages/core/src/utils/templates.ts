@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createPatch } from 'diff'
-import { dropRecordedFile, hashFile, rebaselineRecordedFile, recordCreated, recordFile, recordOwned } from '../manifest.js'
+import { dropRecordedFile, hashFile, rebaselineRecordedFile, recordCreated, recordedFiles, recordFile, recordOwned, trackersOf } from '../manifest.js'
 import { topoOrder } from '../orchestrator.js'
 import type { Feature, InstalledFeatureRecord } from '../types/feature.js'
 import type { RunContext } from '../types/run-context.js'
@@ -170,7 +170,7 @@ const BINARY_EXTENSIONS = new Set([
     '.pdf', '.tgz', '.zip',
 ])
 
-function isBinaryPath(rel: string): boolean {
+export function isBinaryPath(rel: string): boolean {
     return BINARY_EXTENSIONS.has(path.extname(rel).toLowerCase())
 }
 
@@ -395,12 +395,7 @@ function recordedHashesFor(ctx: RunContext, rel: string, extra?: string): Set<st
     const hashes = new Set<string>()
     if (extra) hashes.add(extra)
     const posix = toPosix(rel)
-    for (const [key, value] of Object.entries(ctx.state)) {
-        if (!key.startsWith('files:') || !value || typeof value !== 'object') continue
-        for (const [r, h] of Object.entries(value as Record<string, string>)) {
-            if (toPosix(r) === posix && typeof h === 'string') hashes.add(h)
-        }
-    }
+    for (const tracker of trackersOf(ctx, rel)) hashes.add(tracker.hash)
     // A file its old owner queued for deletion is still that owner's pristine copy to the feature taking it over.
     for (const queued of (ctx.state[OBSOLETE_QUEUE_KEY] as QueuedObsolete[] | undefined) ?? []) {
         if (toPosix(queued.rel) === posix) hashes.add(queued.recordedHash)
@@ -637,11 +632,7 @@ export function queueObsoleteDeletions(ctx: RunContext): void {
 export async function removeQueuedObsoleteFiles(ctx: RunContext): Promise<string[]> {
     const queue = (ctx.state[OBSOLETE_QUEUE_KEY] as QueuedObsolete[] | undefined) ?? []
     delete ctx.state[OBSOLETE_QUEUE_KEY]
-    const tracked = new Set<string>()
-    for (const [key, value] of Object.entries(ctx.state)) {
-        if (!key.startsWith('files:') || !value || typeof value !== 'object') continue
-        for (const rel of Object.keys(value)) tracked.add(toPosix(rel))
-    }
+    const tracked = new Set([...recordedFiles(ctx)].map((r) => toPosix(r.rel)))
     const removed: string[] = []
     for (const { rel, recordedHash } of queue) {
         if (tracked.has(toPosix(rel))) continue

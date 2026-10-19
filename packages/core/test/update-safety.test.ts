@@ -107,6 +107,32 @@ describe('findBase', () => {
         git('commit', '-q', '-am', 'edit')
         expect((await findBase(projectDir, 'f.txt', [sha256(BASE)]))?.toString()).toBe(BASE)
     })
+
+    it('finds it for a project in a subdirectory, as checkout wrote it', async () => {
+        git('init', '-q')
+        const crlf = BASE.replaceAll('\n', '\r\n')
+        // Only a lookup by the file's repository path matches this pattern.
+        await write('apps/web/.gitattributes', '/f.txt text eol=crlf\n')
+        await write('apps/web/f.txt', crlf)
+        await write('f.txt', 'a root file of the same name\n')
+        git('add', '-A')
+        git('commit', '-q', '-m', 'scaffold')
+        for (const edit of ['edited once', 'edited twice']) {
+            await write('apps/web/f.txt', crlf.replace('line two', edit))
+            git('commit', '-q', '-am', edit)
+        }
+        const found = await findBase(path.join(projectDir, 'apps/web'), 'f.txt', [sha256(crlf)])
+        expect(found?.toString()).toBe(crlf)
+    })
+
+    it('returns null when no version in history matches', async () => {
+        git('init', '-q')
+        await write('f.txt', BASE)
+        git('add', '-A')
+        git('commit', '-q', '-m', 'scaffold')
+        expect(await findBase(projectDir, 'f.txt', [sha256('something else')])).toBeNull()
+        expect(await findBase(projectDir, 'never-committed.txt', [sha256(BASE)])).toBeNull()
+    })
 })
 
 describe('writes during an update', () => {

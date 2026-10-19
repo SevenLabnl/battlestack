@@ -45,18 +45,23 @@ function manifestWith(files: Record<string, string>): ProjectManifest {
     }
 }
 
-function ctxRecording(files: Record<string, string>): RunContext {
+function ctxRecording(files: Record<string, string>, dir = projectDir, state: Record<string, unknown> = {}): RunContext {
     return {
         projectName: 'demo',
-        projectDir,
+        projectDir: dir,
         framework: undefined as never,
         template: undefined as never,
         enabledFeatures: new Set(),
-        state: { 'files:test:feat': files },
+        state: { 'files:test:feat': files, ...state },
         debug: false,
         dryRun: false,
         registries: new BattlestackRegistries(),
     }
+}
+
+async function commitAll(): Promise<void> {
+    git('add', '-A')
+    git('commit', '-q', '-m', 'commit')
 }
 
 const EMPTY: PullSummary = {
@@ -92,6 +97,22 @@ describe('preflight', () => {
     it('runs outside git, reporting that it could not check', async () => {
         await expect(preflight(projectDir, manifestWith({}), { allowDirty: false })).resolves.toEqual({ git: false, clean: false })
     })
+
+    it('lets --force and --overwrite start over conflict markers, since they replace the file', async () => {
+        await write('a.ts', '<<<<<<< a.ts (yours)\nx\n=======\ny\n>>>>>>> a.ts (upstream now)\n')
+        await expect(preflight(projectDir, manifestWith({ 'a.ts': sha256('y\n') }), { allowDirty: true, replacing: true }))
+            .resolves.toEqual({ git: false, clean: false })
+    })
+
+    it('in a monorepo, looks only at the project directory', async () => {
+        git('init', '-q')
+        await write('apps/web/a.txt', 'a\n')
+        await write('README.md', 'root\n')
+        await commitAll()
+        await write('README.md', 'edited elsewhere in the repository\n')
+        await expect(preflight(path.join(projectDir, 'apps/web'), manifestWith({}), { allowDirty: false }))
+            .resolves.toEqual({ git: true, clean: true })
+    })
 })
 
 describe('repairOverwrites', () => {
@@ -110,6 +131,7 @@ describe('repairOverwrites', () => {
         expect(repairs).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'staged' }])
         expect(await read('Dockerfile')).toBe('FROM node\nCOPY patches/ ./patches/\n')
         expect(await read('.battlestack/pull/Dockerfile.new')).toBe('FROM node:24\n')
+        expect(await read('.battlestack/pull/Dockerfile.patch')).toContain('+FROM node:24')
         expect(updateLedger(ctx).staged).toContain('Dockerfile')
         // Unmerged, so the next pull must still see the old upstream as the base.
         expect((ctx.state['files:test:feat'] as Record<string, string>).Dockerfile).toBe(sha256('FROM node\n'))
@@ -126,6 +148,83 @@ describe('repairOverwrites', () => {
 
         expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([])
         expect(await read('a.ts')).toBe('v2\n')
+    })
+
+    it('compares against HEAD as checked out, so an eol-converted pristine file is not taken for an edit', async () => {
+        git('init', '-q')
+        await write('.gitattributes', '*.txt text eol=crlf\n')
+        await write('a.txt', 'v1\r\n')
+        await commitAll()
+        const start = recordedAtStart(manifestWith({ 'a.txt': sha256('v1\r\n') }))
+        await write('a.txt', 'v2\r\n')
+        const ctx = ctxRecording({ 'a.txt': sha256('v2\r\n') })
+
+        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([])
+        expect(await read('a.txt')).toBe('v2\r\n')
+    })
+
+    it('reads HEAD with the attributes of the file\'s repository path in a subdirectory project', async () => {
+        git('init', '-q')
+        await write('apps/web/.gitattributes', '/a.txt text eol=crlf\n')
+        await write('apps/web/a.txt', 'v1\r\n')
+        await commitAll()
+        const start = recordedAtStart(manifestWith({ 'a.txt': sha256('v1\r\n') }))
+        await write('apps/web/a.txt', 'v2\r\n')
+        const ctx = ctxRecording({ 'a.txt': sha256('v2\r\n') }, path.join(projectDir, 'apps/web'))
+
+        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([])
+        expect(await read('apps/web/a.txt')).toBe('v2\r\n')
+    })
+
+    it('works on a project in a subdirectory of the repository', async () => {
+        git('init', '-q')
+        await write('apps/web/Dockerfile', 'FROM node\nCOPY patches/ ./patches/\n')
+        await commitAll()
+        const web = path.join(projectDir, 'apps/web')
+        const start = recordedAtStart(manifestWith({ Dockerfile: sha256('FROM node\n') }))
+        await write('apps/web/Dockerfile', 'FROM node:24\n')
+        const ctx = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, web)
+
+        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'staged' }])
+        expect(await read('apps/web/Dockerfile')).toBe('FROM node\nCOPY patches/ ./patches/\n')
+        expect(await read('apps/web/.battlestack/pull/Dockerfile.new')).toBe('FROM node:24\n')
+    })
+
+    it('leaves the feature output alone under --force and --overwrite', async () => {
+        git('init', '-q')
+        await write('Dockerfile', 'FROM node\nCOPY patches/ ./patches/\n')
+        await commitAll()
+        const start = recordedAtStart(manifestWith({ Dockerfile: sha256('FROM node\n') }))
+        await write('Dockerfile', 'FROM node:24\n')
+
+        for (const flag of ['force', 'overwrite']) {
+            const ctx = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { [flag]: true })
+            expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([])
+            expect(await read('Dockerfile')).toBe('FROM node:24\n')
+        }
+    })
+
+    it('puts back the record of the feature that wrote the file, not another tracker\'s', async () => {
+        git('init', '-q')
+        await write('Dockerfile', 'FROM node\nCOPY patches/ ./patches/\n')
+        await commitAll()
+        const manifest = manifestWith({})
+        manifest.features = [
+            { id: 'test:x:other', version: '1.0.0', files: { Dockerfile: sha256('FROM other\n') } },
+            { id: 'test:x:feat', version: '1.0.0', files: { Dockerfile: sha256('FROM node\n') } },
+        ]
+        const start = recordedAtStart(manifest)
+        await write('Dockerfile', 'FROM node:24\n')
+        // State maps key on bare ids while the manifest records fqids.
+        const ctx = ctxRecording({}, projectDir)
+        ctx.state = { 'files:x:other': { Dockerfile: sha256('FROM other\n') }, 'files:x:feat': { Dockerfile: sha256('FROM node:24\n') } }
+        for (const id of ['x:other', 'x:feat']) {
+            ctx.registries.features.register({ id, label: id, version: '1.0.0', stage: 0, async execute() {} } as never, { plugin: 'p', namespace: 'test' })
+        }
+
+        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([{ rel: 'Dockerfile', featureId: 'x:feat', outcome: 'staged' }])
+        expect(ctx.state['files:x:feat']).toEqual({ Dockerfile: sha256('FROM node\n') })
+        expect(ctx.state['files:x:other']).toEqual({ Dockerfile: sha256('FROM other\n') })
     })
 })
 
@@ -144,6 +243,11 @@ describe('report', () => {
         expect(text).toContain('.battlestack/pull/<path>.new')
         expect(text).toContain('- Set `X`.')
         expect(text).not.toMatch(/—/)
+    })
+
+    it('lists a restored file once under New files', () => {
+        const text = renderReport({ ...EMPTY, added: ['a.ts'], restored: ['a.ts'] })
+        expect(text.match(/^- `a\.ts`$/gm)).toHaveLength(1)
     })
 })
 

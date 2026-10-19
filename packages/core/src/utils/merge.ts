@@ -1,18 +1,18 @@
-import { execFileSync, spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { execFile, spawnSync } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { promisify } from 'node:util'
+import { createPatch } from 'diff'
+import { hashContent as sha256, toPosixRel } from '../manifest.js'
 import { exists } from './fs.js'
+
+const execFileAsync = promisify(execFile)
 
 /** Upstream bytes a merged or conflicted file was last merged against, keyed by sha256. */
 export const BASE_DIR = path.join('.battlestack', 'base')
 
 const GIT_HISTORY_DEPTH = 200
-
-function sha256(content: string | Buffer): string {
-    return createHash('sha256').update(content).digest('hex')
-}
 
 const BASE_README = [
     '# Merge bases for `battlestack pull`',
@@ -66,24 +66,55 @@ export async function findBase(projectDir: string, rel: string, hashes: Iterable
     return findBaseInGit(projectDir, rel, wanted)
 }
 
-function findBaseInGit(projectDir: string, rel: string, wanted: Set<string>): Buffer | null {
-    const posix = rel.split(path.sep).join('/')
-    let commits: string[]
+async function findBaseInGit(projectDir: string, rel: string, wanted: Set<string>): Promise<Buffer | null> {
+    const posix = toPosixRel(rel)
+    let prefix: string
+    let log: string
     try {
-        commits = execFileSync(
+        prefix = (await execFileAsync('git', ['rev-parse', '--show-prefix'], { cwd: projectDir })).stdout.trim()
+        log = (await execFileAsync(
             'git',
-            ['log', '--format=%H', `-n${GIT_HISTORY_DEPTH}`, '--', posix],
-            { cwd: projectDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
-        ).split('\n').filter(Boolean)
+            ['log', '--format=', '--raw', '--no-abbrev', `-n${GIT_HISTORY_DEPTH}`, '--', posix],
+            { cwd: projectDir, maxBuffer: 64 * 1024 * 1024 },
+        )).stdout
     } catch {
         return null
     }
-    for (const commit of commits) {
-        const blob = spawnSync('git', ['show', `${commit}:${posix}`], { cwd: projectDir, maxBuffer: 64 * 1024 * 1024 })
-        if (blob.status !== 0) continue
-        if (wanted.has(sha256(blob.stdout))) return blob.stdout
+    const blobs = new Set<string>()
+    for (const line of log.split('\n')) {
+        if (!line.startsWith(':')) continue
+        const blob = line.split(' ')[3]
+        if (blob && !/^0+$/.test(blob)) blobs.add(blob)
+    }
+    // --filters returns the bytes checkout would write for the file's repository path.
+    for (const blob of blobs) {
+        const content = await execFileAsync(
+            'git',
+            ['cat-file', '--filters', `--path=${prefix}${posix}`, blob],
+            { cwd: projectDir, encoding: 'buffer', maxBuffer: 64 * 1024 * 1024 },
+        ).then((r) => r.stdout, () => null)
+        if (content && wanted.has(sha256(content))) return content
     }
     return null
+}
+
+/** Stages `upstream` as `.battlestack/pull/<rel>.new`, plus a `.patch` from `current` unless the file is binary. */
+export async function stageUpstream(
+    projectDir: string,
+    rel: string,
+    current: Buffer,
+    upstream: Buffer,
+    opts: { binary: boolean },
+): Promise<void> {
+    const staged = path.join(projectDir, '.battlestack', 'pull', rel)
+    await mkdir(path.dirname(staged), { recursive: true })
+    await writeFile(`${staged}.new`, upstream)
+    if (opts.binary) {
+        await rm(`${staged}.patch`, { force: true })
+        return
+    }
+    const patch = createPatch(toPosixRel(rel), current.toString('utf8'), upstream.toString('utf8'), 'current', 'new')
+    await writeFile(`${staged}.patch`, patch, 'utf8')
 }
 
 export interface MergeResult {
