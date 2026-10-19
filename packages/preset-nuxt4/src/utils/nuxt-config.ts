@@ -74,6 +74,11 @@ export class NuxtConfig {
         return this
     }
 
+    /** The current `app.head.link` entries, as plain objects. See `addHeadLink` re: the spread. */
+    headLinks(): Record<string, string>[] {
+        return [...(this.config.app?.head?.link ?? [])]
+    }
+
     /** Append a `<meta>` to `app.head.meta`. Idempotent on name. See `addHeadLink` re: the spread. */
     addHeadMeta(meta: Record<string, string>): this {
         this.config.app ||= {}
