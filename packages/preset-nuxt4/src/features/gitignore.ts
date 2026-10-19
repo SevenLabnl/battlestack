@@ -24,6 +24,8 @@ const REQUIRED_PATTERNS = [
     '.battlestack/lock',
     // `battlestack pull` stages merge artifacts here. They may hold secrets.
     '.battlestack/pull/',
+    // Local merge cache; `battlestack pull` rebuilds what it needs.
+    '.battlestack/base/',
     '.mastra',
     // Fetched third-party skill content, recorded by the tracked `skills-lock.json`.
     '.agents/',
@@ -224,7 +226,7 @@ async function applyNuxtIgnore(projectDir: string): Promise<void> {
 /** Ignore patterns for git, Nuxt's and Nitro's auto-import scanners, and the ESLint config. */
 export const gitignoreFeature: Feature = {
     id: 'nuxt4:gitignore',
-    version: '1.5.2',
+    version: '1.5.3',
     label: 'Enforce ignore patterns (git, Nuxt, ESLint)',
     frameworks: ['nuxt4'],
     stage: STAGE.GITIGNORE,
