@@ -172,6 +172,38 @@ describe('githubFeature', () => {
             expect(await exists(OLD_SONAR)).toBe(false)
         })
 
+        // A project's own deploy workflow on one of the old paths is not this feature's leftover.
+        it('leaves a same-named file it never recorded alone, and says nothing', async () => {
+            const own = '.github/workflows/production.yml'
+            await mkdir(path.join(projectDir, '.github/workflows'), { recursive: true })
+            await writeFile(path.join(projectDir, own), 'name: Deploy\n')
+
+            const report = await githubFeature.update!(ctx(), null)
+
+            expect(await readFile(path.join(projectDir, own), 'utf8')).toBe('name: Deploy\n')
+            expect(report.notes).toEqual([])
+            expect(report.unmanaged).toEqual([])
+        })
+
+        it('still reports a recorded, edited deploy workflow as no longer managed', async () => {
+            const old = '.github/workflows/production.yml'
+            await mkdir(path.join(projectDir, '.github/workflows'), { recursive: true })
+            await writeFile(path.join(projectDir, old), 'name: Production\n')
+            const recorded = { [old]: await hashFile(path.join(projectDir, old)) }
+            await writeFile(path.join(projectDir, old), 'name: Production\n# mine\n')
+            const c = mockRunContext({
+                projectDir,
+                enabledFeatures: new Set(['shared:github']),
+                state: { 'packageManager': 'pnpm', 'files:shared:github': recorded },
+            })
+
+            const report = await githubFeature.update!(c, null)
+
+            expect(await exists(old)).toBe(true)
+            expect(report.unmanaged).toEqual([old])
+            expect(Object.keys(c.state['files:shared:github'] as Record<string, string>)).not.toContain(old)
+        })
+
         it('is a no-op on a project that never had them', async () => {
             const report = await githubFeature.update!(ctx(), null)
             expect(report.notes).toEqual([])
