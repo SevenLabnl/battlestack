@@ -30,11 +30,26 @@ export function pushUniqueAll(arr: any, values: unknown[]): void {
     for (const v of values) pushUnique(arr, v)
 }
 
-export function mergeShallow(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    target: any,
+/**
+ * Adds the keys of `defaults` that `target[key]` lacks, recursing into nested objects.
+ * Edits the magicast node in place: rebuilding the object would reprint it, dropping
+ * its comments and resetting every value the project changed.
+ */
+export function mergeDefaults(
+    target: Record<string, unknown>,
     key: string,
-    patch: Record<string, unknown>,
+    defaults: Record<string, unknown>,
 ): void {
-    target[key] = { ...target[key], ...patch }
+    target[key] ||= {}
+    const object = target[key] as Record<string, unknown>
+    for (const [k, value] of Object.entries(defaults)) {
+        const existing = object[k] as { $type?: string } | null | undefined
+        if (existing === undefined) {
+            object[k] = value
+            continue
+        }
+        // magicast proxies an object literal as `$type: 'object'`; any other existing value is the project's.
+        const nested = typeof value === 'object' && value !== null && !Array.isArray(value)
+        if (nested && existing?.$type === 'object') mergeDefaults(object, k, value as Record<string, unknown>)
+    }
 }
