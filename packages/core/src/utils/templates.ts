@@ -447,6 +447,11 @@ function pushOnce(list: string[], rel: string): void {
     if (!list.includes(rel)) list.push(rel)
 }
 
+/** The feature's owned rels, which `pull` seeds from the manifest's `ownedByUser`. */
+function ownedRelsFor(ctx: RunContext, featureId: string): Set<string> {
+    return new Set((ctx.state[`owned:${featureId}`] as string[] | undefined) ?? [])
+}
+
 /**
  * Writes one file into an existing project without losing local edits: a pristine or
  * missing file is written, an edited or untracked one is merged three-way, or staged
@@ -462,7 +467,8 @@ export async function writeGuarded(
 ): Promise<UpdateReport> {
     const dest = path.join(ctx.projectDir, rel)
     const recordedHashes = recordedHashesFor(ctx, rel)
-    const { state, newHash } = await classifyForUpdate(dest, rel, content, ownedSet, recordedHashes)
+    const owned = new Set([...ownedSet, ...ownedRelsFor(ctx, featureId)])
+    const { state, newHash } = await classifyForUpdate(dest, rel, content, owned, recordedHashes)
     const recorded = (ctx.state[`files:${featureId}`] as Record<string, string> | undefined)?.[rel]
     await applyUpdateState(ctx, featureId, { state, dest, rel, newContent: content, newHash, recordedHash: recorded, recordedHashes, report })
     return report
