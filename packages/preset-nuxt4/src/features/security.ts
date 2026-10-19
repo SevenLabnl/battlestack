@@ -6,14 +6,6 @@ import { STAGE } from '@battlestack/core/constants/stages.js'
 
 const RATE_LIMIT_GATE = 'process.env.NUXT_RATE_LIMIT_DISABLED === \'true\' ? false : '
 
-/**
- * Projects scaffolded before the gate existed carry a bare `rateLimiter: {...}`, which e2e runs cannot switch off.
- * Wraps that object, keeping its values; anything else (already gated, `false`, a nested object) is left alone.
- */
-export function gateRateLimiter(raw: string): string {
-    return raw.replace(/(\brateLimiter:\s*)(\{[^{}]*\})/, (_, key: string, obj: string) => `${key}${RATE_LIMIT_GATE}${obj}`)
-}
-
 /** `nuxt-security` wrapper: response headers and a module-level rate-limit floor. */
 export const securityFeature: Feature = {
     id: 'shared:security',
@@ -112,21 +104,17 @@ export const securityFeature: Feature = {
     },
 
     async update(ctx, _prev) {
-        await patchNuxtConfig(ctx.projectDir, (c) =>
+        let gated = false
+        await patchNuxtConfig(ctx.projectDir, (c) => {
             c.mutate((cfg) => {
                 if (!cfg.security) {
                     cfg.security = {}
                 }
-            }),
-        )
-        const cfgPath = path.join(ctx.projectDir, 'nuxt.config.ts')
-        const raw = await readFile(cfgPath, 'utf8')
-        const gated = gateRateLimiter(raw)
-        const notes: string[] = []
-        if (gated !== raw) {
-            await writeFile(cfgPath, gated, 'utf8')
-            notes.push('security: rateLimiter now turns off with NUXT_RATE_LIMIT_DISABLED=true (dev and e2e only)')
-        }
+            })
+            // Projects scaffolded before the gate carry a bare object that e2e runs cannot switch off.
+            gated = c.gateRateLimiter(RATE_LIMIT_GATE)
+        })
+        const notes = gated ? ['security: rateLimiter now turns off with NUXT_RATE_LIMIT_DISABLED=true (dev and e2e only)'] : []
         return { written: ['nuxt.config.ts'], skipped: [], notes }
     },
 }

@@ -87,8 +87,10 @@
   `.battlestack/pull/REPORT.md` and pull exits with code 2. Scaffold also
   checks for the SQL file instead of trusting drizzle-kit's exit code.
 - `pull` now gates a hardcoded `security.rateLimiter` in `nuxt.config.ts` on
-  `NUXT_RATE_LIMIT_DISABLED`, keeping its values. Projects scaffolded before the
-  gate existed could not switch the nuxt-security limiter off for e2e runs.
+  `NUXT_RATE_LIMIT_DISABLED`, keeping its values, nested options included.
+  Projects scaffolded before the gate existed could not switch the
+  nuxt-security limiter off for e2e runs. A limiter that is `false`, already
+  gated or set from a variable is left alone.
 
 ## v1.4.0 (2026-10-15)
 
