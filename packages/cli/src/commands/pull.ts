@@ -378,7 +378,9 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         // shell over nuxt4:nuxt-ui's). Keyed bare, matching `ctx.state` conventions.
         for (const f of manifest.features) {
             if (!registries.features.has(f.id)) continue
-            ctx.state[`files:${registries.features.get(f.id).id}`] = { ...f.files }
+            const bare = registries.features.get(f.id).id
+            ctx.state[`files:${bare}`] = { ...f.files }
+            if (f.ownedByUser) ctx.state[`owned:${bare}`] = [...f.ownedByUser]
         }
 
         // `--skills-only`: skills only, skipping template updates, dep install and formatting.
