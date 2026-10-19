@@ -109,34 +109,43 @@ const OBSOLETE_PATHS = [
     '.github/workflows/production.yml',
 ]
 
+/** The key `map` records `rel` under, whichever separator it was written with. */
+function recordedKey(map: Record<string, string>, rel: string): string | undefined {
+    return Object.keys(map).find((key) => key.replaceAll(path.sep, '/') === rel)
+}
+
 function trackedByAnotherFeature(ctx: RunContext, rel: string): boolean {
     return Object.entries(ctx.state).some(([key, value]) =>
         key.startsWith('files:') && key !== `files:${FEATURE_ID}`
-        && Boolean(value) && typeof value === 'object' && rel in (value as Record<string, string>))
+        && Boolean(value) && typeof value === 'object'
+        && recordedKey(value as Record<string, string>, rel) !== undefined)
 }
 
 /**
- * Drops files earlier versions shipped. One another feature now writes is only unrecorded
- * here. Otherwise an untouched file is deleted, and an edited one is left on disk unrecorded,
- * so a project that customised it keeps it and owns it.
+ * Drops files earlier versions shipped. A file this feature never recorded is the project's
+ * own and is not touched. One another feature now writes is only unrecorded here. Otherwise
+ * an untouched file is deleted, and an edited one is left on disk unrecorded, so a project
+ * that customised it keeps it and owns it.
  */
 async function dropObsolete(ctx: RunContext): Promise<{ removed: string[], kept: string[] }> {
     const recorded = (ctx.state[`files:${FEATURE_ID}`] as Record<string, string> | undefined) ?? {}
     const removed: string[] = []
     const kept: string[] = []
     for (const rel of OBSOLETE_PATHS) {
+        const key = recordedKey(recorded, rel)
+        if (key === undefined) continue
         const abs = path.join(ctx.projectDir, rel)
         if (!(await exists(abs)) || trackedByAnotherFeature(ctx, rel)) {
-            dropRecordedFile(ctx, FEATURE_ID, rel)
+            dropRecordedFile(ctx, FEATURE_ID, key)
             continue
         }
-        if (recorded[rel] && recorded[rel] === (await hashFile(abs))) {
+        if (recorded[key] === (await hashFile(abs))) {
             await rm(abs, { force: true })
             removed.push(rel)
         } else {
             kept.push(rel)
         }
-        dropRecordedFile(ctx, FEATURE_ID, rel)
+        dropRecordedFile(ctx, FEATURE_ID, key)
     }
     return { removed, kept }
 }
