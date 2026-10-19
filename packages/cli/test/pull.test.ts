@@ -723,15 +723,17 @@ describe('battlestack pull: a file moving to a later feature', () => {
 
 describe('battlestack pull: a schema change ships with its migration', () => {
     // Production applies only committed SQL, so a schema file pull rewrote needs a migration.
-    // The stand-in `db:generate` drops a marker, so the real `<pm> run db:generate` path runs
-    // without drizzle-kit.
+    // The stand-in `db:generate` writes a SQL file like drizzle-kit does, so the real
+    // `<pm> run db:generate` path runs without drizzle-kit.
     const schemaRel = path.join('server', 'database', 'schema', 'sessions.ts')
-    const marker = 'db-generate-ran'
-    const writesMarker = `node -e "require('fs').writeFileSync('${marker}', '')"`
+    const sqlRel = path.join('server', 'database', 'migrations', '0001_new_index.sql')
+    const writesSql = `node -e "require('fs').mkdirSync('server/database/migrations',{recursive:true});require('fs').writeFileSync('server/database/migrations/0001_new_index.sql','')"`
+    // drizzle-kit without a TTY on a rename prompt: prints, writes nothing, exits 0.
+    const promptsWithoutTty = `node -e "console.error('Interactive prompts require a TTY terminal')"`
 
     async function setup(
         v2: { schema: string, other: string },
-        dbGenerate = writesMarker,
+        dbGenerate = writesSql,
     ): Promise<{ projectDir: string, registriesV2: BattlestackRegistries }> {
         const projectDir = await tmp('battlestack-pull-schema-')
         const tplV1 = await tmp('battlestack-pull-schema-v1-')
@@ -760,39 +762,70 @@ describe('battlestack pull: a schema change ships with its migration', () => {
         return { projectDir, registriesV2: registriesFor(tplV2, '1.1.0') }
     }
 
-    const pull = (projectDir: string, registries: BattlestackRegistries, overrides: Partial<ParsedArgs> = {}) =>
-        withCwdCapture(projectDir, () => pullCommand(args(overrides), silentLoader(), registries))
-    const generated = (projectDir: string) => exists(path.join(projectDir, marker))
+    async function pull(projectDir: string, registries: BattlestackRegistries, overrides: Partial<ParsedArgs> = {}): Promise<{ lines: string[], exitCode: typeof process.exitCode, report: string }> {
+        const lines = await withCwdCapture(projectDir, () => pullCommand(args(overrides), silentLoader(), registries))
+        const exitCode = process.exitCode
+        process.exitCode = undefined
+        const reportPath = path.join(projectDir, '.battlestack', 'pull', 'REPORT.md')
+        const report = await exists(reportPath) ? await readFile(reportPath, 'utf8') : ''
+        return { lines, exitCode, report }
+    }
+    const generated = (projectDir: string) => exists(path.join(projectDir, sqlRel))
 
-    it('runs db:generate when the pull rewrote a schema file', async () => {
+    it('runs db:generate when the pull rewrote a schema file, and names the new migration', async () => {
         const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' })
-        const lines = await pull(projectDir, registriesV2)
+        const { lines, exitCode } = await pull(projectDir, registriesV2)
 
         expect(await readFile(path.join(projectDir, schemaRel), 'utf8')).toBe('v2 schema\n')
         expect(await generated(projectDir)).toBe(true)
-        expect(lines.some((l) => l.includes('ran db:generate'))).toBe(true)
+        expect(lines.some((l) => l.includes('generated 0001_new_index.sql'))).toBe(true)
+        expect(exitCode).toBeUndefined()
     })
 
     it.each([
-        ['--skip-install', { skipInstall: true }, writesMarker],
+        ['--skip-install', { skipInstall: true }, writesSql],
         ['a failing db:generate', {}, 'node -e "process.exit(1)"'],
-    ])('warns to run db:generate by hand on %s, and the pull still completes', async (_, overrides, dbGenerate) => {
+        ['a db:generate that exits 0 without writing SQL', {}, promptsWithoutTty],
+    ])('reports db:generate as still to do on %s, and the pull still completes', async (_, overrides, dbGenerate) => {
         const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' }, dbGenerate)
-        const lines = await pull(projectDir, registriesV2, overrides)
+        const { lines, exitCode, report } = await pull(projectDir, registriesV2, overrides)
 
         expect(await generated(projectDir)).toBe(false)
-        expect(lines.some((l) => l.includes('Run `pnpm run db:generate` and commit the SQL'))).toBe(true)
+        expect(lines.some((l) => l.includes('Schema changed: generated'))).toBe(false)
+        expect(report).toContain('pnpm run db:generate')
+        expect(exitCode).toBe(2)
         expect((await readManifestRaw(projectDir)).features[0].version).toBe('1.1.0')
+    })
+
+    it('passes on what drizzle-kit said, with a hint, when it stopped at a prompt', async () => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' }, promptsWithoutTty)
+        const { report } = await pull(projectDir, registriesV2)
+
+        expect(report).toContain('Interactive prompts require a TTY terminal')
+        expect(report).toContain('run it in a terminal')
+    })
+
+    it('does not generate while an edited schema file still waits for the user\'s merge', async () => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' })
+        await writeFile(path.join(projectDir, schemaRel), 'my own schema\n')
+        const { exitCode, report } = await pull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, schemaRel), 'utf8')).not.toBe('v2 schema\n')
+        expect(await generated(projectDir)).toBe(false)
+        expect(report).toContain('Schema files still need your merge')
+        expect(report).toContain('server/database/schema/sessions.ts')
+        expect(exitCode).toBe(2)
     })
 
     it('generates nothing when the schema bytes are unchanged, though the update reports the file', async () => {
         // The bump changes only `other.ts`; the schema is still reported as written (converged).
         const { projectDir, registriesV2 } = await setup({ schema: 'v1 schema\n', other: 'v2\n' })
-        const lines = await pull(projectDir, registriesV2)
+        const { lines, report } = await pull(projectDir, registriesV2)
 
         expect(await readFile(path.join(projectDir, 'other.ts'), 'utf8')).toBe('v2\n')
         expect(await generated(projectDir)).toBe(false)
         expect(lines.some((l) => l.includes('Schema changed'))).toBe(false)
+        expect(report).not.toContain('db:generate')
     })
 })
 

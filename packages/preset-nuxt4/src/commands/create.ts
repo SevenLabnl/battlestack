@@ -262,11 +262,12 @@ async function generateInitialMigration(ctx: RunContext, enabled: Set<string>): 
     // `enabled` holds canonicalized fqids, so a bare `enabled.has('nuxt4:database')` never matches.
     if (!enabledHas(enabled, 'nuxt4:database', ctx.registries)) return
     if (ctx.dryRun || ctx.state.skipInstall) return
-    if (await generateMigration(ctx)) {
-        ui.ok('Initial migration generated (server/database/migrations/)')
+    const { created, lastLine } = await generateMigration(ctx)
+    if (created.length > 0) {
+        ui.ok(`Initial migration generated (server/database/migrations/${created[0]})`)
     } else {
         ui.warn(
-            'db:generate failed (non-fatal). Run `pnpm run db:generate` once before your first deploy',
+            `db:generate wrote no migration (non-fatal)${lastLine ? `: ${lastLine}` : ''}. Run \`pnpm run db:generate\` once before your first deploy`,
         )
     }
 }
