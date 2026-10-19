@@ -17,6 +17,7 @@ import {
 } from '@battlestack/core'
 import { addCommand, removeCommand } from '../src/commands/add-remove.js'
 import { pullCommand } from '../src/commands/pull.js'
+import { writeReport } from '../src/commands/pull-safety.js'
 import { buildRegistries, defaultArgs, withCwd, withCwdCapture } from './test-utils.js'
 
 const NS = 'addtest'
@@ -510,6 +511,26 @@ describe('battlestack add into an existing file', () => {
         expect(await readFile(path.join(p.dir, '.battlestack', 'pull', 'add-opt.txt.new'), 'utf8')).toBe('add:opt\n')
         expect(await fileExists(p.dir, '.battlestack/pull/REPORT.md')).toBe(true)
         expect(process.exitCode).toBe(2)
+        process.exitCode = undefined
+    })
+})
+
+describe('battlestack add after a pull that left work', () => {
+    it('keeps the pull\'s items in REPORT.md next to its own', async () => {
+        const p = await project()
+        await writeReport(p.dir, {
+            merged: [], conflicts: ['app/conflicted.ts'], staged: [], backups: [], unmanaged: [], restored: [],
+            added: [], orphans: [], actions: ['Run the new database migration'], repairs: [],
+        })
+        await writeFile(path.join(p.dir, 'add-opt.txt'), 'the project\'s own file\n')
+
+        await withCwd(p.dir, () => add('add:opt')(p))
+
+        const report = await readFile(path.join(p.dir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        expect(report).toContain('`add-opt.txt`')
+        expect(report).toContain('`app/conflicted.ts`')
+        expect(report).toContain('Run the new database migration')
+        expect(report.indexOf('`add-opt.txt`')).toBeLessThan(report.indexOf('# battlestack pull report'))
         process.exitCode = undefined
     })
 })
