@@ -197,11 +197,15 @@ describe('repairOverwrites', () => {
         const start = recordedAtStart(manifestWith({ Dockerfile: sha256('FROM node\n') }))
         await write('Dockerfile', 'FROM node:24\n')
 
-        for (const flag of ['force', 'overwrite']) {
-            const ctx = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { [flag]: true })
-            expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([])
-            expect(await read('Dockerfile')).toBe('FROM node:24\n')
-        }
+        const overwrite = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { overwrite: true })
+        expect(await repairOverwrites(overwrite, start, overwrite.registries)).toEqual([])
+        expect(await read('Dockerfile')).toBe('FROM node:24\n')
+
+        // --force keeps the output too, but saves the local version, as the drift-aware writers do.
+        const force = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { force: true })
+        expect((await repairOverwrites(force, start, force.registries)).map((r) => r.outcome)).toEqual(['backed up'])
+        expect(await read('Dockerfile')).toBe('FROM node:24\n')
+        expect(await read(path.join('.battlestack', 'pull', 'Dockerfile.bak'))).toBe('FROM node\nCOPY patches/ ./patches/\n')
     })
 
     it('puts back the record of the feature that wrote the file, not another tracker\'s', async () => {
