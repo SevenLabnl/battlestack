@@ -745,13 +745,14 @@ describe('battlestack pull: a schema change ships with its migration', () => {
     async function setup(
         v2: { schema: string, other: string },
         dbGenerate = writesSql,
+        { featureId = 'nuxt4:database', schema = schemaRel } = {},
     ): Promise<{ projectDir: string, registriesV2: BattlestackRegistries }> {
         const projectDir = await tmp('battlestack-pull-schema-')
         const tplV1 = await tmp('battlestack-pull-schema-v1-')
         const tplV2 = await tmp('battlestack-pull-schema-v2-')
-        await writeTemplateFile(tplV1, schemaRel, 'v1 schema\n')
+        await writeTemplateFile(tplV1, schema, 'v1 schema\n')
         await writeTemplateFile(tplV1, 'other.ts', 'v1\n')
-        await writeTemplateFile(tplV2, schemaRel, v2.schema)
+        await writeTemplateFile(tplV2, schema, v2.schema)
         await writeTemplateFile(tplV2, 'other.ts', v2.other)
         await writeFile(
             path.join(projectDir, 'package.json'),
@@ -760,13 +761,12 @@ describe('battlestack pull: a schema change ships with its migration', () => {
 
         const registriesFor = (tplDir: string, version: string): BattlestackRegistries => buildRegistries({
             namespace: 'nuxt4',
-            frameworks: [{ id: FW, label: FW, supportedFeatures: ['nuxt4:database'] }],
-            features: [makeFileFeature('nuxt4:database', version, tplDir, { stage: STAGE.DATABASE })],
-            templates: [{ id: TPL, label: TPL, framework: FW, requiredFeatures: ['nuxt4:database'], optionalFeatures: [] }],
+            frameworks: [{ id: FW, label: FW, supportedFeatures: [featureId] }],
+            features: [makeFileFeature(featureId, version, tplDir, { stage: STAGE.DATABASE })],
+            templates: [{ id: TPL, label: TPL, framework: FW, requiredFeatures: [featureId], optionalFeatures: [] }],
         }).registries
         const registriesV1 = registriesFor(tplV1, '1.0.0')
-        const database = registriesV1.features.get('nuxt4:database')
-        expect(database.fqid).toBe('nuxt4:nuxt4:database')
+        const database = registriesV1.features.get(featureId)
         const ctx = scaffoldCtx(projectDir, registriesV1, [database.fqid])
         await database.execute(ctx)
         await writeManifest(ctx)
@@ -838,6 +838,19 @@ describe('battlestack pull: a schema change ships with its migration', () => {
         expect(await generated(projectDir)).toBe(false)
         expect(lines.some((l) => l.includes('Schema changed'))).toBe(false)
         expect(report).not.toContain('db:generate')
+    })
+
+    it.each([
+        ['drizzle-kit finds nothing to migrate', {}, `node -e "console.log('No schema changes, nothing to migrate')"`],
+        ['the changed file is not one drizzle-kit reads', { schema: path.join('server', 'database', 'schema', 'README.md') }, writesSql],
+        ['nuxt4:database is not enabled', { featureId: 'nuxt4:other' }, writesSql],
+    ])('reports nothing to do when %s', async (_, opts, dbGenerate) => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' }, dbGenerate, opts)
+        const { exitCode, report } = await pull(projectDir, registriesV2)
+
+        expect(await generated(projectDir)).toBe(false)
+        expect(report).not.toContain('db:generate')
+        expect(exitCode).toBeUndefined()
     })
 })
 
