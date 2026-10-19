@@ -61,9 +61,13 @@
   check never sees. The auth feature now sets
   `runtimeConfig.session.sessionHeader: false`; run `battlestack pull`.
 - `pull` no longer appends the template's favicon and apple-touch-icon links to
-  a project that declares its own icons in `app.head.link`: browsers take the
-  last matching icon, so those links overrode the project's branding. Remove any
-  `/favicon.ico` or `/apple-touch-icon.png` links a previous pull added.
+  a project that declares its own icons: browsers take the last matching icon,
+  so those links overrode the project's branding. Any `icon`, `shortcut icon` or
+  `apple-touch-icon` link counts, in any casing, when it is in
+  `nuxt.config.ts#app.head.link`, `app/app.vue` or a layout under
+  `app/layouts/`. Icon links set in a page, a plugin or `app/error.vue` are not
+  detected. `pull` notes when it skips the links. Remove any `/favicon.ico` or
+  `/apple-touch-icon.png` links a previous pull added.
 - `battlestack pull` runs `db:generate` when it changes a file under
   `server/database/schema/`. Before, the schema change came without a
   migration and never reached production, which applies only committed SQL.
