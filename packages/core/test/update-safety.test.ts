@@ -112,7 +112,7 @@ describe('findBase', () => {
         git('init', '-q')
         const crlf = BASE.replaceAll('\n', '\r\n')
         // Only a lookup by the file's repository path matches this pattern.
-        await write('apps/web/.gitattributes', 'f.txt text eol=crlf\n')
+        await write('apps/web/.gitattributes', '/f.txt text eol=crlf\n')
         await write('apps/web/f.txt', crlf)
         await write('f.txt', 'a root file of the same name\n')
         git('add', '-A')
