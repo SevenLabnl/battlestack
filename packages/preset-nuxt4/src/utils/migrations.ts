@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { readdir } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { exists, hashFile, isFeatureEnabled, resolveProjectPM, run, updateLedger, type RunContext } from '@battlestack/core'
 import { ui } from '@battlestack/tui'
 
@@ -82,6 +82,7 @@ export async function hashSchemaFiles(projectDir: string): Promise<Map<string, s
  */
 export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map<string, string>): Promise<void> {
     if (!isFeatureEnabled(ctx, 'nuxt4:database')) return
+    await warnDroppedAvatarColumn(ctx)
     const ledger = updateLedger(ctx)
 
     // A staged or conflicted schema file is not on disk in its new form yet, so generating now
@@ -116,4 +117,23 @@ export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map
     const rename = /tty|interactive/i.test(lastLine ?? '') ? ' A renamed column or table needs the prompt, so run it in a terminal.' : ''
     ledger.actions.push(`The schema changed but db:generate wrote no migration.${why}${rename} To finish, ${generateByHand(ctx)}`)
     ui.warn('Schema changed but no migration was generated. See .battlestack/pull/REPORT.md')
+}
+
+/**
+ * Earlier pulls staged a users.ts without `avatarKey` on storage projects, and generating from it
+ * drops the column, deleting every avatar on deploy. Warns while the migrations end with it dropped.
+ */
+async function warnDroppedAvatarColumn(ctx: RunContext): Promise<void> {
+    if (!isFeatureEnabled(ctx, 'nuxt4:storage')) return
+    const dir = path.join(ctx.projectDir, MIGRATIONS_DIR)
+    let droppedIn: string | undefined
+    for (const file of [...await migrationFiles(ctx.projectDir)].sort()) {
+        const sql = await readFile(path.join(dir, file), 'utf8')
+        for (const [, op] of sql.matchAll(/\b(DROP|ADD) COLUMN\s+(?:IF (?:NOT )?EXISTS\s+)?"?avatar_key"?/gi)) {
+            droppedIn = op.toUpperCase() === 'DROP' ? file : undefined
+        }
+    }
+    if (droppedIn) {
+        ui.warn(`server/database/migrations/${droppedIn} drops users.avatar_key, which deletes every avatar on deploy. Remove that migration unless you meant it`)
+    }
 }

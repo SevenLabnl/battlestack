@@ -22,7 +22,8 @@
   file dropped the `avatar_key` column. The database feature now ships
   `users.ts` with `avatarKey` when storage is on, and an edited `users.ts` is
   merged instead of staged. If you took a staged `users.ts` and generated a
-  migration that drops `avatar_key`, delete that migration before you deploy.
+  migration that drops `avatar_key`, delete that migration before you deploy;
+  `pull` now warns about one on a project with storage.
 - `pull` removes a file a feature no longer ships only after every feature has
   updated. A file moving to another feature is no longer deleted and written
   back in the same run, and a pull that stops halfway leaves it in place.
