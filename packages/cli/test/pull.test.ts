@@ -641,10 +641,14 @@ describe('battlestack pull: a file moving to a later feature', () => {
     // the old owner updates first and sees the file as obsolete.
     const movedRel = path.join('test', 'e2e', 'moved.test.ts')
     const movedContent = 'export const moved = true\n'
-    const FROM = 'test:from'
-    const TO = 'test:to'
+    // The new owner sorts first by id, as nuxt4:auth does before nuxt4:vitest, while its stage runs later.
+    const FROM = 'test:z-from'
+    const TO = 'test:a-to'
 
-    async function setup(enabledBare: string[]): Promise<{ projectDir: string, registriesV2: BattlestackRegistries }> {
+    async function setup(
+        enabledBare: string[],
+        newContent = movedContent,
+    ): Promise<{ projectDir: string, registriesV2: BattlestackRegistries }> {
         const projectDir = await tmp('battlestack-pull-moved-')
         const fromV1 = await tmp('battlestack-pull-moved-from-v1-')
         const fromV2 = await tmp('battlestack-pull-moved-from-v2-')
@@ -655,7 +659,7 @@ describe('battlestack pull: a file moving to a later feature', () => {
         await writeTemplateFile(fromV2, 'from.ts', 'from\n')
         await writeTemplateFile(toV1, 'to.ts', 'to\n')
         await writeTemplateFile(toV2, 'to.ts', 'to\n')
-        await writeTemplateFile(toV2, movedRel, movedContent)
+        await writeTemplateFile(toV2, movedRel, newContent)
 
         const required = enabledBare.map(fqid)
         const registriesV1 = makeRegistries({ requiredFeatures: required })
@@ -685,6 +689,18 @@ describe('battlestack pull: a file moving to a later feature', () => {
         const manifest = await readManifestRaw(projectDir)
         expect(Object.keys(filesOf(manifest, FROM) ?? {})).not.toContain(movedRel)
         expect(Object.keys(filesOf(manifest, TO) ?? {})).toContain(movedRel)
+    })
+
+    it('writes the new owner\'s version when the move also changed the file', async () => {
+        const changed = 'export const moved = "v2"\n'
+        const { projectDir, registriesV2 } = await setup([FROM, TO], changed)
+        await runPull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(changed)
+        const manifest = await readManifestRaw(projectDir)
+        expect(Object.keys(filesOf(manifest, FROM) ?? {})).not.toContain(movedRel)
+        expect(Object.keys(filesOf(manifest, TO) ?? {})).toContain(movedRel)
+        expect(await exists(path.join(projectDir, '.battlestack', 'pull', `${movedRel}.patch`))).toBe(false)
     })
 
     it('CORE PROPERTY: never deletes the user\'s edits to the moved file', async () => {
