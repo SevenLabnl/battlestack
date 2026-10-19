@@ -6,7 +6,7 @@
 
 ## Upgrading: `battlestack pull`
 
-`battlestack pull` merges upstream feature changes into files you edited and lists what it could not settle in `.battlestack/pull/REPORT.md`. Exit code 2 means that report has work in it. Use the `battlestack-upgrade` skill to run a pull or to finish one: it covers conflict markers, staged `.new` files, files the project deleted on purpose and the checks to run before committing. Never import from, edit or ship files under `.battlestack/pull/`; they are merge scratch.
+`battlestack pull` merges upstream feature changes into files you edited and lists what it could not settle in `.battlestack/pull/REPORT.md`. Exit code 2 means that report has work in it. Use the `battlestack-upgrade` skill to run a pull or to finish one: it covers conflict markers, staged `.new` files, schema changes and their migrations, files the project deleted on purpose and the checks to run before committing. Never import from, edit or ship files under `.battlestack/pull/`; they are merge scratch, and a staged schema `.new` copied over the real file drops the project's own columns.
 
 ## Runtime Config: env vars go through `runtimeConfig`, not `process.env`
 

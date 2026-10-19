@@ -49,6 +49,11 @@
   to the `.new`, as the report says. The report lists a restored file once, and
   each feature's line counts merges, conflicts and staged files from all of its
   writes.
+- The `battlestack-upgrade` skill for AI agents now covers schema changes:
+  finish schema merges first, run `db:generate` in a terminal for renames,
+  read every generated migration for dropped columns, and never copy a staged
+  schema `.new` over the project's file. It also covers `--force` backups,
+  monorepo projects and checking that a second pull exits with code 0.
 - A feature whose plugin did not load keeps its manifest record on `pull`
   instead of being dropped, so its files stay managed.
 - `shared:github` drops its records of the deploy workflows it no longer ships.
