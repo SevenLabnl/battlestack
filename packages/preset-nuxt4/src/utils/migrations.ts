@@ -17,6 +17,8 @@ export interface GenerateResult {
     created: string[]
     /** The last line drizzle-kit printed, to explain an empty `created`. */
     lastLine?: string
+    /** drizzle-kit said the schema needs no migration. */
+    upToDate: boolean
 }
 
 async function migrationFiles(projectDir: string): Promise<Set<string>> {
@@ -42,6 +44,7 @@ function lastLineOf(text: string): string | undefined {
 export async function generateMigration(ctx: RunContext): Promise<GenerateResult> {
     const before = await migrationFiles(ctx.projectDir)
     let lastLine: string | undefined
+    let upToDate = false
     try {
         const pm = await resolveProjectPM({
             projectDir: ctx.projectDir,
@@ -49,12 +52,13 @@ export async function generateMigration(ctx: RunContext): Promise<GenerateResult
         })
         const result = await run(pm, ['run', 'db:generate'], { cwd: ctx.projectDir, inherit: ctx.debug })
         lastLine = lastLineOf(result.stderr) ?? lastLineOf(result.stdout)
+        upToDate = /no schema changes/i.test(`${result.stdout}\n${result.stderr}`)
     } catch (err) {
         if (ctx.debug) console.error(err)
         lastLine = (err as Error).message
     }
     const created = [...await migrationFiles(ctx.projectDir)].filter((f) => !before.has(f)).sort()
-    return { created, lastLine }
+    return { created, lastLine, upToDate }
 }
 
 /** Content hash of each schema file drizzle-kit reads, keyed by absolute path. */
@@ -99,12 +103,12 @@ export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map
         ui.warn('Schema changed; --skip-install skipped db:generate. See .battlestack/pull/REPORT.md')
         return
     }
-    const { created, lastLine } = await generateMigration(ctx)
+    const { created, lastLine, upToDate } = await generateMigration(ctx)
     if (created.length > 0) {
         ui.ok(`Schema changed: generated ${created.join(', ')}. Commit it with this pull`)
         return
     }
-    if (/no schema changes/i.test(lastLine ?? '')) {
+    if (upToDate) {
         ui.dim('  Schema files changed, but drizzle-kit found nothing to migrate')
         return
     }
