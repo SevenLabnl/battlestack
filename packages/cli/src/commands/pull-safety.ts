@@ -1,5 +1,4 @@
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import {
@@ -7,10 +6,16 @@ import {
     ErrorCode,
     exists,
     findBase,
+    hashContent,
     hasConflictMarkers,
+    isBinaryPath,
     pruneBases,
+    recordedFiles,
+    stageUpstream,
     storeBase,
     threeWayMerge,
+    toPosixRel,
+    trackersOf,
     updateLedger,
     type BattlestackRegistries,
     type ProjectManifest,
@@ -23,10 +28,7 @@ export const REPORT_PATH = path.join(PULL_DIR, 'REPORT.md')
 /** Exit code for a pull that finished but left work for a person or agent. */
 export const NEEDS_ATTENTION_EXIT_CODE = 2
 
-function sha256(content: Buffer): string {
-    return createHash('sha256').update(content).digest('hex')
-}
-
+/** Runs in the project directory. Paths it takes and prints are relative to it, also when the repository root is higher up. */
 function git(cwd: string, args: string[]): { ok: boolean, out: Buffer } {
     const r = spawnSync('git', args, { cwd, maxBuffer: 64 * 1024 * 1024 })
     return { ok: r.status === 0, out: r.stdout ?? Buffer.alloc(0) }
@@ -37,33 +39,45 @@ export function isGitRepo(projectDir: string): boolean {
         && git(projectDir, ['rev-parse', '--verify', '-q', 'HEAD']).ok
 }
 
-/** rel → every hash the manifest records for it, taken before any feature runs. */
-export function recordedAtStart(manifest: ProjectManifest): Map<string, Set<string>> {
-    const out = new Map<string, Set<string>>()
+/** posix rel → manifest feature id → the hash it recorded, taken before any feature runs. */
+export type StartRecords = Map<string, Map<string, string>>
+
+export function recordedAtStart(manifest: ProjectManifest): StartRecords {
+    const out: StartRecords = new Map()
     for (const f of manifest.features) {
         for (const [rel, hash] of Object.entries(f.files ?? {})) {
-            const posix = rel.split(path.sep).join('/')
-            if (!out.has(posix)) out.set(posix, new Set())
-            out.get(posix)!.add(hash)
+            const posix = toPosixRel(rel)
+            if (!out.has(posix)) out.set(posix, new Map())
+            out.get(posix)!.set(f.id, hash)
         }
     }
     return out
 }
 
+/** Recorded files missing from disk before the pull, so the ones it restores can be reported. */
+export async function missingAtStart(projectDir: string, start: StartRecords): Promise<string[]> {
+    const missing: string[] = []
+    for (const rel of start.keys()) {
+        if (!(await exists(path.join(projectDir, rel)))) missing.push(rel)
+    }
+    return missing
+}
+
 /**
  * A pull rewrites files in place, so it starts from a commit: git is the undo, and the
- * overwrite check below compares against HEAD. Unresolved markers from an earlier run block it.
+ * overwrite check below compares against HEAD. Unresolved markers from an earlier run block
+ * it, unless the run replaces drifted files anyway (`--force`, `--overwrite`).
  */
 export async function preflight(
     projectDir: string,
     manifest: ProjectManifest,
-    opts: { allowDirty: boolean },
+    opts: { allowDirty: boolean, replacing?: boolean },
 ): Promise<{ git: boolean, clean: boolean }> {
-    for (const [rel, hashes] of recordedAtStart(manifest)) {
+    for (const [rel, byFeature] of opts.replacing ? [] : recordedAtStart(manifest)) {
         const abs = path.join(projectDir, rel)
         if (!(await exists(abs))) continue
         const content = await readFile(abs)
-        if (hashes.has(sha256(content))) continue
+        if ([...byFeature.values()].includes(hashContent(content))) continue
         if (hasConflictMarkers(content.toString('utf8'))) {
             throw new CLIError(
                 ErrorCode.SCAFFOLD_FAILED,
@@ -73,7 +87,7 @@ export async function preflight(
     }
 
     if (!isGitRepo(projectDir)) return { git: false, clean: false }
-    const status = git(projectDir, ['status', '--porcelain', '--untracked-files=normal']).out.toString().trim()
+    const status = git(projectDir, ['status', '--porcelain', '--untracked-files=normal', '--', '.']).out.toString().trim()
     if (status && opts.allowDirty) return { git: true, clean: false }
     if (status) {
         throw new CLIError(
@@ -91,44 +105,45 @@ export interface OverwriteRepair {
     outcome: 'merged' | 'conflicts' | 'staged'
 }
 
-function featureRecording(ctx: RunContext, rel: string): string | null {
-    for (const [key, value] of Object.entries(ctx.state)) {
-        if (!key.startsWith('files:') || !value || typeof value !== 'object') continue
-        for (const r of Object.keys(value as Record<string, string>)) {
-            if (r.split(path.sep).join('/') === rel) return key.slice('files:'.length)
-        }
-    }
-    return null
+/** Bare feature id for a manifest id, which may be an fqid. */
+function bareId(registries: BattlestackRegistries, id: string): string {
+    return registries.features.has(id) ? registries.features.get(id).id : id
 }
 
 /**
  * Catches feature writes that bypassed the drift-aware writers: a tracked or untracked file
  * that held local edits at HEAD and was replaced. The local version is put back and the
  * feature's output is merged into it, or staged when there is no base to merge against.
+ * `--force` and `--overwrite` take feature output as asked, so they skip this.
  */
 export async function repairOverwrites(
     ctx: RunContext,
-    startRecorded: Map<string, Set<string>>,
+    start: StartRecords,
     registries: BattlestackRegistries,
 ): Promise<OverwriteRepair[]> {
+    if (ctx.state.force === true || ctx.state.overwrite === true) return []
     const ledger = updateLedger(ctx)
     const handled = new Set(ledger.handled)
     const exempt = selfMergedPaths(ctx, registries)
-    const changed = git(ctx.projectDir, ['diff', '--name-only', '-z', 'HEAD']).out.toString().split('\0').filter(Boolean)
+    const changed = git(ctx.projectDir, ['diff', '--name-only', '-z', '--relative', 'HEAD']).out.toString().split('\0').filter(Boolean)
     const repairs: OverwriteRepair[] = []
 
     for (const rel of changed) {
         if (handled.has(rel) || isExempt(rel, exempt)) continue
-        const featureId = featureRecording(ctx, rel)
-        if (!featureId) continue
+        const trackers = trackersOf(ctx, rel)
+        if (trackers.length === 0) continue
         const abs = path.join(ctx.projectDir, rel)
         if (!(await exists(abs))) continue
-        const head = git(ctx.projectDir, ['show', `HEAD:${rel}`])
+        // `./` resolves against the project directory, and --filters gives the bytes checkout wrote.
+        const head = git(ctx.projectDir, ['cat-file', '--filters', `HEAD:./${rel}`])
         if (!head.ok) continue
-        const before = startRecorded.get(rel) ?? new Set<string>()
-        if (before.has(sha256(head.out))) continue
+        const startByFeature = start.get(rel) ?? new Map<string, string>()
+        const before = new Set(startByFeature.values())
+        if (before.has(hashContent(head.out))) continue
 
         const upstream = await readFile(abs)
+        const tracker = trackers.find((t) => t.hash === hashContent(upstream)) ?? trackers[0]!
+        const featureId = tracker.featureId
         const base = before.size > 0 ? await findBase(ctx.projectDir, rel, before) : null
         const merged = base
             ? await threeWayMerge(head.out, base, upstream, {
@@ -146,14 +161,11 @@ export async function repairOverwrites(
             continue
         }
         await writeFile(abs, head.out)
-        // Not merged, so the record goes back to what the file last matched, or away if nothing did.
-        const files = ctx.state[`files:${featureId}`] as Record<string, string>
-        const previous = [...before][0]
-        if (previous) files[rel] = previous
-        else delete files[rel]
-        const staged = path.join(ctx.projectDir, PULL_DIR, `${rel}.new`)
-        await mkdir(path.dirname(staged), { recursive: true })
-        await writeFile(staged, upstream)
+        // Not merged, so the record goes back to what this feature recorded before the pull, or away if it had none.
+        const previous = [...startByFeature].find(([id]) => bareId(registries, id) === featureId)?.[1]
+        if (previous) tracker.files[tracker.rel] = previous
+        else delete tracker.files[tracker.rel]
+        await stageUpstream(ctx.projectDir, rel, head.out, upstream, { binary: isBinaryPath(rel) })
         ledger.staged.push(rel)
         repairs.push({ rel, featureId, outcome: 'staged' })
     }
@@ -173,6 +185,14 @@ function isExempt(rel: string, exempt: string[]): boolean {
     return exempt.some((e) => (e.endsWith('/') ? rel.startsWith(e) : rel === e))
 }
 
+/** Recorded files this pull created that git does not know yet. */
+export function newlyAddedFiles(ctx: RunContext): string[] {
+    const r = git(ctx.projectDir, ['ls-files', '--others', '--exclude-standard', '-z'])
+    if (!r.ok) return []
+    const recorded = new Set([...recordedFiles(ctx)].map((f) => toPosixRel(f.rel)))
+    return r.out.toString().split('\0').filter((f) => recorded.has(f))
+}
+
 /** Drops stored bases nothing will merge against any more. */
 export async function pruneStoredBases(projectDir: string, manifest: ProjectManifest): Promise<void> {
     const keep = new Set<string>()
@@ -180,11 +200,12 @@ export async function pruneStoredBases(projectDir: string, manifest: ProjectMani
         for (const [rel, hash] of Object.entries(f.files ?? {})) {
             const abs = path.join(projectDir, rel)
             if (!(await exists(abs))) continue
-            if (sha256(await readFile(abs)) !== hash) keep.add(hash)
+            if (hashContent(await readFile(abs)) !== hash) keep.add(hash)
         }
     }
     await pruneBases(projectDir, keep)
 }
+
 
 export interface PullSummary {
     merged: string[]
@@ -221,7 +242,7 @@ export function renderReport(s: PullSummary): string {
         '',
         ...section(
             'Conflicts',
-            'Both your project and upstream changed the same lines. Each file has diff3 markers: `<<<<<<<` your version, `|||||||` upstream before, `=======` upstream now, `>>>>>>>`. Keep your intent and take the upstream change where it does not contradict it. `git diff --check` lists any marker left behind, and pull refuses to run until none are.',
+            'Both your project and upstream changed the same lines. Each file has diff3 markers: `<<<<<<<` your version, `|||||||` upstream before, `=======` upstream now, `>>>>>>>`. Keep your intent and take the upstream change where it does not contradict it. `git diff --check` lists any marker left behind, and pull refuses to run until none are left, except with `--force` or `--overwrite`.',
             s.conflicts.map((r) => `\`${r}\``),
         ),
         ...section(
@@ -255,7 +276,7 @@ export function renderReport(s: PullSummary): string {
         ...section(
             'New files',
             'Pull added these. Check `git log --diff-filter=D -- <path>` for each one: if the project deleted it on purpose, remove the feature with `battlestack remove <feature>` instead of deleting the file again.',
-            [...s.added, ...s.restored].map((r) => `\`${r}\``),
+            [...new Set([...s.added, ...s.restored])].map((r) => `\`${r}\``),
         ),
         ...section(
             'Merged cleanly',

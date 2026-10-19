@@ -14,6 +14,7 @@ import {
     readManifest,
     renameProject,
     silentLoader,
+    storeBase,
     STAGE,
     updateFromTemplateDir,
     writeManifest,
@@ -935,6 +936,56 @@ describe('battlestack pull --allow-dirty', () => {
         await runPull(projectDir, v2, { allowDirty: true, format: false, skipInstall: true })
         process.exitCode = undefined
         expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe('uncommitted edit\n')
+    })
+})
+
+describe('battlestack pull: reporting writes a feature did not report', () => {
+    async function setup(prefix: string, v1Content: string): Promise<string> {
+        const projectDir = await tmp(prefix)
+        const tplDir = await tmp(`${prefix}tpl-`)
+        await writeTemplateFile(tplDir, 'a.ts', v1Content)
+        const v1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplDir)
+        v1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, v1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+        return projectDir
+    }
+
+    function v2Writing(content: string): BattlestackRegistries {
+        const v2 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        v2.features.register({
+            ...makeFileFeature('test:feat-a', '2.0.0', '/nonexistent'),
+            // Writes through the drift-aware writer but returns a report without it.
+            async update(c) {
+                await writeRecorded(c, 'test:feat-a', 'a.ts', content)
+                return { written: [], skipped: [], notes: [] }
+            },
+        }, origin)
+        return v2
+    }
+
+    it('counts a merge in the feature line', async () => {
+        const base = 'one\ntwo\nthree\nfour\nfive\n'
+        const projectDir = await setup('battlestack-pull-count-', base)
+        await storeBase(projectDir, Buffer.from(base))
+        await writeFile(path.join(projectDir, 'a.ts'), base.replace('one', 'one, edited'))
+
+        const lines = await withCwdCapture(projectDir, () => pullCommand(args({ skipInstall: true }), silentLoader(), v2Writing(base.replace('five', 'five, upstream'))))
+        process.exitCode = undefined
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe('one, edited\ntwo\nthree\nfour\nfive, upstream\n')
+        expect(lines.join('\n')).toMatch(/test:feat-a: 1 merged/)
+    })
+
+    it('lists a deleted file it restored in the report', async () => {
+        const projectDir = await setup('battlestack-pull-restored-', 'v1\n')
+        await rm(path.join(projectDir, 'a.ts'))
+
+        await withCwdCapture(projectDir, () => pullCommand(args({ skipInstall: true }), silentLoader(), v2Writing('v2\n')))
+        process.exitCode = undefined
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe('v2\n')
+        expect(await readFile(path.join(projectDir, '.battlestack/pull/REPORT.md'), 'utf8')).toMatch(/## New files[\s\S]*- `a\.ts`/)
     })
 })
 

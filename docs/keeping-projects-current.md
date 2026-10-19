@@ -89,7 +89,9 @@ report. The short version for people: resolve the conflict markers
 (`git diff --check` finds any left), compare each staged `.new` with your file,
 check whether each new file is something the project deleted on purpose, run
 lint, typecheck and the tests, and commit. `pull` refuses to start again while
-a conflict marker is left in a merged file.
+a conflict marker is left in a merged file, unless you pass `--force` or
+`--overwrite`: those write upstream's version over edited files instead of
+merging into them.
 
 ## Moving template files
 
