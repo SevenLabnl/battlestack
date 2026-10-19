@@ -304,6 +304,50 @@ describe('battlestack pull: ownedByUser is inviolable', () => {
         expect(await exists(path.join(projectDir, '.battlestack', 'pull', 'a.ts.new'))).toBe(false)
     })
 
+    it('CORE PROPERTY: an owned file written through writeRecorded by an update that ignores prev is left alone', async () => {
+        const projectDir = await tmp('battlestack-pull-owned-recorded-')
+        const makeFeature = (version: string, content: string): Feature => ({
+            id: 'test:feat-docker',
+            label: 'test:feat-docker',
+            version,
+            stage: STAGE.STYLING,
+            // A structural path recorded after update must not displace the user's own entry.
+            structuralFiles: () => ['branding.svg'],
+            async execute(ctx) {
+                await writeRecorded(ctx, 'test:feat-docker', 'Dockerfile', content)
+            },
+            async update(ctx) {
+                await writeRecorded(ctx, 'test:feat-docker', 'Dockerfile', content)
+                return { written: ['Dockerfile'], skipped: [], notes: [] }
+            },
+        })
+
+        const registriesV1 = makeRegistries({ requiredFeatures: [fqid('test:feat-docker')] })
+        const featV1 = makeFeature('1.0.0', 'FROM node:22\nRUN a\n')
+        registriesV1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, [fqid('test:feat-docker')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+
+        await withCwd(projectDir, () => ownCommand(defaultArgs({ positionals: ['own', 'Dockerfile'] }), silentLoader()))
+        const edited = 'FROM node:22\nRUN mine\n'
+        await writeFile(path.join(projectDir, 'Dockerfile'), edited, 'utf8')
+
+        const registriesV2 = makeRegistries({ requiredFeatures: [fqid('test:feat-docker')] })
+        registriesV2.features.register(makeFeature('2.0.0', 'FROM node:24\nRUN a\n'), origin)
+
+        process.exitCode = undefined
+        await runPull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, 'Dockerfile'), 'utf8')).toBe(edited)
+        expect(await exists(path.join(projectDir, '.battlestack', 'pull', 'Dockerfile.new'))).toBe(false)
+        expect(process.exitCode).toBeUndefined()
+        const rec = (await readManifestRaw(projectDir)).features.find((f) => f.id === fqid('test:feat-docker'))!
+        expect(rec.version).toBe('2.0.0')
+        expect(rec.ownedByUser).toContain('Dockerfile')
+        process.exitCode = undefined
+    })
+
     it('retires a moved template through real ownership and version-gated pulls without data loss', async () => {
         const projectDir = await tmp('battlestack-pull-owned-retirement-')
         const tplV1 = await tmp('battlestack-pull-owned-retirement-v1-')
