@@ -86,8 +86,7 @@ async function findBaseInGit(projectDir: string, rel: string, wanted: Set<string
         const blob = line.split(' ')[3]
         if (blob && !/^0+$/.test(blob)) blobs.add(blob)
     }
-    // One read per distinct version: `cat-file --batch --filters` headers give the unfiltered
-    // size, so its output cannot be split. --filters returns the bytes checkout would write.
+    // --filters returns the bytes checkout would write for the file's repository path.
     for (const blob of blobs) {
         const content = await execFileAsync(
             'git',
