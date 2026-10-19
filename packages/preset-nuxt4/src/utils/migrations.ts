@@ -25,8 +25,10 @@ async function migrationFiles(projectDir: string): Promise<Set<string>> {
         .map((e) => path.relative(dir, path.join(e.parentPath, e.name))))
 }
 
+/** The last error line, else the last line that is not a stack frame. */
 function lastLineOf(text: string): string | undefined {
-    return text.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean).at(-1)
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('at '))
+    return lines.findLast((l) => /error/i.test(l)) ?? lines.at(-1)
 }
 
 /**

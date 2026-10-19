@@ -152,7 +152,7 @@ async function addRuntimeConfig(projectDir: string): Promise<void> {
     )
 }
 
-async function patchUsersSchema(projectDir: string): Promise<void> {
+export async function patchUsersSchema(projectDir: string): Promise<void> {
     const schemaPath = path.join(projectDir, 'server/database/schema/users.ts')
     let content: string
     try {
