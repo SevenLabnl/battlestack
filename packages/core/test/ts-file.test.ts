@@ -7,7 +7,7 @@ import {
     patchTsFile,
     pushUnique,
     pushUniqueAll,
-    mergeShallow,
+    mergeDefaults,
 } from '../src/utils/ts-file.js'
 import { loadFile } from 'magicast'
 
@@ -79,15 +79,47 @@ describe('ts-file (magicast helpers)', () => {
         expect(out).toMatch(/['"]c['"]/)
     })
 
-    it('mergeShallow preserves siblings', async () => {
+    it('mergeDefaults preserves siblings', async () => {
         const file = mkFile(
             `export default { settings: { keep: 1 } }\n`,
         )
         await patchTsFile(file, (mod) => {
-            mergeShallow(defaultObject(mod), 'settings', { added: 2 })
+            mergeDefaults(defaultObject(mod), 'settings', { added: 2 })
         })
         const out = readFileSync(file, 'utf8')
         expect(out).toMatch(/keep:\s*1/)
         expect(out).toMatch(/added:\s*2/)
+    })
+
+    it('mergeDefaults keeps existing values and comments, adding only missing keys', async () => {
+        const file = mkFile(
+            [
+                `export default defineNuxtConfig({`,
+                `    runtimeConfig: {`,
+                `        // why this key exists`,
+                `        keep: 'mine',`,
+                `        health: {`,
+                `            // tuned for our slow replica`,
+                `            dbTimeoutMs: 5000,`,
+                `        },`,
+                `    },`,
+                `})`,
+                ``,
+            ].join('\n'),
+        )
+        await patchTsFile(file, (mod) => {
+            mergeDefaults(defaultObject(mod), 'runtimeConfig', {
+                keep: '',
+                added: '',
+                health: { failOnDegraded: true, dbTimeoutMs: 1000 },
+            })
+        })
+        const out = readFileSync(file, 'utf8')
+        expect(out).toContain('// why this key exists')
+        expect(out).toContain(`keep: 'mine'`)
+        expect(out).toMatch(/added:\s*['"]{2}/)
+        expect(out).toContain('// tuned for our slow replica')
+        expect(out).toMatch(/dbTimeoutMs:\s*5000/)
+        expect(out).toMatch(/failOnDegraded:\s*true/)
     })
 })

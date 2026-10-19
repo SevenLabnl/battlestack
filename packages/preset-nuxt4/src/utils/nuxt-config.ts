@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { writeFile as fsWriteFile } from 'node:fs/promises'
 import { generateCode, loadFile } from 'magicast'
-import { defaultObject, mergeShallow, pushUnique, pushUniqueAll } from '@battlestack/core/utils/ts-file.js'
+import { defaultObject, mergeDefaults, pushUnique, pushUniqueAll } from '@battlestack/core/utils/ts-file.js'
 
 type Mod = Awaited<ReturnType<typeof loadFile>>
 
@@ -127,14 +127,16 @@ export class NuxtConfig {
         return this
     }
 
+    /** Adds the `runtimeConfig` keys the project lacks; existing values and comments stay. */
     mergeRuntimeConfig(patch: Record<string, unknown>): this {
-        mergeShallow(this.config, 'runtimeConfig', patch)
+        mergeDefaults(this.config, 'runtimeConfig', patch)
         return this
     }
 
+    /** Adds the `runtimeConfig.public` keys the project lacks; existing values and comments stay. */
     mergeRuntimePublic(patch: Record<string, unknown>): this {
         this.config.runtimeConfig ||= {}
-        mergeShallow(this.config.runtimeConfig, 'public', patch)
+        mergeDefaults(this.config.runtimeConfig, 'public', patch)
         return this
     }
 

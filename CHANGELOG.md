@@ -2,11 +2,35 @@
 
 ## Unreleased
 
+- The project name recorded in `.battlestack/manifest.json` now always wins over
+  the directory name. Before, any project command in a clone, CI checkout or
+  renamed directory silently renamed the project to the directory name, and
+  `pull` then rendered that name into compose projects, hostnames, secrets and
+  image names. A mismatch now prints a one-line note, except under CI, where
+  the checkout directory is usually the repository name. Renaming the
+  directory no longer renames the project: use the new `battlestack rename
+  <name>`. A project already renamed this way gets its name back with
+  `battlestack rename <old-name>` (the old name is in the manifest's
+  `previousNames`). The first `pull` after a rename re-renders every feature,
+  also at unchanged versions, without touching owned or edited files, and lists
+  the tracked files that still contain the old name.
+
 - A skill whose `skills add` fails no longer ends the run on a plain "Scaffold
   complete" or "Update complete": the closing line names the skills that were
   not installed. The warning points at access (`gh auth login` or git
   credentials for the source's host) and `battlestack pull --skills-only`, not at
   the registry.
+- `pull` no longer rewrites `runtimeConfig` in `nuxt.config.ts`: it only adds
+  the keys a feature needs that are missing, so your comments and the values
+  you set (`public.allowRegistration: true`, an `oauthProviders.<provider>:
+  false`) stay. Check your `runtimeConfig` for comments or values an earlier
+  `pull` reset.
+  For preset authors, `mergeShallow` in `@battlestack/core/utils/ts-file.js` is
+  now `mergeDefaults`.
+- A logged-out or revoked session could still sign in when its sealed cookie
+  value was sent as an `x-nuxt-session-session` header, which the revocation
+  check never sees. The auth feature now sets
+  `runtimeConfig.session.sessionHeader: false`; run `battlestack pull`.
 - `pull` no longer appends the template's favicon and apple-touch-icon links to
   a project that declares its own icons in `app.head.link`: browsers take the
   last matching icon, so those links overrode the project's branding. Remove any
