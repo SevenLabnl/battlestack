@@ -79,6 +79,27 @@ describe('e2e: auth flow', () => {
         expect((await apiGet('/api/auth/sessions', other)).status).toBe(200)
     })
 
+    it.skipIf(!serverUp)('a session revoked from another device is refused when replayed as a session header', async () => {
+        const revoked = await loginAsAdmin()
+        const other = await loginAsAdmin()
+        const list = await apiGet<{ rows: { id: string, current: boolean }[] }>('/api/auth/sessions', revoked)
+        const current = list.data?.rows.find((r) => r.current)
+        expect(current).toBeTruthy()
+        expect((await apiDelete(`/api/auth/sessions/${current!.id}`, other)).status).toBeLessThan(400)
+        const sealed = revoked.slice(revoked.indexOf('=') + 1)
+        const replay = await fetch(`${BASE_URL}/api/auth/sessions`, { headers: { 'x-nuxt-session-session': sealed } })
+        expect(replay.status).toBe(401)
+    })
+
+    it.skipIf(!serverUp)('a live session is refused when sent only as a session header', async () => {
+        // `sessionHeader: false` turns the header off entirely, so even a valid session needs the cookie.
+        const cookie = await loginAsAdmin()
+        const sealed = cookie.slice(cookie.indexOf('=') + 1)
+        const viaHeader = await fetch(`${BASE_URL}/api/auth/sessions`, { headers: { 'x-nuxt-session-session': sealed } })
+        expect(viaHeader.status).toBe(401)
+        expect((await apiGet('/api/auth/sessions', cookie)).status).toBe(200)
+    })
+
     if (!serverUp) {
         // Surface the skip reason once so the dev sees why the suite is empty.
         it('e2e suite skipped, no server up at TEST_BASE_URL', () => {
