@@ -608,6 +608,42 @@ async function mergeInPlace(
     return true
 }
 
+const OBSOLETE_QUEUE_KEY = 'obsolete:queue'
+
+interface QueuedObsolete {
+    rel: string
+    recordedHash: string
+}
+
+/**
+ * Makes `deleteObsoleteFiles` queue pristine deletions until `removeQueuedObsoleteFiles`. A file
+ * moving to a feature that updates later in the same run is then never deleted by its old owner.
+ */
+export function queueObsoleteDeletions(ctx: RunContext): void {
+    ctx.state[OBSOLETE_QUEUE_KEY] = []
+}
+
+/** Deletes the queued files that no feature tracks now and that are still pristine. Returns their rels. */
+export async function removeQueuedObsoleteFiles(ctx: RunContext): Promise<string[]> {
+    const queue = (ctx.state[OBSOLETE_QUEUE_KEY] as QueuedObsolete[] | undefined) ?? []
+    delete ctx.state[OBSOLETE_QUEUE_KEY]
+    const tracked = new Set<string>()
+    for (const [key, value] of Object.entries(ctx.state)) {
+        if (!key.startsWith('files:') || !value || typeof value !== 'object') continue
+        for (const rel of Object.keys(value)) tracked.add(toPosix(rel))
+    }
+    const removed: string[] = []
+    for (const { rel, recordedHash } of queue) {
+        if (tracked.has(toPosix(rel))) continue
+        const dest = path.join(ctx.projectDir, rel)
+        if (!(await exists(dest)) || await hashFile(dest) !== recordedHash) continue
+        await rm(dest, { force: true })
+        await clearArtifacts(ctx, dest, rel)
+        removed.push(rel)
+    }
+    return removed
+}
+
 /** Deletes pristine files no longer shipped. User-owned or modified ones stay, with a note.
  *  A rel another enabled feature still tracks is only dropped from this feature's
  *  records, because the file is that feature's to keep. */
@@ -638,7 +674,10 @@ export async function deleteObsoleteFiles(
             continue
         }
         const currentHash = await hashFile(dest)
-        if (currentHash === recordedHash) {
+        const queue = ctx.state[OBSOLETE_QUEUE_KEY] as QueuedObsolete[] | undefined
+        if (currentHash === recordedHash && queue) {
+            queue.push({ rel, recordedHash })
+        } else if (currentHash === recordedHash) {
             await rm(dest, { force: true })
             await clearArtifacts(ctx, dest, rel)
             report.notes.push(`removed obsolete file: ${rel}`)

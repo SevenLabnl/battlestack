@@ -22,8 +22,10 @@ import {
     CLIError,
     ErrorCode,
     findProjectRoot,
+    queueObsoleteDeletions,
     readManifest,
     recordOwned,
+    removeQueuedObsoleteFiles,
     skillsOutcome,
     updateLedger,
     UPDATING_STATE_KEY,
@@ -429,9 +431,11 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             : undefined
         if (renamedFrom) ui.info(`Project renamed ${renamedFrom} → ${ctx.projectName}: re-rendering every feature`)
 
+        queueObsoleteDeletions(ctx)
         for (const record of existingRecords) {
             await pullOneFeature(ctx, record, args, loader, registries, renamedFrom)
         }
+        for (const rel of await removeQueuedObsoleteFiles(ctx)) ui.dim(`  removed obsolete file: ${rel}`)
 
         // Compares against HEAD, so uncommitted edits would read as feature output.
         const repairs = safety.clean && !ctx.dryRun ? await repairOverwrites(ctx, startRecorded, registries) : []
