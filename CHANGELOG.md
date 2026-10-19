@@ -56,10 +56,20 @@
   `pull` reset.
   For preset authors, `mergeShallow` in `@battlestack/core/utils/ts-file.js` is
   now `mergeDefaults`.
-- A logged-out or revoked session could still sign in when its sealed cookie
+- A logged-out or revoked session was still accepted when its sealed cookie
   value was sent as an `x-nuxt-session-session` header, which the revocation
   check never sees. The auth feature now sets
   `runtimeConfig.session.sessionHeader: false`; run `battlestack pull`.
+- `pull` now stops with a clear error when `runtimeConfig` in `nuxt.config.ts`
+  is a variable or shorthand instead of an inline object, where it used to
+  crash with a proxy error. A default that cannot be added because its parent
+  is not an inline object (for example `session: baseSession`) is reported as a
+  warning instead of being skipped silently, and an explicit `null` is kept as
+  your value. If you set `runtimeConfig.session.sessionHeader` to anything but
+  `false`, `pull` keeps it and warns that a revoked session is still accepted
+  through the session header.
+  For preset authors, `mergeDefaults` now returns the paths it could not add,
+  and `objectLiteralAt` is exported from `@battlestack/core/utils/ts-file.js`.
 - `pull` no longer appends the template's favicon and apple-touch-icon links to
   a project that declares its own icons: browsers take the last matching icon,
   so those links overrode the project's branding. Any `icon`, `shortcut icon` or
