@@ -64,8 +64,11 @@
 - `battlestack pull` runs `db:generate` when it changes a file under
   `server/database/schema/`. Before, the schema change came without a
   migration and never reached production, which applies only committed SQL.
-  Commit the new SQL in `server/database/migrations/`. With `--skip-install`,
-  or if generating fails, pull tells you to run `pnpm run db:generate` yourself.
+  Pull names the new SQL file to commit. When no file appears (with
+  `--skip-install`, a rename drizzle-kit has to ask about, or a schema file
+  still waiting for your merge), the step goes into
+  `.battlestack/pull/REPORT.md` and pull exits with code 2. Scaffold also
+  checks for the SQL file instead of trusting drizzle-kit's exit code.
 
 ## v1.4.0 (2026-10-15)
 
