@@ -10,7 +10,7 @@ import { allocatePort, STAGE, type EnvVar, type Feature } from '@battlestack/cor
  */
 export const storageFeature: Feature = {
     id: 'nuxt4:storage',
-    version: '1.3.3',
+    version: '1.3.4',
     label: 'Object storage (RustFS dev / S3 prod)',
     description: 'File uploads and presigned downloads; RustFS locally, S3-compatible provider in prod.',
     frameworks: ['nuxt4'],
