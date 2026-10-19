@@ -1,4 +1,6 @@
+import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
+import { ui } from '@battlestack/tui'
 import { readJson, writeJson, STAGE, type Feature, type RunContext } from '@battlestack/core'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
@@ -58,6 +60,8 @@ export const essentialsFeature: Feature = {
                     'The scaffold ships SevenLab branding at `public/favicon.ico`, `public/favicon.svg` and `public/apple-touch-icon.png`, wired into `nuxt.config.ts#app.head.link`. They replace the Nuxt-logo favicon that `nuxi init` leaves behind.',
                     '',
                     'These three paths are **user-owned**: once they exist, `battlestack pull` never touches them. Replace them with the client\'s own branding and the update path will leave your version alone. Keep the filenames: the `<link>` tags in `nuxt.config.ts` point at them. A project scaffolded before the icon pack shipped gets them written once, on the pull that introduces them, and they are user-owned from then on.',
+                    '',
+                    'A project that declares its own icon links gets none of the template\'s, because browsers use the last matching icon and the template links would override yours. `pull` looks for `icon`, `shortcut icon` or `apple-touch-icon` links in `nuxt.config.ts#app.head.link`, `app/app.vue` and `app/layouts/`. Icon links set anywhere else, such as a page, a plugin or `app/error.vue`, are not detected: move them to one of those places, or `pull` adds the template links next to them.',
                 ].join('\n'),
                 targets: ['readme', 'agents'] as const satisfies Array<'readme' | 'agents'>,
             },
@@ -85,13 +89,15 @@ export const essentialsFeature: Feature = {
     async execute(ctx) {
         await emitTemplate(ctx, 'nuxt4:essentials', import.meta.url, 'essentials')
         await wireScripts(ctx)
-        await wireIcons(ctx)
+        const note = await wireIcons(ctx)
+        if (note) ui.dim(note)
     },
 
     async update(ctx, prev) {
         const report = await emitTemplateUpdate(ctx, 'nuxt4:essentials', import.meta.url, 'essentials', prev)
         await wireScripts(ctx)
-        await wireIcons(ctx)
+        const note = await wireIcons(ctx)
+        if (note) report.notes.push(note)
         return report
     },
 }
@@ -107,16 +113,65 @@ async function wireScripts(ctx: RunContext): Promise<void> {
     await writeJson(pkgPath, pkg)
 }
 
+const ICON_RELS = new Set(['icon', 'apple-touch-icon'])
+
+/** True for `icon`, `shortcut icon`, `Icon`, `apple-touch-icon` and the like. */
+function isIconRel(rel: unknown): boolean {
+    if (typeof rel !== 'string') return false
+    return rel.toLowerCase().split(/\s+/).some((token) => ICON_RELS.has(token))
+}
+
+/** Matches `rel: 'icon'` (a `useHead` link) and `rel="icon"` (a `<link>` in a template). */
+const REL_IN_SOURCE = /\brel\s*[:=]\s*(['"`])([^'"`]*)\1/g
+
+/**
+ * Whether `app/app.vue` or a layout under `app/layouts/` declares an icon link. A plain
+ * text scan: battlestack never writes icon links into Vue files, so any match is the project's.
+ */
+async function vueSourcesDeclareIcon(projectDir: string): Promise<boolean> {
+    const appDir = path.join(projectDir, 'app')
+    const files = [path.join(appDir, 'app.vue')]
+    try {
+        const entries = await readdir(path.join(appDir, 'layouts'), { recursive: true, withFileTypes: true })
+        for (const e of entries) {
+            if (e.isFile() && e.name.endsWith('.vue')) files.push(path.join(e.parentPath, e.name))
+        }
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+    for (const file of files) {
+        let source: string
+        try {
+            source = await readFile(file, 'utf8')
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
+            throw error
+        }
+        for (const m of source.matchAll(REL_IN_SOURCE)) {
+            if (isIconRel(m[2])) return true
+        }
+    }
+    return false
+}
+
 /**
  * Points the document head at our icon set, mirroring `icon-pack/head.html` from the
- * battlestack icon pack. `nuxi init` only leaves a bare `public/favicon.ico`, so
- * without these the SVG and the iOS icon go unused.
+ * battlestack icon pack, and sets `theme-color`. `nuxi init` only leaves a bare
+ * `public/favicon.ico`, so without these links the SVG and the iOS icon go unused.
+ *
+ * A project with its own icon links gets none of ours, since browsers take the last
+ * matching icon and ours would override its branding. Detected: an icon or
+ * apple-touch-icon link (any rel casing, `shortcut icon` included) in `nuxt.config.ts`
+ * `app.head.link` whose href is not one of ours, or in `app/app.vue` or `app/layouts/`.
+ * Pages, plugins and `error.vue` are not scanned. Returns a note when the links are skipped.
  *
  * Lives in `nuxt.config.ts` (plain data, serializes fine) rather than `app/app.vue`,
  * which this feature does not own. The pack's `<link rel="manifest">` is deliberately
  * absent: `nuxt4:pwa` generates and injects its own manifest, and two would collide.
  */
-async function wireIcons(ctx: RunContext): Promise<void> {
+async function wireIcons(ctx: RunContext): Promise<string | undefined> {
+    const iconsInVue = await vueSourcesDeclareIcon(ctx.projectDir)
+    let skipped = iconsInVue
     await patchNuxtConfig(ctx.projectDir, (c) => {
         const icons: Record<string, string>[] = [
             // Order follows the pack: `.ico` first for the browsers that take the first
@@ -125,13 +180,14 @@ async function wireIcons(ctx: RunContext): Promise<void> {
             { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
             { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
         ]
-        // An icon link we did not write means the project has its own branding: leave
-        // it alone, as `structuralFiles` does for the icon files. Appending ours would
-        // override it, since browsers take the last matching icon.
-        const branded = c.headLinks().some(
-            (l) => (l.rel === 'icon' || l.rel === 'apple-touch-icon') && !icons.some((i) => i.href === l.href),
+        const brandedInConfig = c.headLinks().some(
+            (l) => isIconRel(l.rel) && !icons.some((i) => i.href === l.href),
         )
-        if (!branded) for (const icon of icons) c.addHeadLink(icon)
+        skipped ||= brandedInConfig
+        if (!skipped) for (const icon of icons) c.addHeadLink(icon)
         c.addHeadMeta({ name: 'theme-color', content: BRAND_NAVY })
     })
+    if (!skipped) return undefined
+    const where = iconsInVue ? 'app/app.vue or app/layouts/' : 'nuxt.config.ts app.head.link'
+    return `own icon links found in ${where}, so the template favicon links were not added`
 }
