@@ -77,7 +77,7 @@ export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map
 
     // A staged or conflicted schema file is not on disk in its new form yet, so generating now
     // would miss its change, and a file with conflict markers does not load at all.
-    const pending = [...new Set([...ledger.staged, ...ledger.conflicts])].filter((rel) => rel.startsWith(SCHEMA_DIR)).sort()
+    const pending = [...new Set([...ledger.staged, ...ledger.conflicts])].map((rel) => rel.replaceAll('\\', '/')).filter((rel) => rel.startsWith(SCHEMA_DIR)).sort()
     if (pending.length > 0) {
         ledger.actions.push(`Schema files still need your merge (${pending.join(', ')}). Finish them, then ${GENERATE_BY_HAND}`)
         ui.warn('Schema update not applied yet, so no migration was generated. See .battlestack/pull/REPORT.md')
