@@ -86,14 +86,17 @@ async function findBaseInGit(projectDir: string, rel: string, wanted: Set<string
         const blob = line.split(' ')[3]
         if (blob && !/^0+$/.test(blob)) blobs.add(blob)
     }
-    // --filters returns the bytes checkout would write for the file's repository path.
+    const read = (args: string[]): Promise<Buffer | null> => execFileAsync(
+        'git',
+        args,
+        { cwd: projectDir, encoding: 'buffer', maxBuffer: 64 * 1024 * 1024 },
+    ).then((r) => r.stdout, () => null)
     for (const blob of blobs) {
-        const content = await execFileAsync(
-            'git',
-            ['cat-file', '--filters', `--path=${prefix}${posix}`, blob],
-            { cwd: projectDir, encoding: 'buffer', maxBuffer: 64 * 1024 * 1024 },
-        ).then((r) => r.stdout, () => null)
-        if (content && wanted.has(sha256(content))) return content
+        // Committed bytes match a file battlestack wrote itself; --filters gives what checkout wrote.
+        for (const args of [['cat-file', 'blob', blob], ['cat-file', '--filters', `--path=${prefix}${posix}`, blob]]) {
+            const content = await read(args)
+            if (content && wanted.has(sha256(content))) return content
+        }
     }
     return null
 }
