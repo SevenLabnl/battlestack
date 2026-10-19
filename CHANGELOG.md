@@ -17,6 +17,9 @@
   code 2 when that list is not empty. Console output is one line per feature.
 - Generated projects ship a `battlestack-upgrade` skill for AI agents, and the
   generated AGENTS.md and README describe the merge instead of the old staging.
+- `pull` removes a file a feature no longer ships only after every feature has
+  updated. A file moving to another feature is no longer deleted and written
+  back in the same run, and a pull that stops halfway leaves it in place.
 - A feature whose plugin did not load keeps its manifest record on `pull`
   instead of being dropped, so its files stay managed.
 - `shared:github` drops its records of the deploy workflows it no longer ships.
