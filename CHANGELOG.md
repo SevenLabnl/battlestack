@@ -17,6 +17,12 @@
   code 2 when that list is not empty. Console output is one line per feature.
 - Generated projects ship a `battlestack-upgrade` skill for AI agents, and the
   generated AGENTS.md and README describe the merge instead of the old staging.
+- With `nuxt4:storage` on, every `nuxt4:database` update staged
+  `server/database/schema/users.ts` for a manual merge, and taking the staged
+  file dropped the `avatar_key` column. The database feature now ships
+  `users.ts` with `avatarKey` when storage is on, and an edited `users.ts` is
+  merged instead of staged. If you took a staged `users.ts` and generated a
+  migration that drops `avatar_key`, delete that migration before you deploy.
 - `pull` removes a file a feature no longer ships only after every feature has
   updated. A file moving to another feature is no longer deleted and written
   back in the same run, and a pull that stops halfway leaves it in place.

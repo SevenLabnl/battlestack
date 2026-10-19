@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { randomBytes } from 'node:crypto'
 import {
     allocatePort,
@@ -13,6 +14,8 @@ import {
     recordFile,
     resolveProjectPM,
     run,
+    storeBase,
+    templatesDir,
     writeFileEnsured,
     writeJson,
     STAGE,
@@ -460,6 +463,7 @@ export const databaseFeature: Feature = {
     },
 
     async update(ctx, prev) {
+        await storeUsersBase(ctx)
         const report = await emitTemplateUpdateMany(ctx, 'nuxt4:database', import.meta.url, ['database', usersTemplate(ctx)], prev)
         await emitCompose(ctx)
         await registerRuntimeConfig(ctx.projectDir)
@@ -633,4 +637,14 @@ export const databaseFeature: Feature = {
 /** `nuxt4:storage` adds `avatarKey` to users.ts, so the file ships with it whenever storage is on. */
 function usersTemplate(ctx: RunContext): string {
     return isFeatureEnabled(ctx, 'nuxt4:storage') ? 'database-users/with-storage' : 'database-users/base'
+}
+
+/**
+ * Storage projects recorded users.ts before storage patched it, so no commit holds that version.
+ * Storing it gives an edited users.ts a merge base instead of a manual merge.
+ */
+export async function storeUsersBase(ctx: RunContext): Promise<void> {
+    if (!isFeatureEnabled(ctx, 'nuxt4:storage')) return
+    const base = templatesDir(import.meta.url, '..', '..', 'templates', 'database-users', 'base', 'server', 'database', 'schema', 'users.ts')
+    await storeBase(ctx.projectDir, await readFile(base))
 }
