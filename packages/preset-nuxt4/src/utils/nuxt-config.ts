@@ -1,13 +1,17 @@
 import path from 'node:path'
 import { writeFile as fsWriteFile } from 'node:fs/promises'
 import { generateCode, loadFile } from 'magicast'
-import { defaultObject, mergeDefaults, pushUnique, pushUniqueAll } from '@battlestack/core/utils/ts-file.js'
+import { defaultObject, mergeDefaults, objectLiteralAt, pushUnique, pushUniqueAll } from '@battlestack/core/utils/ts-file.js'
+import { ui } from '@battlestack/tui'
 
 type Mod = Awaited<ReturnType<typeof loadFile>>
+
+const RUNTIME_CONFIG = 'nuxt.config.ts#runtimeConfig'
 
 export class NuxtConfig {
     private readonly mod: Mod
     private readonly filePath: string
+    private readonly skipped: string[] = []
 
     private constructor(mod: Mod, filePath: string) {
         this.mod = mod
@@ -127,17 +131,20 @@ export class NuxtConfig {
         return this
     }
 
-    /** Adds the `runtimeConfig` keys the project lacks; existing values and comments stay. */
     mergeRuntimeConfig(patch: Record<string, unknown>): this {
-        mergeDefaults(this.config, 'runtimeConfig', patch)
+        this.skipped.push(...mergeDefaults(this.config, 'runtimeConfig', patch, RUNTIME_CONFIG))
         return this
     }
 
-    /** Adds the `runtimeConfig.public` keys the project lacks; existing values and comments stay. */
     mergeRuntimePublic(patch: Record<string, unknown>): this {
-        this.config.runtimeConfig ||= {}
-        mergeDefaults(this.config.runtimeConfig, 'public', patch)
+        const runtimeConfig = objectLiteralAt(this.config, 'runtimeConfig', RUNTIME_CONFIG)
+        this.skipped.push(...mergeDefaults(runtimeConfig, 'public', patch, `${RUNTIME_CONFIG}.public`))
         return this
+    }
+
+    /** Defaults the merges left out because the project's value above them is not an object literal. */
+    skippedDefaults(): string[] {
+        return [...this.skipped]
     }
 
     /** Sets a `runtimeConfig.public` key only when absent, never clobbering a user value. */
@@ -200,6 +207,9 @@ export async function patchNuxtConfig(
     const cfg = await NuxtConfig.load(projectDir)
     await fn(cfg)
     await cfg.save()
+    for (const skipped of cfg.skippedDefaults()) {
+        ui.warn(`${skipped} not added: its parent is not an object literal. Set it yourself.`)
+    }
 }
 
 // magicast appends a new key last; `nuxt/nuxt-config-keys-order` puts `extends` right after the ids.
