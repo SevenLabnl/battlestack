@@ -695,6 +695,7 @@ describe('battlestack pull: a file moving to a later feature', () => {
         const ids = { from: 'test:a-from', to: 'test:z-to' }
         const { projectDir, registriesV2 } = await setup([ids.from, ids.to], movedContent, ids)
         const lines = await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV2))
+        process.exitCode = undefined
 
         expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(movedContent)
         expect(lines.join('\n')).not.toContain('removed obsolete file')
@@ -773,6 +774,7 @@ describe('battlestack pull: a schema change ships with its migration', () => {
     }
 
     async function pull(projectDir: string, registries: BattlestackRegistries, overrides: Partial<ParsedArgs> = {}): Promise<{ lines: string[], exitCode: typeof process.exitCode, report: string }> {
+        process.exitCode = undefined
         const lines = await withCwdCapture(projectDir, () => pullCommand(args(overrides), silentLoader(), registries))
         const exitCode = process.exitCode
         process.exitCode = undefined
