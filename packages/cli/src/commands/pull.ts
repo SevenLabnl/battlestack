@@ -38,6 +38,7 @@ import {
     type RunContext,
     type UpdateReport,
 } from '@battlestack/core'
+import { generatePulledMigration, hashSchemaFiles } from '@battlestack/preset-nuxt4'
 
 /** Static metadata only. `run` is built per-dispatch in `project.ts`. */
 export const pullReservedMeta: Omit<ReservedCommand, 'run'> = {
@@ -405,6 +406,9 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             }
         }
 
+        // Before anything writes: the schema files this pull changes need a migration.
+        const schemaBefore = await hashSchemaFiles(projectDir)
+
         // Rehydration runs before the update pass, whose doc aggregator reads enabled features.
         await rehydrateMissingFeatures(
             manifest,
@@ -445,6 +449,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             await writeManifest(ctx, { rendered: true })
             const written = await readManifest(projectDir, registries)
             if (written) await pruneStoredBases(projectDir, written)
+            await generatePulledMigration(ctx, schemaBefore)
         }
 
         if (renamedFrom && !ctx.dryRun) {

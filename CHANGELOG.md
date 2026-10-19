@@ -61,6 +61,11 @@
   a project that declares its own icons in `app.head.link`: browsers take the
   last matching icon, so those links overrode the project's branding. Remove any
   `/favicon.ico` or `/apple-touch-icon.png` links a previous pull added.
+- `battlestack pull` runs `db:generate` when it changes a file under
+  `server/database/schema/`. Before, the schema change came without a
+  migration and never reached production, which applies only committed SQL.
+  Commit the new SQL in `server/database/migrations/`. With `--skip-install`,
+  or if generating fails, pull tells you to run `pnpm run db:generate` yourself.
 
 ## v1.4.0 (2026-10-15)
 
