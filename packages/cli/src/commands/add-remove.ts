@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { rm } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import type { Ora } from 'ora'
 import {
     classifyFileState,
@@ -30,7 +30,7 @@ import {
 import { applyEnv, collectEnvForFeature } from '@battlestack/preset-nuxt4'
 import { ui } from '@battlestack/tui'
 import { formatAndReconcile } from './format-project.js'
-import { needsAttention, NEEDS_ATTENTION_EXIT_CODE, writeReport, type PullSummary } from './pull-safety.js'
+import { needsAttention, NEEDS_ATTENTION_EXIT_CODE, renderReport, REPORT_PATH, writeReport, type PullSummary } from './pull-safety.js'
 
 /** Static metadata only. `run` is built per-dispatch in `project.ts`. */
 export const addReservedMeta: Omit<ReservedCommand, 'run'> = {
@@ -154,7 +154,7 @@ export async function addCommand(args: ParsedArgs, loader: Ora, registries: Batt
         backups: [], unmanaged: [], restored: [], added: [], orphans: [], actions: ledger.actions, repairs: [],
     }
     if (needsAttention(leftover)) {
-        const reportPath = await writeReport(projectRoot, leftover)
+        const reportPath = await writeAddReport(projectRoot, fqid, leftover)
         ui.warn(`Added ${fqid}, merging into ${ledger.conflicts.length + ledger.staged.length} existing file(s) that need a look`)
         ui.dim(`  Next steps: ${reportPath}`)
         process.exitCode = NEEDS_ATTENTION_EXIT_CODE
@@ -178,6 +178,18 @@ export async function addCommand(args: ParsedArgs, loader: Ora, registries: Batt
         ui.dim('  .env was not modified; update manually to adopt the new defaults.')
     }
     ui.blank()
+}
+
+/** Puts add's leftovers above an earlier report rather than replacing it, so a pull's unfinished items stay listed. */
+async function writeAddReport(projectRoot: string, fqid: string, leftover: PullSummary): Promise<string> {
+    const dest = path.join(projectRoot, REPORT_PATH)
+    if (!(await exists(dest))) return writeReport(projectRoot, leftover)
+    const rendered = renderReport(leftover)
+    const sections = rendered.slice(rendered.indexOf('\n## ') + 1)
+    const intro = `Adding ${fqid} left work to finish. The report of an earlier run follows it.`
+    const prior = await readFile(dest, 'utf8')
+    await writeFile(dest, [`# battlestack add ${fqid}`, '', intro, '', sections, prior].join('\n'))
+    return REPORT_PATH
 }
 
 export async function removeCommand(args: ParsedArgs, _loader: Ora, registries: BattlestackRegistries): Promise<void> {
