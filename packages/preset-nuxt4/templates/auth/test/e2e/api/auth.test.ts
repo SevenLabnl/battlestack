@@ -59,6 +59,15 @@ describe('e2e: auth flow', () => {
         expect((await apiGet('/api/auth/sessions', cookie)).status).toBe(401)
     })
 
+    it.skipIf(!serverUp)('a logged-out session is refused when replayed as a session header', async () => {
+        // h3 also reads the sealed session from an `x-nuxt-session-session` header; a stolen value must not outlive logout that way.
+        const cookie = await loginAsAdmin()
+        expect((await apiPost('/api/auth/logout', {}, cookie)).status).toBeLessThan(400)
+        const sealed = cookie.slice(cookie.indexOf('=') + 1)
+        const replay = await fetch(`${BASE_URL}/api/auth/sessions`, { headers: { 'x-nuxt-session-session': sealed } })
+        expect(replay.status).toBe(401)
+    })
+
     it.skipIf(!serverUp)('a session revoked from another device stops authenticating', async () => {
         const revoked = await loginAsAdmin()
         const other = await loginAsAdmin()
