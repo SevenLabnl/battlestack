@@ -142,7 +142,6 @@ export class NuxtConfig {
         return this
     }
 
-    /** Defaults the merges left out because the project's value above them is not an object literal. */
     skippedDefaults(): string[] {
         return [...this.skipped]
     }

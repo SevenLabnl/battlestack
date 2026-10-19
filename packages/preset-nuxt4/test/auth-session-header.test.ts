@@ -51,13 +51,15 @@ it.each([
     ['true', 1],
     ['process.env.ALLOW_HEADER === \'1\'', 1],
     ['false', 0],
-])('keeps `sessionHeader: %s` on pull, with %i note about it', async (value, notes) => {
+])('keeps `sessionHeader: %s` on pull, with %i warning about it', async (value, warnings) => {
     await writeConfig(`export default defineNuxtConfig({\n    runtimeConfig: { session: { sessionHeader: ${value} } },\n})\n`)
-    const report = await authFeature.update!(context(), { id: 'nuxt4:nuxt4:auth', version: '1.10.0', files: {} })
+    const warn = vi.spyOn(ui, 'warn').mockImplementation(() => {})
+    await authFeature.update!(context(), { id: 'nuxt4:nuxt4:auth', version: '1.10.0', files: {} })
 
     const config = await readFile(path.join(projectDir, 'nuxt.config.ts'), 'utf8')
     expect(config).toContain(`sessionHeader: ${value}`)
-    expect(report.notes.filter((note) => note.includes('sessionHeader'))).toHaveLength(notes)
+    const about = warn.mock.calls.filter(([message]) => String(message).includes('session.sessionHeader is not'))
+    expect(about).toHaveLength(warnings)
 })
 
 it('names nuxt.config.ts#runtimeConfig when it is not an object literal', async () => {
