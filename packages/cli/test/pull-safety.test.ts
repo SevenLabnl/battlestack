@@ -115,6 +115,9 @@ describe('preflight', () => {
     })
 })
 
+/** Files put back from HEAD are in their checked-out form, which is CRLF on a Windows runner with core.autocrlf. */
+const lf = (text: string): string => text.replaceAll('\r\n', '\n')
+
 describe('repairOverwrites', () => {
     it('puts back local edits a feature wrote over, and stages its version', async () => {
         git('init', '-q')
@@ -129,7 +132,7 @@ describe('repairOverwrites', () => {
 
         const repairs = await repairOverwrites(ctx, start, ctx.registries)
         expect(repairs).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'staged' }])
-        expect(await read('Dockerfile')).toBe('FROM node\nCOPY patches/ ./patches/\n')
+        expect(lf(await read('Dockerfile'))).toBe('FROM node\nCOPY patches/ ./patches/\n')
         expect(await read('.battlestack/pull/Dockerfile.new')).toBe('FROM node:24\n')
         expect(await read('.battlestack/pull/Dockerfile.patch')).toContain('+FROM node:24')
         expect(updateLedger(ctx).staged).toContain('Dockerfile')
@@ -199,7 +202,7 @@ describe('repairOverwrites', () => {
         const ctx = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, web)
 
         expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'staged' }])
-        expect(await read('apps/web/Dockerfile')).toBe('FROM node\nCOPY patches/ ./patches/\n')
+        expect(lf(await read('apps/web/Dockerfile'))).toBe('FROM node\nCOPY patches/ ./patches/\n')
         expect(await read('apps/web/.battlestack/pull/Dockerfile.new')).toBe('FROM node:24\n')
     })
 
@@ -218,8 +221,7 @@ describe('repairOverwrites', () => {
         const force = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { force: true })
         expect((await repairOverwrites(force, start, force.registries)).map((r) => r.outcome)).toEqual(['backed up'])
         expect(await read('Dockerfile')).toBe('FROM node:24\n')
-        // The checked-out form, so CRLF on a Windows runner with core.autocrlf.
-        expect((await read(path.join('.battlestack', 'pull', 'Dockerfile.bak'))).replaceAll('\r\n', '\n')).toBe('FROM node\nCOPY patches/ ./patches/\n')
+        expect(lf(await read(path.join('.battlestack', 'pull', 'Dockerfile.bak')))).toBe('FROM node\nCOPY patches/ ./patches/\n')
     })
 
     it('puts back the record of the feature that wrote the file, not another tracker\'s', async () => {
