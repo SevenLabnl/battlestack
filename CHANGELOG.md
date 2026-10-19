@@ -36,6 +36,19 @@
   that file.
 - `battlestack add` no longer erases an earlier pull's unfinished items from
   `.battlestack/pull/REPORT.md`; it puts its own section first.
+- `battlestack pull` works on a project in a subfolder of a git repository:
+  the clean-tree check, the repair of local edits and the merge base from git
+  history only look at the project folder.
+- Line-ending and other checkout filters (`.gitattributes`, `core.autocrlf`)
+  no longer make untouched files look edited during `pull`.
+- `pull --force` and `pull --overwrite` start even when an earlier pull left
+  conflict markers. A local edit that a feature wrote over is kept as
+  `.battlestack/pull/<path>.bak` under `--force`, and replaced under
+  `--overwrite`.
+- A file `pull` stages after putting back your edits now gets a `.patch` next
+  to the `.new`, as the report says. The report lists a restored file once, and
+  each feature's line counts merges, conflicts and staged files from all of its
+  writes.
 - A feature whose plugin did not load keeps its manifest record on `pull`
   instead of being dropped, so its files stay managed.
 - `shared:github` drops its records of the deploy workflows it no longer ships.

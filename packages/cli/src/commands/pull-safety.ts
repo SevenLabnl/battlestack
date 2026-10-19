@@ -101,7 +101,7 @@ export async function preflight(
 export interface OverwriteRepair {
     rel: string
     featureId: string
-    outcome: 'merged' | 'conflicts' | 'staged'
+    outcome: 'merged' | 'conflicts' | 'staged' | 'backed up'
 }
 
 /** Bare feature id for a manifest id, which may be an fqid. */
@@ -113,14 +113,15 @@ function bareId(registries: BattlestackRegistries, id: string): string {
  * Catches feature writes that bypassed the drift-aware writers: a tracked or untracked file
  * that held local edits at HEAD and was replaced. The local version is put back and the
  * feature's output is merged into it, or staged when there is no base to merge against.
- * `--force` and `--overwrite` take feature output as asked, so they skip this.
+ * `--force` keeps the feature output and saves the local version as a `.bak`, as the drift-aware
+ * writers do; `--overwrite` takes the output as asked.
  */
 export async function repairOverwrites(
     ctx: RunContext,
     start: StartRecords,
     registries: BattlestackRegistries,
 ): Promise<OverwriteRepair[]> {
-    if (ctx.state.force === true || ctx.state.overwrite === true) return []
+    if (ctx.state.overwrite === true && ctx.state.force !== true) return []
     const ledger = updateLedger(ctx)
     const handled = new Set(ledger.handled)
     const exempt = selfMergedPaths(ctx, registries)
@@ -140,6 +141,13 @@ export async function repairOverwrites(
         const before = new Set(startByFeature.values())
         if (before.has(hashContent(head.out))) continue
 
+        if (ctx.state.force === true) {
+            const bak = path.join(ctx.projectDir, PULL_DIR, `${rel}.bak`)
+            await mkdir(path.dirname(bak), { recursive: true })
+            await writeFile(bak, head.out)
+            repairs.push({ rel, featureId: trackers[0]!.featureId, outcome: 'backed up' })
+            continue
+        }
         const upstream = await readFile(abs)
         const tracker = trackers.find((t) => t.hash === hashContent(upstream)) ?? trackers[0]!
         const featureId = tracker.featureId
@@ -251,7 +259,7 @@ export function renderReport(s: PullSummary): string {
         ),
         ...section(
             'Local edits a feature wrote over',
-            'These features replaced a file that had local edits. Pull put your version back and merged or staged theirs, as listed in the sections above. Check the result.',
+            'These features replaced a file that had local edits. Pull put your version back and merged or staged theirs, as listed in the sections above, or under `--force` kept theirs and saved yours as `.battlestack/pull/<path>.bak`. Check the result.',
             repaired,
         ),
         ...section(
