@@ -163,6 +163,19 @@ describe('repairOverwrites', () => {
         expect(await read('a.txt')).toBe('v2\r\n')
     })
 
+    it('takes a file battlestack wrote as LF under core.autocrlf for pristine, as on a Windows runner', async () => {
+        git('init', '-q')
+        git('config', 'core.autocrlf', 'true')
+        await write('a.txt', 'v1\n')
+        await commitAll()
+        const start = recordedAtStart(manifestWith({ 'a.txt': sha256('v1\n') }))
+        await write('a.txt', 'v2\n')
+        const ctx = ctxRecording({ 'a.txt': sha256('v2\n') })
+
+        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([])
+        expect(await read('a.txt')).toBe('v2\n')
+    })
+
     it('reads HEAD with the attributes of the file\'s repository path in a subdirectory project', async () => {
         git('init', '-q')
         await write('apps/web/.gitattributes', '/a.txt text eol=crlf\n')
@@ -205,7 +218,8 @@ describe('repairOverwrites', () => {
         const force = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { force: true })
         expect((await repairOverwrites(force, start, force.registries)).map((r) => r.outcome)).toEqual(['backed up'])
         expect(await read('Dockerfile')).toBe('FROM node:24\n')
-        expect(await read(path.join('.battlestack', 'pull', 'Dockerfile.bak'))).toBe('FROM node\nCOPY patches/ ./patches/\n')
+        // The checked-out form, so CRLF on a Windows runner with core.autocrlf.
+        expect((await read(path.join('.battlestack', 'pull', 'Dockerfile.bak'))).replaceAll('\r\n', '\n')).toBe('FROM node\nCOPY patches/ ./patches/\n')
     })
 
     it('puts back the record of the feature that wrote the file, not another tracker\'s', async () => {

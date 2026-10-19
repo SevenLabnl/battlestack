@@ -108,6 +108,15 @@ describe('findBase', () => {
         expect((await findBase(projectDir, 'f.txt', [sha256(BASE)]))?.toString()).toBe(BASE)
     })
 
+    it('finds a file battlestack wrote as LF under core.autocrlf, as on a Windows runner', async () => {
+        git('init', '-q')
+        git('config', 'core.autocrlf', 'true')
+        await write('f.txt', BASE)
+        git('add', '-A')
+        git('commit', '-q', '-m', 'scaffold')
+        expect((await findBase(projectDir, 'f.txt', [sha256(BASE)]))?.toString()).toBe(BASE)
+    })
+
     it('finds it for a project in a subdirectory, as checkout wrote it', async () => {
         git('init', '-q')
         const crlf = BASE.replaceAll('\n', '\r\n')

@@ -140,6 +140,8 @@ export async function repairOverwrites(
         const startByFeature = start.get(rel) ?? new Map<string, string>()
         const before = new Set(startByFeature.values())
         if (before.has(hashContent(head.out))) continue
+        // A file battlestack wrote and never checked out matches the committed bytes, not the filtered ones.
+        if (before.has(hashContent(git(ctx.projectDir, ['cat-file', '-p', `HEAD:./${rel}`]).out))) continue
 
         if (ctx.state.force === true) {
             const bak = path.join(ctx.projectDir, PULL_DIR, `${rel}.bak`)
