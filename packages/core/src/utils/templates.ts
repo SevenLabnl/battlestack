@@ -463,10 +463,12 @@ export async function writeGuarded(
     rel: string,
     content: Buffer,
     report: UpdateReport = { written: [], skipped: [], notes: [] },
+    ownedSet: Set<string> = new Set(),
 ): Promise<UpdateReport> {
     const dest = path.join(ctx.projectDir, rel)
     const recordedHashes = recordedHashesFor(ctx, rel)
-    const { state, newHash } = await classifyForUpdate(dest, rel, content, ownedRelsFor(ctx, featureId), recordedHashes)
+    const owned = new Set([...ownedSet, ...ownedRelsFor(ctx, featureId)])
+    const { state, newHash } = await classifyForUpdate(dest, rel, content, owned, recordedHashes)
     const recorded = (ctx.state[`files:${featureId}`] as Record<string, string> | undefined)?.[rel]
     await applyUpdateState(ctx, featureId, { state, dest, rel, newContent: content, newHash, recordedHash: recorded, recordedHashes, report })
     return report
