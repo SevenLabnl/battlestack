@@ -83,6 +83,19 @@ export class NuxtConfig {
         return [...(this.config.app?.head?.link ?? [])]
     }
 
+    /** Removes the `app.head.link` entries matching `match`. Returns how many it removed. */
+    removeHeadLinks(match: (link: Record<string, string>) => boolean): number {
+        const links = this.config.app?.head?.link
+        if (!links) return 0
+        let removed = 0
+        for (let i = links.length - 1; i >= 0; i--) {
+            if (!match({ ...links[i] })) continue
+            links.splice(i, 1)
+            removed++
+        }
+        return removed
+    }
+
     /** Append a `<meta>` to `app.head.meta`. Idempotent on name. See `addHeadLink` re: the spread. */
     addHeadMeta(meta: Record<string, string>): this {
         this.config.app ||= {}

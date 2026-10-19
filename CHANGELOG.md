@@ -84,8 +84,8 @@
   `apple-touch-icon` link counts, in any casing, when it is in
   `nuxt.config.ts#app.head.link`, `app/app.vue` or a layout under
   `app/layouts/`. Icon links set in a page, a plugin or `app/error.vue` are not
-  detected. `pull` notes when it skips the links. Remove any `/favicon.ico` or
-  `/apple-touch-icon.png` links a previous pull added.
+  detected. `pull` notes when it skips the links, and removes the three
+  template links when an earlier pull added them.
 - `battlestack pull` runs `db:generate` when it changes a file under
   `server/database/schema/`. Before, the schema change came without a
   migration and never reached production, which applies only committed SQL.
