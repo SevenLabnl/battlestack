@@ -434,7 +434,8 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         if (renamedFrom) ui.info(`Project renamed ${renamedFrom} → ${ctx.projectName}: re-rendering every feature`)
 
         queueObsoleteDeletions(ctx)
-        let renderedAll = true
+        // An orphan's files were not re-rendered either, so they still carry the old name.
+        let renderedAll = orphans.length === 0
         for (const record of existingRecords) {
             if (!(await pullOneFeature(ctx, record, args, loader, registries, renamedFrom))) renderedAll = false
         }
