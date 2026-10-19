@@ -691,6 +691,17 @@ describe('battlestack pull: a file moving to a later feature', () => {
         expect(Object.keys(filesOf(manifest, TO) ?? {})).toContain(movedRel)
     })
 
+    it('writes the new owner\'s changed version when the old owner updates first', async () => {
+        const ids = { from: 'test:a-from', to: 'test:z-to' }
+        const changed = 'export const moved = "v2"\n'
+        const { projectDir, registriesV2 } = await setup([ids.from, ids.to], changed, ids)
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV2))
+        process.exitCode = undefined
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(changed)
+        expect(Object.keys(filesOf(await readManifestRaw(projectDir), ids.to) ?? {})).toContain(movedRel)
+    })
+
     it('does not delete and rewrite the file when the old owner updates first', async () => {
         const ids = { from: 'test:a-from', to: 'test:z-to' }
         const { projectDir, registriesV2 } = await setup([ids.from, ids.to], movedContent, ids)
