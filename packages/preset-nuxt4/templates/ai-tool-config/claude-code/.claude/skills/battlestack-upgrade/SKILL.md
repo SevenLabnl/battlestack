@@ -20,8 +20,6 @@ Run it from the project folder. In a monorepo that is the app's folder, not the 
 
 A project without `.battlestack/manifest.json` cannot be pulled. If it was made with an older tool, run `battlestack migrate` to see which conversions the installed plugins offer, run the one that applies, commit its result on its own, and pull after that.
 
-`.battlestack/base/` holds the upstream versions pull merges against. It must be committed. Without it, edited files can only be staged for a manual merge instead of merged.
-
 ## Reading the result
 
 Exit code 0 means nothing needs attention. Exit code 2 means the pull finished and left work, and the console ends with the path to the report. Read the whole report before changing anything. Its sections are ordered by urgency, so work through them top to bottom, and read the console output too: warnings such as a migration that drops a column are printed there.
@@ -101,13 +99,13 @@ pnpm run typecheck
 pnpm test
 ```
 
-Fix what fails, then commit, including `.battlestack/` and any new migration. A good commit message names the feature upgrades, lists every conflict you resolved by keeping the project's version over upstream, and names each migration.
+Fix what fails, then commit, including `.battlestack/manifest.json` and any new migration. A good commit message names the feature upgrades, lists every conflict you resolved by keeping the project's version over upstream, and names each migration.
 
 Then run `battlestack pull` once more. It should report every feature as up to date and exit with code 0. If it does not, something is still unfinished.
 
 ## Never
 
 - Never run `battlestack pull --force` or `--overwrite` to make conflicts go away. `--force` replaces the project's edits with upstream and keeps them only as `.bak` files; `--overwrite` does not keep them at all.
-- Never edit hashes in `.battlestack/manifest.json` by hand or delete `.battlestack/base/`. The next pull needs both to merge correctly.
+- Never edit hashes in `.battlestack/manifest.json` by hand. The next pull needs them to merge correctly.
 - Never resolve a conflict by taking the upstream side wholesale without reading what the project's side did.
 - Never copy a staged schema `.new` over the project's file, and never commit a migration you have not read.

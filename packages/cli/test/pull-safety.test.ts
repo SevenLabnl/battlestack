@@ -6,6 +6,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { BattlestackRegistries, updateLedger, type ProjectManifest, type RunContext } from '@battlestack/core'
 import {
+    baseDirIsTracked,
     needsAttention,
     preflight,
     recordedAtStart,
@@ -283,5 +284,17 @@ describe('pull with --allow-dirty', () => {
         expect(safety.clean).toBe(false)
         // pull runs repairOverwrites only when `clean`, so the uncommitted bytes stay as they are.
         expect(await read('a.ts')).toBe('uncommitted edit\n')
+    })
+})
+
+describe('baseDirIsTracked', () => {
+    it('spots a .battlestack/base/ an earlier version had the project commit', async () => {
+        git('init', '-q')
+        await write('a.txt', 'a\n')
+        await commitAll()
+        expect(baseDirIsTracked(projectDir)).toBe(false)
+        await write('.battlestack/base/0000', 'base\n')
+        await commitAll()
+        expect(baseDirIsTracked(projectDir)).toBe(true)
     })
 })
