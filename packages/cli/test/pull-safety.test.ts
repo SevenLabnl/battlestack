@@ -163,6 +163,19 @@ describe('repairOverwrites', () => {
         expect(await read('a.txt')).toBe('v2\r\n')
     })
 
+    it('reads HEAD with the attributes of the file\'s repository path in a subdirectory project', async () => {
+        git('init', '-q')
+        await write('apps/web/.gitattributes', '/a.txt text eol=crlf\n')
+        await write('apps/web/a.txt', 'v1\r\n')
+        await commitAll()
+        const start = recordedAtStart(manifestWith({ 'a.txt': sha256('v1\r\n') }))
+        await write('apps/web/a.txt', 'v2\r\n')
+        const ctx = ctxRecording({ 'a.txt': sha256('v2\r\n') }, path.join(projectDir, 'apps/web'))
+
+        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([])
+        expect(await read('apps/web/a.txt')).toBe('v2\r\n')
+    })
+
     it('works on a project in a subdirectory of the repository', async () => {
         git('init', '-q')
         await write('apps/web/Dockerfile', 'FROM node\nCOPY patches/ ./patches/\n')

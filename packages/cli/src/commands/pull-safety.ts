@@ -28,7 +28,6 @@ export const REPORT_PATH = path.join(PULL_DIR, 'REPORT.md')
 /** Exit code for a pull that finished but left work for a person or agent. */
 export const NEEDS_ATTENTION_EXIT_CODE = 2
 
-/** Runs in the project directory. Paths it takes and prints are relative to it, also when the repository root is higher up. */
 function git(cwd: string, args: string[]): { ok: boolean, out: Buffer } {
     const r = spawnSync('git', args, { cwd, maxBuffer: 64 * 1024 * 1024 })
     return { ok: r.status === 0, out: r.stdout ?? Buffer.alloc(0) }
