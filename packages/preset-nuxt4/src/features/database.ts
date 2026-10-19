@@ -23,7 +23,7 @@ import {
 } from '@battlestack/core'
 import { applyDbExtensions, waitForPgReady } from '@battlestack/core/utils/db.js'
 import { ui } from '@battlestack/tui'
-import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
+import { emitTemplate, emitTemplateUpdateMany } from '../utils/emit-template.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
 
 /** Sets `state.seeded` on the `nuxt4:database` manifest record. No-op when already `true`. */
@@ -252,7 +252,7 @@ async function registerRuntimeConfig(projectDir: string): Promise<void> {
 /** PostgreSQL 18 in Docker, Drizzle ORM, users schema, seed script. */
 export const databaseFeature: Feature = {
     id: 'nuxt4:database',
-    version: '1.7.4',
+    version: '1.7.5',
     label: 'PostgreSQL + Drizzle ORM (Docker)',
     frameworks: ['nuxt4'],
     stage: STAGE.DATABASE,
@@ -441,6 +441,7 @@ export const databaseFeature: Feature = {
         }
 
         await emitTemplate(ctx, 'nuxt4:database', import.meta.url, 'database')
+        await emitTemplate(ctx, 'nuxt4:database', import.meta.url, usersTemplate(ctx))
 
         await emitCompose(ctx)
 
@@ -459,7 +460,7 @@ export const databaseFeature: Feature = {
     },
 
     async update(ctx, prev) {
-        const report = await emitTemplateUpdate(ctx, 'nuxt4:database', import.meta.url, 'database', prev)
+        const report = await emitTemplateUpdateMany(ctx, 'nuxt4:database', import.meta.url, ['database', usersTemplate(ctx)], prev)
         await emitCompose(ctx)
         await registerRuntimeConfig(ctx.projectDir)
         report.written.push(COMPOSE_FILE)
@@ -627,4 +628,9 @@ export const databaseFeature: Feature = {
             },
         }
     },
+}
+
+/** `nuxt4:storage` adds `avatarKey` to users.ts, so the file ships with it whenever storage is on. */
+function usersTemplate(ctx: RunContext): string {
+    return isFeatureEnabled(ctx, 'nuxt4:storage') ? 'database-users/with-storage' : 'database-users/base'
 }
