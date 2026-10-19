@@ -16,19 +16,6 @@
 - The generated Dockerfile pins the latest `node:24-alpine` image
   (`sha256:8a32c8c`).
 - `@battlestack/theme` requires `@nuxt/kit` `^4.6.4`, in step with Nuxt 4.6.4.
-- The project name recorded in `.battlestack/manifest.json` now always wins over
-  the directory name. Before, any project command in a clone, CI checkout or
-  renamed directory silently renamed the project to the directory name, and
-  `pull` then rendered that name into compose projects, hostnames, secrets and
-  image names. A mismatch now prints a one-line note, except under CI, where
-  the checkout directory is usually the repository name. Renaming the
-  directory no longer renames the project: use the new `battlestack rename
-  <name>`. A project already renamed this way gets its name back with
-  `battlestack rename <old-name>` (the old name is in the manifest's
-  `previousNames`). The first `pull` after a rename re-renders every feature,
-  also at unchanged versions, without touching owned or edited files, and lists
-  the tracked files that still contain the old name.
-
 - `pull` merges upstream changes into files you edited instead of only staging
   them. Edited files get a three-way merge against the version battlestack last
   wrote, with diff3 conflict markers where both sides changed the same lines.
@@ -58,6 +45,20 @@
 - A project-mode command run outside a project, such as `battlestack pull`,
   explains that there is no project here instead of starting a new one with
   that name.
+- The project name recorded in `.battlestack/manifest.json` now always wins over
+  the directory name. Before, any project command in a clone, CI checkout or
+  renamed directory silently renamed the project to the directory name, and
+  `pull` then rendered that name into compose projects, hostnames, secrets and
+  image names. A mismatch now prints a one-line note, except under CI, where
+  the checkout directory is usually the repository name. Renaming the
+  directory no longer renames the project: use the new `battlestack rename
+  <name>`. A project already renamed this way gets its name back with
+  `battlestack rename <old-name>` (the old name is in the manifest's
+  `previousNames`). The first `pull` after a rename re-renders every feature,
+  also at unchanged versions, without touching owned or edited files, and lists
+  the tracked files that still contain the old name. When a feature fails or its
+  plugin does not load, the rename stays pending for the next pull.
+
 - A skill whose `skills add` fails no longer ends the run on a plain "Scaffold
   complete" or "Update complete": the closing line names the skills that were
   not installed. The warning points at access (`gh auth login` or git

@@ -138,7 +138,7 @@ function collectAtRiskOwnedFiles(
     return atRisk
 }
 
-/** Throws on failure unless `failureIsNonFatal` is set. */
+/** Throws on failure unless `failureIsNonFatal` is set. False when the feature could not run: unregistered, or failed. */
 async function pullOneFeature(
     ctx: RunContext,
     record: InstalledFeatureRecord,
@@ -147,23 +147,23 @@ async function pullOneFeature(
     registries: BattlestackRegistries,
     /** Set after `battlestack rename`: every feature re-renders, at unchanged versions too. */
     renamedFrom?: string,
-): Promise<void> {
+): Promise<boolean> {
     if (!registries.features.has(record.id)) {
         ui.warn(`feature "${record.id}" is not registered by any loaded plugin, skipped`)
-        return
+        return false
     }
     const feature = registries.features.get(record.id)
 
     if (feature.upgradable === false) {
         ui.skip(`${feature.label} (install-only)`)
-        return
+        return true
     }
 
     const sameVersion = feature.version === record.version
     // `--force` bypasses the version gate. `--overwrite` only sets drift policy.
     if (sameVersion && ((!args.force && !renamedFrom) || !feature.update)) {
         ui.skip(`${feature.label} (${feature.version}, up to date)`)
-        return
+        return true
     }
 
     if (!feature.update) {
@@ -175,7 +175,7 @@ async function pullOneFeature(
         } else {
             ui.dim(`  ${feature.label} (${record.version} → ${feature.version}, metadata-only)`)
         }
-        return
+        return true
     }
 
     const arrow = sameVersion
@@ -202,7 +202,9 @@ async function pullOneFeature(
         const msg = error instanceof Error ? error.message : String(error)
         loader.fail(`${feature.label}: ${msg}`)
         if (!feature.failureIsNonFatal) throw error
+        return false
     }
+    return true
 }
 
 /**
@@ -432,8 +434,9 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         if (renamedFrom) ui.info(`Project renamed ${renamedFrom} → ${ctx.projectName}: re-rendering every feature`)
 
         queueObsoleteDeletions(ctx)
+        let renderedAll = true
         for (const record of existingRecords) {
-            await pullOneFeature(ctx, record, args, loader, registries, renamedFrom)
+            if (!(await pullOneFeature(ctx, record, args, loader, registries, renamedFrom))) renderedAll = false
         }
         for (const rel of await removeQueuedObsoleteFiles(ctx)) ui.dim(`  removed obsolete file: ${rel}`)
 
@@ -450,7 +453,8 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             if (args.format) {
                 await formatAndReconcile(ctx, manifest, registries)
             }
-            await writeManifest(ctx, { rendered: true })
+            // A feature that did not run still carries the old name, so the rename stays pending.
+            await writeManifest(ctx, { rendered: renderedAll })
             const written = await readManifest(projectDir, registries)
             if (written) await pruneStoredBases(projectDir, written)
             await generatePulledMigration(ctx, schemaBefore)
