@@ -5,9 +5,12 @@ import { ui } from '@battlestack/tui'
 
 /** Drizzle migrations for scaffold and `pull`: production applies only the committed SQL. */
 
-const SCHEMA_DIR = 'server/database/schema/'
+// drizzle.config.ts reads `./server/database/schema/*.ts`; other files there never reach a migration.
+const SCHEMA_FILE = /^server\/database\/schema\/[^/]+\.ts$/
 const MIGRATIONS_DIR = path.join('server', 'database', 'migrations')
-const GENERATE_BY_HAND = 'run `pnpm run db:generate` and commit the SQL in server/database/migrations/ before you deploy'
+function generateByHand(ctx: RunContext): string {
+    return `run \`${String(ctx.state.packageManager ?? 'pnpm')} run db:generate\` and commit the SQL in server/database/migrations/ before you deploy`
+}
 
 export interface GenerateResult {
     /** The new `.sql` files, relative to the migrations folder. Empty when nothing was written. */
@@ -54,13 +57,13 @@ export async function generateMigration(ctx: RunContext): Promise<GenerateResult
     return { created, lastLine }
 }
 
-/** Content hash of every file under `server/database/schema/`, keyed by absolute path. */
+/** Content hash of each schema file drizzle-kit reads, keyed by absolute path. */
 export async function hashSchemaFiles(projectDir: string): Promise<Map<string, string>> {
     const dir = path.join(projectDir, 'server', 'database', 'schema')
     const hashes = new Map<string, string>()
     if (!(await exists(dir))) return hashes
-    for (const entry of await readdir(dir, { recursive: true, withFileTypes: true })) {
-        if (!entry.isFile()) continue
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith('.ts')) continue
         const file = path.join(entry.parentPath, entry.name)
         hashes.set(file, await hashFile(file))
     }
@@ -79,9 +82,9 @@ export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map
 
     // A staged or conflicted schema file is not on disk in its new form yet, so generating now
     // would miss its change, and a file with conflict markers does not load at all.
-    const pending = [...new Set([...ledger.staged, ...ledger.conflicts])].map((rel) => rel.replaceAll('\\', '/')).filter((rel) => rel.startsWith(SCHEMA_DIR)).sort()
+    const pending = [...new Set([...ledger.staged, ...ledger.conflicts])].map((rel) => rel.replaceAll('\\', '/')).filter((rel) => SCHEMA_FILE.test(rel)).sort()
     if (pending.length > 0) {
-        ledger.actions.push(`Schema files still need your merge (${pending.join(', ')}). Finish them, then ${GENERATE_BY_HAND}`)
+        ledger.actions.push(`Schema files still need your merge (${pending.join(', ')}). Finish them, then ${generateByHand(ctx)}`)
         ui.warn('Schema update not applied yet, so no migration was generated. See .battlestack/pull/REPORT.md')
         return
     }
@@ -92,7 +95,7 @@ export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map
     if (!changed) return
 
     if (ctx.state.skipInstall) {
-        ledger.actions.push(`The schema changed and --skip-install skipped db:generate: ${GENERATE_BY_HAND}`)
+        ledger.actions.push(`The schema changed and --skip-install skipped db:generate: ${generateByHand(ctx)}`)
         ui.warn('Schema changed; --skip-install skipped db:generate. See .battlestack/pull/REPORT.md')
         return
     }
@@ -101,8 +104,12 @@ export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map
         ui.ok(`Schema changed: generated ${created.join(', ')}. Commit it with this pull`)
         return
     }
+    if (/no schema changes/i.test(lastLine ?? '')) {
+        ui.dim('  Schema files changed, but drizzle-kit found nothing to migrate')
+        return
+    }
     const why = lastLine ? ` drizzle-kit said: ${lastLine}.` : ''
     const rename = /tty|interactive/i.test(lastLine ?? '') ? ' A renamed column or table needs the prompt, so run it in a terminal.' : ''
-    ledger.actions.push(`The schema changed but db:generate wrote no migration.${why}${rename} To finish, ${GENERATE_BY_HAND}`)
+    ledger.actions.push(`The schema changed but db:generate wrote no migration.${why}${rename} To finish, ${generateByHand(ctx)}`)
     ui.warn('Schema changed but no migration was generated. See .battlestack/pull/REPORT.md')
 }
