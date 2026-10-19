@@ -16,7 +16,7 @@ const ICON_FILES = [
 /** Always-on Nuxt essentials: `@nuxt/eslint`, `@nuxt/fonts`, `@nuxt/image`, datepicker, `@iconify/vue`. */
 export const essentialsFeature: Feature = {
     id: 'nuxt4:essentials',
-    version: '1.2.2',
+    version: '1.2.3',
     label: 'Nuxt essentials (eslint, fonts, image, iconify, datepicker, nodemailer)',
     frameworks: ['nuxt4'],
     stage: STAGE.BASE_CONFIG,
@@ -118,11 +118,20 @@ async function wireScripts(ctx: RunContext): Promise<void> {
  */
 async function wireIcons(ctx: RunContext): Promise<void> {
     await patchNuxtConfig(ctx.projectDir, (c) => {
-        // Order follows the pack: `.ico` first for the browsers that take the first
-        // entry they recognise, SVG next for those that read `type`.
-        c.addHeadLink({ rel: 'icon', sizes: '32x32', href: '/favicon.ico' })
-        c.addHeadLink({ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' })
-        c.addHeadLink({ rel: 'apple-touch-icon', href: '/apple-touch-icon.png' })
+        const icons: Record<string, string>[] = [
+            // Order follows the pack: `.ico` first for the browsers that take the first
+            // entry they recognise, SVG next for those that read `type`.
+            { rel: 'icon', sizes: '32x32', href: '/favicon.ico' },
+            { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+            { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+        ]
+        // An icon link we did not write means the project has its own branding: leave
+        // it alone, as `structuralFiles` does for the icon files. Appending ours would
+        // override it, since browsers take the last matching icon.
+        const branded = c.headLinks().some(
+            (l) => (l.rel === 'icon' || l.rel === 'apple-touch-icon') && !icons.some((i) => i.href === l.href),
+        )
+        if (!branded) for (const icon of icons) c.addHeadLink(icon)
         c.addHeadMeta({ name: 'theme-color', content: BRAND_NAVY })
     })
 }

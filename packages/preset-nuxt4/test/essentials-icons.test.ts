@@ -117,6 +117,27 @@ describe('essentialsFeature: default favicon and app icons', () => {
         expect(cfg).toContain('/site.webmanifest')
         expect(cfg).toMatch(/href:\s*["']\/favicon\.svg["']/)
     })
+
+    it('adds no icon links to a project with its own branding', async () => {
+        // A project's own icon set, one href shared with ours: none of ours may join it.
+        const ownHead = [
+            "{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }",
+            "{ rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png' }",
+            "{ rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16.png' }",
+            "{ rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon-180.png' }",
+        ].join(', ')
+        await writeFile(
+            path.join(projectDir, 'nuxt.config.ts'),
+            `export default defineNuxtConfig({\n    app: { head: { link: [${ownHead}] } },\n})\n`,
+            'utf8',
+        )
+        await essentialsFeature.execute(ctx())
+
+        const cfg = await readNuxtConfig()
+        expect(cfg).not.toContain('/favicon.ico')
+        expect(cfg).not.toContain('/apple-touch-icon.png')
+        expect(cfg.match(/\/favicon\.svg/g)).toHaveLength(1)
+    })
 })
 
 describe('essentialsFeature: icon ownership', () => {
