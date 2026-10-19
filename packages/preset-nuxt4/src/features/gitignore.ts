@@ -24,6 +24,8 @@ const REQUIRED_PATTERNS = [
     '.battlestack/lock',
     // `battlestack pull` stages merge artifacts here. They may hold secrets.
     '.battlestack/pull/',
+    // Local merge cache; `battlestack pull` rebuilds what it needs.
+    '.battlestack/base/',
     '.mastra',
     // Fetched third-party skill content, recorded by the tracked `skills-lock.json`.
     '.agents/',

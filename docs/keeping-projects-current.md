@@ -64,10 +64,9 @@ both versions and the original between them:
 >>>>>>> server/utils/auth.ts (upstream now, nuxt4:auth)
 ```
 
-The version battlestack last wrote comes from `.battlestack/base/`, which
-holds those versions by content hash. Commit it with the rest of the project so
-everyone's next pull can merge. On a project's first merge, before that directory
-exists, `pull` finds the version in git history instead. When neither has it, the
+The version battlestack last wrote comes from `.battlestack/base/`, a local
+cache of those versions by content hash. It is ignored by git: on another
+machine or a fresh clone, `pull` finds the version in git history instead. When neither has it, the
 file is left as it is and the new version is staged as
 `.battlestack/pull/<path>.new` for you to compare by hand.
 
