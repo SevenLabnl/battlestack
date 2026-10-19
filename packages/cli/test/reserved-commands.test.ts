@@ -24,7 +24,7 @@ describe('RESERVED_COMMANDS', () => {
         for (const expected of [
             'describe', 'doctor', 'cleanup',
             'pull', 'upgrade', 'bump', 'sync',
-            'install', 'add', 'remove', 'own', 'disown',
+            'install', 'add', 'remove', 'own', 'disown', 'rename',
             'gateway:up', 'gateway:down', 'gateway:status', 'mitm', 'mitm:stop',
         ]) {
             expect(names.has(expected), expected).toBe(true)

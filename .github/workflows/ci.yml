@@ -148,8 +148,21 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # The storage e2e tests upload for real. Credentials are RustFS's defaults,
+      # which the scaffold's `.env` already carries.
+      rustfs:
+        image: rustfs/rustfs:latest
+        env:
+          RUSTFS_ACCESS_KEY: rustfsadmin
+          RUSTFS_SECRET_KEY: rustfsadmin
+        ports:
+          - 9000:9000
     env:
       NUXT_DATABASE_URL: postgres://postgres:postgres@localhost:5432/app
+      NUXT_S3_ENDPOINT: http://localhost:9000
+      # The app's default port. Read by the e2e helpers, which would otherwise
+      # aim at `.env`'s NUXT_PORT, a dev-server setting Nitro ignores.
+      TEST_BASE_URL: http://localhost:3000
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -202,9 +215,21 @@ jobs:
         working-directory: ${{ runner.temp }}/scaffold/ci-app
         run: pnpm run db:push
 
-      # `--reporter=verbose` because the marker is a passing test's title, which
-      # the default reporter does not print. An unreachable database otherwise
-      # produces a green run with the database tests silently skipped.
+      # The e2e tests need a running app, and without one they skip themselves.
+      # A production build, so they run against what ships. `--env-file` does not
+      # override the job env, so the services above win over `.env`'s ports, and
+      # `.env`'s NUXT_RATE_LIMIT_DISABLED keeps the repeated logins under the limit.
+      - name: Start the app
+        working-directory: ${{ runner.temp }}/scaffold/ci-app
+        run: |
+          pnpm run build
+          pnpm run db:seed
+          node --env-file=.env .output/server/index.mjs > server.log 2>&1 &
+          curl -fsS --retry 60 --retry-delay 1 --retry-all-errors "$TEST_BASE_URL/api/health" || { cat server.log; exit 1; }
+
+      # `--reporter=verbose` because the markers are passing tests' titles, which
+      # the default reporter does not print. An unreachable database or app
+      # otherwise produces a green run with those tests silently skipped.
       - name: Test
         working-directory: ${{ runner.temp }}/scaffold/ci-app
         run: |
@@ -214,10 +239,15 @@ jobs:
             echo "::error::database-gated tests skipped; the postgres service was not reachable"
             exit 1
           fi
+          if grep -q 'e2e suite skipped' test-output.txt; then
+            echo "::error::e2e tests skipped; the app was not reachable at $TEST_BASE_URL"
+            exit 1
+          fi
 
-      # The scaffold's own gates run Nitro in dev mode, where a package aliased under an
-      # `npm:` name still resolves. Only the image build proves the traced `.output` resolves,
-      # and its alias guard fails here rather than in a deployed container.
+      # The e2e server above runs `.output` beside the project's node_modules, where a
+      # package aliased under an `npm:` name still resolves. Only the image build proves
+      # the traced `.output` resolves, and its alias guard fails here rather than in a
+      # deployed container.
       - name: Build the production image
         working-directory: ${{ runner.temp }}/scaffold/ci-app
         run: docker build -t ci-app:ci .

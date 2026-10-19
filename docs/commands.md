@@ -97,6 +97,7 @@ These work anywhere, project or not:
 | `battlestack remove <feature>` | Disable a feature. |
 | `battlestack own <path...>` | Claim a file as yours. `pull` will skip it from now on. |
 | `battlestack disown <path...>` | Hand it back. `pull` manages it again. |
+| `battlestack rename <name>` | Rename the project. Renaming its directory does not. |
 
 ### Sync with upstream
 

@@ -187,8 +187,8 @@ Interactive, and worth knowing about before you go hunting manually. It finds
 leftovers: `pull` artefacts (`*.battlestack.bak`, `*.battlestack.patch`), stale
 records in the manifest, and Docker resources detached from any current project.
 
-Renamed a project directory? Pass the old name so it can reconcile what was
-registered under it:
+After `battlestack rename`, it also reconciles what was registered under the
+old name. For a name the manifest does not record, pass it:
 
 ```bash
 battlestack cleanup old-name
