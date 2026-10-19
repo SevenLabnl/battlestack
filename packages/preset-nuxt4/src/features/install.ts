@@ -296,5 +296,10 @@ export function keepsHigherFloor(prior: string, incoming: string): boolean {
     const floor = (m: RegExpExecArray): [number, number] => [Number(m[2] ?? 0), Number(m[3] ?? 0)]
     const [pMinor, pPatch] = floor(p)
     const [iMinor, iPatch] = floor(i)
+    // Below 1.0 a caret pins the minor (`^0.0.x` the patch), so a higher one is another compatibility line.
+    if (i[1] === '0' && i[2] !== undefined) {
+        if (pMinor !== iMinor) return false
+        if (iMinor === 0 && i[3] !== undefined) return pPatch === iPatch
+    }
     return pMinor > iMinor || (pMinor === iMinor && pPatch >= iPatch)
 }
