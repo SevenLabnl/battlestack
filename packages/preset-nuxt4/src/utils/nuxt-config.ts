@@ -148,12 +148,7 @@ export class NuxtConfig {
 
     /** Sets a `runtimeConfig.public` key only when absent, never clobbering a user value. */
     setRuntimePublicDefault(key: string, value: unknown): this {
-        this.config.runtimeConfig ||= {}
-        this.config.runtimeConfig.public ||= {}
-        if (this.config.runtimeConfig.public[key] == null) {
-            this.config.runtimeConfig.public[key] = value
-        }
-        return this
+        return this.mergeRuntimePublic({ [key]: value })
     }
 
     /** Append a JSON file to `i18n.locales[code].files`. Idempotent. */
