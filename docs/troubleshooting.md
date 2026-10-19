@@ -245,7 +245,8 @@ battlestack pull --force    # take upstream, saving yours as .bak
 Either the working tree has uncommitted changes, or a file still has conflict
 markers from the last pull. Commit or stash your work, or resolve the markers
 (`git diff --check` lists them), and run it again. `--allow-dirty` skips the
-first check, never the second.
+first check. `--force` and `--overwrite` skip the second, because they write
+upstream's version over edited files instead of merging into them.
 
 ### I keep getting drift on a file I intend to own
 
