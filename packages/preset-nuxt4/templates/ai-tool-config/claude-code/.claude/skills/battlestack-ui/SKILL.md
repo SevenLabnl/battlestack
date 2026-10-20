@@ -28,6 +28,8 @@ description: Apply the Battlestack design system when building, modifying, revie
 
 State the classification in one line before implementing. For 6–7, read `references/component-selection.md`.
 
+A page that needs an action in the app header, such as "New chat", teleports it into the layout's `#header-actions` target instead of editing the layout: `<Teleport to="#header-actions" defer>`. Render it client-side only (`<ClientOnly>` or a `v-if` on client state), because Nuxt teleports only to `body` during SSR. The layout is the project's shell, and editing it makes every later `battlestack pull` merge into it.
+
 ### 3. Implement with tokens
 
 - Semantic utilities only in screens: `text-muted`, `bg-elevated`, `border-default`, `text-primary`, `rounded-md`. Never raw hex, arbitrary px, or Tailwind palette classes (`text-blue-600`) where a semantic name exists.
