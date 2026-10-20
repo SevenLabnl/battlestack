@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { createHmac } from 'node:crypto'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
-import { patchNuxtConfig } from '../utils/nuxt-config.js'
+import { NuxtConfig, patchNuxtConfig } from '../utils/nuxt-config.js'
 import {
     allocatePort,
     resolveAppPort,
@@ -30,7 +30,7 @@ function titleCase(slug: string): string {
 /** Session auth on `nuxt-auth-utils`. The sealed cookie carries an opaque sessionId. */
 export const authFeature: Feature = {
     id: 'nuxt4:auth',
-    version: '1.10.7',
+    version: '1.10.8',
     label: 'Session-based auth (argon2id)',
     frameworks: ['nuxt4'],
     stage: STAGE.AUTH,
@@ -186,6 +186,9 @@ export const authFeature: Feature = {
         const result = await emitTemplateUpdate(ctx, 'nuxt4:auth', import.meta.url, 'auth', prev)
         result.notes.push(...(await retainedPasswordPolicyNotes(ctx.projectDir)))
         await postPatches(ctx.projectDir)
+        // A warning, not a report action: a project that keeps the header on would otherwise fail every pull.
+        const warning = await sessionHeaderWarning(ctx.projectDir)
+        if (warning) ui.warn(warning)
         await emitRecoveryHookStub(ctx)
         await emitAuditStub(ctx)
         return result
@@ -219,6 +222,21 @@ async function retainedPasswordPolicyNotes(projectDir: string): Promise<string[]
         )
     }
     return notes
+}
+
+/** The merge keeps a project's own `sessionHeader`, so a value other than `false` is reported instead of reset. */
+async function sessionHeaderWarning(projectDir: string): Promise<string | undefined> {
+    let warning: string | undefined
+    const cfg = await NuxtConfig.load(projectDir)
+    cfg.mutate((config) => {
+        const session = config.runtimeConfig?.session
+        // A non-literal `session` is already reported by the merge.
+        if (session?.$type !== 'object' || session.sessionHeader === false) return
+        warning = 'nuxt.config.ts#runtimeConfig.session.sessionHeader is not `false`: a sealed session sent as an '
+            + '`x-<session name>-session` header skips the revocation check, so a logged-out or revoked session '
+            + 'is still accepted that way. Set it to `false` unless a client relies on that header.'
+    })
+    return warning
 }
 
 /** No-op stub at `server/utils/auth-recovery-signup-hook.ts` when `nuxt4:auth-recovery` is off. */
@@ -358,8 +376,8 @@ async function postPatches(projectDir: string): Promise<void> {
             allowedOrigins: '',
             // Must be registered: `NUXT_RATE_LIMIT_DISABLED` only binds onto an existing key.
             rateLimitDisabled: false,
-            // h3 also accepts the sealed session from an `x-<name>-session` header, which
-            // `02.session-revocation.ts` never sees (it checks the cookie): refuse that path.
+            // h3 also accepts the sealed session from an `x-<name>-session` header, but the
+            // revocation middleware only checks requests that carry the cookie: refuse that path.
             session: { sessionHeader: false },
         })
         c.mergeRuntimePublic({

@@ -5,14 +5,34 @@ import type { Ora } from 'ora'
 import { confirmOverwriteOwned, ui } from '@battlestack/tui'
 import { formatAndReconcile } from './format-project.js'
 import {
+    baseDirIsTracked,
+    isGitRepo,
+    missingAtStart,
+    needsAttention,
+    NEEDS_ATTENTION_EXIT_CODE,
+    newlyAddedFiles,
+    preflight,
+    pruneStoredBases,
+    recordedAtStart,
+    repairOverwrites,
+    writeReport,
+    type PullSummary,
+} from './pull-safety.js'
+import {
     acquireProjectLock,
     buildRunContext,
     CLIError,
     ErrorCode,
+    exists,
     findProjectRoot,
+    queueObsoleteDeletions,
     readManifest,
     recordOwned,
+    removeQueuedObsoleteFiles,
     skillsOutcome,
+    toPosixRel,
+    updateLedger,
+    UPDATING_STATE_KEY,
     writeManifest,
     type BattlestackRegistries,
     type EnvDiff,
@@ -24,6 +44,7 @@ import {
     type RunContext,
     type UpdateReport,
 } from '@battlestack/core'
+import { checkLockfileAgainstReleaseAge, generatePulledMigration, hashSchemaFiles, hasReleaseAgePolicy } from '@battlestack/preset-nuxt4'
 
 /** Static metadata only. `run` is built per-dispatch in `project.ts`. */
 export const pullReservedMeta: Omit<ReservedCommand, 'run'> = {
@@ -38,6 +59,7 @@ export const pullReservedMeta: Omit<ReservedCommand, 'run'> = {
         ['battlestack pull --no-skills', 'skip the AI-agent skill refresh'],
         ['battlestack pull --no-format', 'skip the trailing prettier pass'],
         ['battlestack pull --skip-install', 'skip the dependency install'],
+        ['battlestack pull --allow-dirty', 'pull into a working tree with uncommitted changes'],
     ],
 }
 
@@ -48,23 +70,43 @@ export const upgradeReservedMeta: Omit<ReservedCommand, 'run'> = {
     group: 'Sync with upstream',
 }
 
-function printReport(featureId: string, report: UpdateReport): void {
-    if (report.written.length > 0) {
-        ui.dim(`  ${featureId}: ${report.written.length} file(s) written`)
-    }
-    if (report.skipped.length > 0) {
-        console.log(
-            pc.yellow(`  ${ui.sym.warn} ${featureId}: ${report.skipped.length} file(s) skipped (manual merge):`),
-        )
-        for (const f of report.skipped) console.log(pc.yellow(`      ${f}`))
-    }
-    if (report.restoredDeleted && report.restoredDeleted.length > 0) {
-        console.log(
-            pc.yellow(
-                `  ${ui.sym.warn} ${featureId}: restored ${report.restoredDeleted.length} file(s) you had deleted. `
-                + `To drop this feature for good, run \`battlestack remove ${featureId}\` (pull won't restore it then).`,
-            ),
-        )
+/** Per-feature report lists, gathered for the closing summary and `REPORT.md`. */
+type Collected = Required<Pick<UpdateReport, 'backups' | 'unmanaged' | 'actions' | 'restoredDeleted'>>
+
+function collect(c: Collected, report: UpdateReport): void {
+    c.backups.push(...(report.backups ?? []))
+    c.unmanaged.push(...(report.unmanaged ?? []))
+    c.actions.push(...(report.actions ?? []))
+    c.restoredDeleted.push(...(report.restoredDeleted ?? []))
+}
+
+type LedgerMark = Record<'merged' | 'conflicts' | 'staged', number>
+
+function markLedger(ctx: RunContext): LedgerMark {
+    const { merged, conflicts, staged } = updateLedger(ctx)
+    return { merged: merged.length, conflicts: conflicts.length, staged: staged.length }
+}
+
+/** The report's list plus what the drift-aware writers put in the ledger since `mark`, for writes whose report a feature did not return. */
+function withLedger(ctx: RunContext, mark: LedgerMark, kind: keyof LedgerMark, reported: string[] = []): number {
+    const since = updateLedger(ctx)[kind].slice(mark[kind])
+    return new Set([...reported, ...since].map(toPosixRel)).size
+}
+
+function printReport(ctx: RunContext, featureId: string, report: UpdateReport, mark: LedgerMark): void {
+    const merged = withLedger(ctx, mark, 'merged', report.merged)
+    const conflicts = withLedger(ctx, mark, 'conflicts', report.conflicts)
+    const staged = withLedger(ctx, mark, 'staged', report.skipped)
+    const counts = [
+        [report.written.length, 'written'],
+        [merged, 'merged'],
+        [conflicts, 'with conflicts'],
+        [staged, 'staged'],
+    ].filter(([n]) => (n as number) > 0).map(([n, label]) => `${n} ${label}`)
+    if (counts.length > 0) {
+        const line = `  ${featureId}: ${counts.join(', ')}`
+        if (conflicts + staged > 0) console.log(pc.yellow(line))
+        else ui.dim(line)
     }
     for (const note of report.notes) {
         ui.dim(`  ${featureId}: ${note}`)
@@ -109,7 +151,7 @@ function collectAtRiskOwnedFiles(
     return atRisk
 }
 
-/** Throws on failure unless `failureIsNonFatal` is set. */
+/** Throws on failure unless `failureIsNonFatal` is set. False when the feature could not run: unregistered, or failed. */
 async function pullOneFeature(
     ctx: RunContext,
     record: InstalledFeatureRecord,
@@ -117,24 +159,25 @@ async function pullOneFeature(
     loader: Ora,
     registries: BattlestackRegistries,
     /** Set after `battlestack rename`: every feature re-renders, at unchanged versions too. */
-    renamedFrom?: string,
-): Promise<void> {
+    renamedFrom: string | undefined,
+    collected: Collected,
+): Promise<boolean> {
     if (!registries.features.has(record.id)) {
         ui.warn(`feature "${record.id}" is not registered by any loaded plugin, skipped`)
-        return
+        return false
     }
     const feature = registries.features.get(record.id)
 
     if (feature.upgradable === false) {
         ui.skip(`${feature.label} (install-only)`)
-        return
+        return true
     }
 
     const sameVersion = feature.version === record.version
     // `--force` bypasses the version gate. `--overwrite` only sets drift policy.
     if (sameVersion && ((!args.force && !renamedFrom) || !feature.update)) {
         ui.skip(`${feature.label} (${feature.version}, up to date)`)
-        return
+        return true
     }
 
     if (!feature.update) {
@@ -146,13 +189,14 @@ async function pullOneFeature(
         } else {
             ui.dim(`  ${feature.label} (${record.version} → ${feature.version}, metadata-only)`)
         }
-        return
+        return true
     }
 
     const arrow = sameVersion
         ? `${feature.version} (${args.force ? 'forced' : 'project renamed'})`
         : `${record.version} → ${feature.version}`
     loader.start(`${feature.label} ${arrow}`)
+    const mark = markLedger(ctx)
     try {
         const report = ctx.dryRun
             ? { written: [], skipped: [], notes: ['dry-run'] }
@@ -167,12 +211,15 @@ async function pullOneFeature(
             }
         }
         loader.succeed(`${feature.label} ${arrow}`)
-        printReport(feature.id, report)
+        collect(collected, report)
+        printReport(ctx, feature.id, report, mark)
     } catch (error) {
         const msg = error instanceof Error ? error.message : String(error)
         loader.fail(`${feature.label}: ${msg}`)
         if (!feature.failureIsNonFatal) throw error
+        return false
     }
+    return true
 }
 
 /**
@@ -311,6 +358,12 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
 
     const releaseLock = await acquireProjectLock(projectDir, 'battlestack pull', { dryRun: args.dryRun })
     try {
+        const safety = args.dryRun || args.skillsOnly
+            ? { git: false, clean: false }
+            : await preflight(projectDir, manifest, { allowDirty: args.allowDirty === true, replacing: args.force || args.overwrite })
+        const startRecorded = recordedAtStart(manifest)
+        const missingBefore = await missingAtStart(projectDir, startRecorded)
+
         // Orphan features are dropped from ctx. Warnings are deferred to the end.
         const orphans = manifest.features.filter((f) => !registries.features.has(f.id))
         if (orphans.length > 0) {
@@ -330,6 +383,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
                 overwrite: args.overwrite,
                 // `--no-skills` skips the skill refresh.
                 skipSkills: !args.skills,
+                [UPDATING_STATE_KEY]: !args.dryRun,
             },
         }, registries)
 
@@ -340,7 +394,9 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         // shell over nuxt4:nuxt-ui's). Keyed bare, matching `ctx.state` conventions.
         for (const f of manifest.features) {
             if (!registries.features.has(f.id)) continue
-            ctx.state[`files:${registries.features.get(f.id).id}`] = { ...f.files }
+            const bare = registries.features.get(f.id).id
+            ctx.state[`files:${bare}`] = { ...f.files }
+            if (f.ownedByUser) ctx.state[`owned:${bare}`] = [...f.ownedByUser]
         }
 
         // `--skills-only`: skills only, skipping template updates, dep install and formatting.
@@ -372,6 +428,10 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             }
         }
 
+        // Before anything writes: the schema files this pull changes need a migration.
+        const schemaBefore = await hashSchemaFiles(projectDir)
+        const hadReleaseAgePolicy = await hasReleaseAgePolicy(projectDir)
+
         // Rehydration runs before the update pass, whose doc aggregator reads enabled features.
         await rehydrateMissingFeatures(
             manifest,
@@ -392,16 +452,38 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             : undefined
         if (renamedFrom) ui.info(`Project renamed ${renamedFrom} → ${ctx.projectName}: re-rendering every feature`)
 
+        queueObsoleteDeletions(ctx)
+        const collected: Collected = { backups: [], unmanaged: [], actions: [], restoredDeleted: [] }
+        // An orphan's files were not re-rendered either, so they still carry the old name.
+        let renderedAll = orphans.length === 0
         for (const record of existingRecords) {
-            await pullOneFeature(ctx, record, args, loader, registries, renamedFrom)
+            if (!(await pullOneFeature(ctx, record, args, loader, registries, renamedFrom, collected))) renderedAll = false
+        }
+        for (const rel of await removeQueuedObsoleteFiles(ctx)) ui.dim(`  removed obsolete file: ${rel}`)
+
+        // Compares against HEAD, so uncommitted edits would read as feature output.
+        const repairs = safety.clean && !ctx.dryRun ? await repairOverwrites(ctx, startRecorded, registries) : []
+        if (!ctx.dryRun && !safety.clean && !args.force && !args.overwrite) {
+            ui.warn(safety.git
+                ? 'Uncommitted changes (--allow-dirty), so local edits a feature writes over cannot be detected.'
+                : 'Not a git repository with a commit, so local edits a feature writes over cannot be detected.')
         }
 
         if (!ctx.dryRun) {
+            // Only the pull that brings in the policy can leave an older lockfile that breaks it.
+            const lockfileBlocked = !hadReleaseAgePolicy && await checkLockfileAgainstReleaseAge(ctx)
             // `--no-format` skips the format pass and its drift re-baseline.
-            if (args.format) {
+            if (args.format && !lockfileBlocked) {
                 await formatAndReconcile(ctx, manifest, registries)
             }
-            await writeManifest(ctx, { rendered: true })
+            // A feature that did not run still carries the old name, so the rename stays pending.
+            await writeManifest(ctx, { rendered: renderedAll })
+            const written = await readManifest(projectDir, registries)
+            if (written) await pruneStoredBases(projectDir, written)
+            if (safety.git && baseDirIsTracked(projectDir)) {
+                updateLedger(ctx).actions.push('`.battlestack/base/` is now a local cache that git ignores. Stop tracking it: `git rm -r --cached .battlestack/base`')
+            }
+            await generatePulledMigration(ctx, schemaBefore)
         }
 
         if (renamedFrom && !ctx.dryRun) {
@@ -409,7 +491,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             const stale = after ? await filesStillNaming(projectDir, after, renamedFrom) : []
             if (stale.length > 0) {
                 ui.blank()
-                ui.warn(`These files still name the project ${renamedFrom}; pull leaves files you own, files you edited (patches in .battlestack/pull/) and files written only once`)
+                ui.warn(`These files still name the project ${renamedFrom}; pull leaves files you own, files you edited (listed in .battlestack/pull/REPORT.md) and files written only once`)
                 for (const rel of stale) ui.bullet(rel)
                 ui.dim(`  Untracked files can name it too: git grep -n ${renamedFrom}`)
             }
@@ -423,17 +505,52 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
                 // feature. Stating removal as an upstream fact invites the reader to accept
                 // it. `plugins` is the command that distinguishes the two.
                 ui.warn(
-                    `feature "${f.id}" is not registered by any loaded plugin, removed from manifest `
-                    + '(its files stay on disk). If a plugin failed to load, `battlestack plugins` says so',
+                    `feature "${f.id}" is not registered by any loaded plugin. Its record stays in the manifest `
+                    + 'and its files were not updated. `battlestack plugins` shows why a plugin failed to load',
                 )
             }
         }
 
-        ui.blank()
-        const outcome = skillsOutcome(ctx, 'Update complete')
-        if (outcome.ok) ui.ok(outcome.line)
-        else ui.warn(outcome.line)
         printEnvDiff(ctx.state['env:diff'] as EnvDiff | undefined)
+        if (ctx.dryRun) {
+            ui.blank()
+            ui.ok('Dry run complete. Nothing was written.')
+            return
+        }
+
+        const ledger = updateLedger(ctx)
+        const restored = [...collected.restoredDeleted]
+        for (const rel of missingBefore) {
+            if (await exists(path.join(projectDir, rel))) restored.push(rel)
+        }
+        const summary: PullSummary = {
+            merged: ledger.merged,
+            conflicts: ledger.conflicts,
+            staged: ledger.staged,
+            backups: collected.backups,
+            unmanaged: collected.unmanaged,
+            restored: [...new Set(restored.map(toPosixRel))],
+            added: safety.git ? newlyAddedFiles(ctx) : [],
+            orphans: orphans.map((f) => f.id),
+            actions: [...new Set([...collected.actions, ...ledger.actions])],
+            formatError: ctx.state['format:error'] as string | undefined,
+            repairs,
+        }
+        const reportPath = await writeReport(projectDir, summary)
+        ui.blank()
+        const outcome = skillsOutcome(ctx, needsAttention(summary) ? 'Update finished, with work left' : 'Update complete')
+        if (outcome.ok && !needsAttention(summary)) ui.ok(outcome.line)
+        else ui.warn(outcome.line)
+        const tally = [
+            [summary.merged.length, 'merged'],
+            [summary.conflicts.length, 'with conflicts'],
+            [summary.staged.length, 'staged'],
+            [summary.backups.length, 'backed up'],
+            [summary.added.length, 'new'],
+        ].filter(([n]) => (n as number) > 0).map(([n, label]) => `${n} ${label}`)
+        if (tally.length > 0) ui.dim(`  Files: ${tally.join(', ')}.`)
+        ui.dim(`  Next steps: ${reportPath}`)
+        if (needsAttention(summary)) process.exitCode = NEEDS_ATTENTION_EXIT_CODE
     } finally {
         await releaseLock()
     }

@@ -1,7 +1,7 @@
 {
     "mastraAdmin": {
         "title": "AI-instellingen",
-        "subtitle": "Kies welk model elke agent-rol gebruikt. Wijzigingen zijn direct actief — geen redeploy nodig.",
+        "subtitle": "Kies welk model elke agent-rol gebruikt. Wijzigingen zijn direct actief, zonder redeploy.",
         "configsHeader": "Modelconfiguraties",
         "loadingModels": "Modellen laden…",
         "noModels": "Geen modellen beschikbaar. Stel NUXT_AI_GATEWAY_KEY in .env in en herstart.",
@@ -9,7 +9,7 @@
         "searchModels": "Zoek modellen",
         "updated": "Bijgewerkt",
         "agentsHeader": "Agents",
-        "agentsSubtitle": "Koppel elke agent aan een modelconfiguratie en (optioneel) een prompt. Direct actief — geen redeploy nodig.",
+        "agentsSubtitle": "Koppel elke agent aan een modelconfiguratie en (optioneel) een prompt. Direct actief, zonder redeploy.",
         "noAgents": "Nog geen agents geregistreerd.",
         "selectModelConfig": "Kies een modelconfiguratie",
         "selectPrompt": "Kies een prompt",

@@ -2,9 +2,7 @@ import path from 'node:path'
 import { readFile } from 'node:fs/promises'
 import pc from 'picocolors'
 import {
-    hashFile,
     isFeatureEnabled,
-    recordFile,
     readLocalState,
     type BuildSecret,
     type Feature,
@@ -12,8 +10,7 @@ import {
     type RunContext,
     type PackageManager,
 } from '@battlestack/core'
-import { templatesDir } from '@battlestack/core/utils/templates.js'
-import { writeFileEnsured } from '@battlestack/core/utils/fs.js'
+import { templatesDir, writeRecorded } from '@battlestack/core/utils/templates.js'
 import { run } from '@battlestack/core/utils/run.js'
 import { resolvePort } from '@battlestack/core/utils/port-alloc.js'
 import { pmInstallGlobalCommands, resolveProjectPM } from '@battlestack/core/utils/package-manager.js'
@@ -26,7 +23,7 @@ const PROFILE_FLAGS = ['--profile', 'prod']
 /** Production Dockerfile and `battlestack prod` commands, reusing the existing docker-compose.yml. */
 export const dockerFeature: Feature = {
     id: 'shared:docker',
-    version: '1.2.3',
+    version: '1.2.4',
     label: 'Production Dockerfile + prod commands',
     stage: STAGE.GITIGNORE,
     failureIsNonFatal: true,
@@ -199,9 +196,7 @@ async function emit(ctx: RunContext): Promise<void> {
     const dockerfileRaw = await readFile(path.join(src, 'Dockerfile'), 'utf8')
     let dockerfile = dockerfileRaw
     for (const [k, v] of Object.entries(dockerVars)) dockerfile = dockerfile.split(`__${k}__`).join(v)
-    const dockerfileDest = path.join(ctx.projectDir, 'Dockerfile')
-    await writeFileEnsured(dockerfileDest, dockerfile)
-    recordFile(ctx, 'shared:docker', 'Dockerfile', await hashFile(dockerfileDest))
+    await writeRecorded(ctx, 'shared:docker', 'Dockerfile', dockerfile)
 }
 
 /** The `RUN` installing the PM. npm ships with the Node base image, so it emits a comment instead. */

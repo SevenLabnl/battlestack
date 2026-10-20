@@ -4,15 +4,9 @@
 - Always run `pnpm run lint` and `pnpm test` before considering work complete.
 - The workflows in `.claude/skills/` only load when invoked, so reach for them yourself: `task-arbiter` before a task, `brainstorming` before a new feature, `test-driven-development` while coding, `systematic-debugging` for a bug, `verification-before-completion` before calling it done.
 
-## Pending upstream merges: `.battlestack/pull/`
+## Upgrading: `battlestack pull`
 
-When `battlestack pull` finds a file you've edited locally, it does **not** overwrite it. It stages the incoming upstream version + a diff under `.battlestack/pull/`, mirroring the file's path:
-
-- `.battlestack/pull/<path>.new`: the full new upstream content
-- `.battlestack/pull/<path>.patch`: a unified diff from your current file to the new version
-- `.battlestack/pull/<path>.bak`: your prior content, only when `battlestack pull --force` overwrote the file
-
-These live **outside** the source tree on purpose, so Nuxt/Nitro/TS never compile them. **A non-empty `.battlestack/pull/` means the project has pending upstream changes that still need to be applied to your files**; treat it as a TODO. When asked to review, apply, or reconcile pending battlestack updates (or after `battlestack pull` reports skipped/drifted files), look in `.battlestack/pull/` first: read the `.patch` to see what upstream changed, merge the relevant parts into the real file by hand, then clear the staged artifacts by running **`battlestack cleanup`** (interactive: it lists every `.battlestack/pull/` file and any stray legacy artifact for removal). Never import from, edit, or ship files under `.battlestack/pull/`; they are throwaway merge scratch.
+`battlestack pull` merges upstream feature changes into files you edited and lists what it could not settle in `.battlestack/pull/REPORT.md`. Exit code 2 means that report has work in it. Use the `battlestack-upgrade` skill to run a pull or to finish one: it covers conflict markers, staged `.new` files, schema changes and their migrations, files the project deleted on purpose and the checks to run before committing. Never import from, edit or ship files under `.battlestack/pull/`; they are merge scratch, and a staged schema `.new` copied over the real file drops the project's own columns.
 
 ## Runtime Config: env vars go through `runtimeConfig`, not `process.env`
 

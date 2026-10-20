@@ -138,6 +138,7 @@ const FEATURE_ID_ROLES = {
     collectDocs: 'opaque',
     collectBuildSecrets: 'opaque',
     structuralFiles: 'opaque',
+    selfMergedFiles: 'opaque',
     prompt: 'opaque',
     execute: 'opaque',
     update: 'opaque',

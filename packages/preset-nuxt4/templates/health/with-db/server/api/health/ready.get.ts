@@ -6,7 +6,7 @@ import { bootState } from '#server/utils/boot-tasks'
 
 /**
  * Readiness: can this instance serve traffic right now? Failing takes the pod out of
- * the Service and reverses on its own — the right place for the DB ping, unlike
+ * the Service and reverses on its own, which makes it the right place for the DB ping, unlike
  * liveness. Config gates readiness too, same rule as the env-only variant: a restart
  * cannot fix missing env (so it must never fail liveness), but a pod that cannot seal
  * sessions should not join the Service either. Same timeout knob as `/api/health`,

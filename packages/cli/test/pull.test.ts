@@ -14,9 +14,11 @@ import {
     readManifest,
     renameProject,
     silentLoader,
+    storeBase,
     STAGE,
     updateFromTemplateDir,
     writeManifest,
+    writeRecorded,
     type Feature,
     type ParsedArgs,
     type ProjectManifest,
@@ -301,6 +303,50 @@ describe('battlestack pull: ownedByUser is inviolable', () => {
         expect(rec.ownedByUser).toEqual(['a.ts'])
         // No merge artifacts staged for an owned file; there is nothing to merge.
         expect(await exists(path.join(projectDir, '.battlestack', 'pull', 'a.ts.new'))).toBe(false)
+    })
+
+    it('CORE PROPERTY: an owned file written through writeRecorded by an update that ignores prev is left alone', async () => {
+        const projectDir = await tmp('battlestack-pull-owned-recorded-')
+        const makeFeature = (version: string, content: string): Feature => ({
+            id: 'test:feat-docker',
+            label: 'test:feat-docker',
+            version,
+            stage: STAGE.STYLING,
+            // A structural path recorded after update must not displace the user's own entry.
+            structuralFiles: () => ['branding.svg'],
+            async execute(ctx) {
+                await writeRecorded(ctx, 'test:feat-docker', 'Dockerfile', content)
+            },
+            async update(ctx) {
+                await writeRecorded(ctx, 'test:feat-docker', 'Dockerfile', content)
+                return { written: ['Dockerfile'], skipped: [], notes: [] }
+            },
+        })
+
+        const registriesV1 = makeRegistries({ requiredFeatures: [fqid('test:feat-docker')] })
+        const featV1 = makeFeature('1.0.0', 'FROM node:22\nRUN a\n')
+        registriesV1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, [fqid('test:feat-docker')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+
+        await withCwd(projectDir, () => ownCommand(defaultArgs({ positionals: ['own', 'Dockerfile'] }), silentLoader()))
+        const edited = 'FROM node:22\nRUN mine\n'
+        await writeFile(path.join(projectDir, 'Dockerfile'), edited, 'utf8')
+
+        const registriesV2 = makeRegistries({ requiredFeatures: [fqid('test:feat-docker')] })
+        registriesV2.features.register(makeFeature('2.0.0', 'FROM node:24\nRUN a\n'), origin)
+
+        process.exitCode = undefined
+        await runPull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, 'Dockerfile'), 'utf8')).toBe(edited)
+        expect(await exists(path.join(projectDir, '.battlestack', 'pull', 'Dockerfile.new'))).toBe(false)
+        expect(process.exitCode).toBeUndefined()
+        const rec = (await readManifestRaw(projectDir)).features.find((f) => f.id === fqid('test:feat-docker'))!
+        expect(rec.version).toBe('2.0.0')
+        expect(rec.ownedByUser).toContain('Dockerfile')
+        process.exitCode = undefined
     })
 
     it('retires a moved template through real ownership and version-gated pulls without data loss', async () => {
@@ -636,14 +682,18 @@ describe('battlestack pull: rehydrating missing features (fqid defaultEnabledOpt
 })
 
 describe('battlestack pull: a file moving to a later feature', () => {
-    // Mirrors nuxt4:vitest (NAMING) handing test/e2e/api/auth.test.ts to nuxt4:auth (AUTH):
-    // the old owner updates first and sees the file as obsolete.
+    // Mirrors nuxt4:vitest (NAMING) handing test/e2e/api/auth.test.ts to nuxt4:auth (AUTH).
     const movedRel = path.join('test', 'e2e', 'moved.test.ts')
     const movedContent = 'export const moved = true\n'
-    const FROM = 'test:from'
-    const TO = 'test:to'
+    // The new owner sorts first by id, as nuxt4:auth does before nuxt4:vitest, while its stage runs later.
+    const FROM = 'test:z-from'
+    const TO = 'test:a-to'
 
-    async function setup(enabledBare: string[]): Promise<{ projectDir: string, registriesV2: BattlestackRegistries }> {
+    async function setup(
+        enabledBare: string[],
+        newContent = movedContent,
+        ids = { from: FROM, to: TO },
+    ): Promise<{ projectDir: string, registriesV2: BattlestackRegistries }> {
         const projectDir = await tmp('battlestack-pull-moved-')
         const fromV1 = await tmp('battlestack-pull-moved-from-v1-')
         const fromV2 = await tmp('battlestack-pull-moved-from-v2-')
@@ -654,13 +704,13 @@ describe('battlestack pull: a file moving to a later feature', () => {
         await writeTemplateFile(fromV2, 'from.ts', 'from\n')
         await writeTemplateFile(toV1, 'to.ts', 'to\n')
         await writeTemplateFile(toV2, 'to.ts', 'to\n')
-        await writeTemplateFile(toV2, movedRel, movedContent)
+        await writeTemplateFile(toV2, movedRel, newContent)
 
         const required = enabledBare.map(fqid)
         const registriesV1 = makeRegistries({ requiredFeatures: required })
         const v1 = [
-            makeFileFeature(FROM, '1.0.0', fromV1, { stage: STAGE.NAMING }),
-            makeFileFeature(TO, '1.0.0', toV1, { stage: STAGE.AUTH }),
+            makeFileFeature(ids.from, '1.0.0', fromV1, { stage: STAGE.NAMING }),
+            makeFileFeature(ids.to, '1.0.0', toV1, { stage: STAGE.AUTH }),
         ].filter((f) => enabledBare.includes(f.id))
         for (const f of v1) registriesV1.features.register(f, origin)
         const ctx = scaffoldCtx(projectDir, registriesV1, required)
@@ -668,8 +718,8 @@ describe('battlestack pull: a file moving to a later feature', () => {
         await writeManifest(ctx)
 
         const registriesV2 = makeRegistries({ requiredFeatures: required })
-        registriesV2.features.register(makeFileFeature(FROM, '1.1.0', fromV2, { stage: STAGE.NAMING }), origin)
-        registriesV2.features.register(makeFileFeature(TO, '1.1.0', toV2, { stage: STAGE.AUTH }), origin)
+        registriesV2.features.register(makeFileFeature(ids.from, '1.1.0', fromV2, { stage: STAGE.NAMING }), origin)
+        registriesV2.features.register(makeFileFeature(ids.to, '1.1.0', toV2, { stage: STAGE.AUTH }), origin)
         return { projectDir, registriesV2 }
     }
 
@@ -684,6 +734,40 @@ describe('battlestack pull: a file moving to a later feature', () => {
         const manifest = await readManifestRaw(projectDir)
         expect(Object.keys(filesOf(manifest, FROM) ?? {})).not.toContain(movedRel)
         expect(Object.keys(filesOf(manifest, TO) ?? {})).toContain(movedRel)
+    })
+
+    it('writes the new owner\'s changed version when the old owner updates first', async () => {
+        const ids = { from: 'test:a-from', to: 'test:z-to' }
+        const changed = 'export const moved = "v2"\n'
+        const { projectDir, registriesV2 } = await setup([ids.from, ids.to], changed, ids)
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV2))
+        process.exitCode = undefined
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(changed)
+        expect(Object.keys(filesOf(await readManifestRaw(projectDir), ids.to) ?? {})).toContain(movedRel)
+    })
+
+    it('does not delete and rewrite the file when the old owner updates first', async () => {
+        const ids = { from: 'test:a-from', to: 'test:z-to' }
+        const { projectDir, registriesV2 } = await setup([ids.from, ids.to], movedContent, ids)
+        const lines = await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV2))
+        process.exitCode = undefined
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(movedContent)
+        expect(lines.join('\n')).not.toContain('removed obsolete file')
+        expect(Object.keys(filesOf(await readManifestRaw(projectDir), ids.to) ?? {})).toContain(movedRel)
+    })
+
+    it('writes the new owner\'s version when the move also changed the file', async () => {
+        const changed = 'export const moved = "v2"\n'
+        const { projectDir, registriesV2 } = await setup([FROM, TO], changed)
+        await runPull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(changed)
+        const manifest = await readManifestRaw(projectDir)
+        expect(Object.keys(filesOf(manifest, FROM) ?? {})).not.toContain(movedRel)
+        expect(Object.keys(filesOf(manifest, TO) ?? {})).toContain(movedRel)
+        expect(await exists(path.join(projectDir, '.battlestack', 'pull', `${movedRel}.patch`))).toBe(false)
     })
 
     it('CORE PROPERTY: never deletes the user\'s edits to the moved file', async () => {
@@ -704,8 +788,132 @@ describe('battlestack pull: a file moving to a later feature', () => {
     })
 })
 
+describe('battlestack pull: a schema change ships with its migration', () => {
+    // Production applies only committed SQL, so a schema file pull rewrote needs a migration.
+    // The stand-in `db:generate` writes a SQL file like drizzle-kit does, so the real
+    // `<pm> run db:generate` path runs without drizzle-kit.
+    const schemaRel = path.join('server', 'database', 'schema', 'sessions.ts')
+    const sqlRel = path.join('server', 'database', 'migrations', '0001_new_index.sql')
+    const writesSql = `node -e "require('fs').mkdirSync('server/database/migrations',{recursive:true});require('fs').writeFileSync('server/database/migrations/0001_new_index.sql','')"`
+    // drizzle-kit without a TTY on a rename prompt: prints, writes nothing, exits 0.
+    const promptsWithoutTty = `node -e "console.error('Interactive prompts require a TTY terminal')"`
+
+    async function setup(
+        v2: { schema: string, other: string },
+        dbGenerate = writesSql,
+        { featureId = 'nuxt4:database', schema = schemaRel } = {},
+    ): Promise<{ projectDir: string, registriesV2: BattlestackRegistries }> {
+        const projectDir = await tmp('battlestack-pull-schema-')
+        const tplV1 = await tmp('battlestack-pull-schema-v1-')
+        const tplV2 = await tmp('battlestack-pull-schema-v2-')
+        await writeTemplateFile(tplV1, schema, 'v1 schema\n')
+        await writeTemplateFile(tplV1, 'other.ts', 'v1\n')
+        await writeTemplateFile(tplV2, schema, v2.schema)
+        await writeTemplateFile(tplV2, 'other.ts', v2.other)
+        await writeFile(
+            path.join(projectDir, 'package.json'),
+            JSON.stringify({ scripts: { 'db:generate': dbGenerate } }),
+        )
+
+        const registriesFor = (tplDir: string, version: string): BattlestackRegistries => buildRegistries({
+            namespace: 'nuxt4',
+            frameworks: [{ id: FW, label: FW, supportedFeatures: [featureId] }],
+            features: [makeFileFeature(featureId, version, tplDir, { stage: STAGE.DATABASE })],
+            templates: [{ id: TPL, label: TPL, framework: FW, requiredFeatures: [featureId], optionalFeatures: [] }],
+        }).registries
+        const registriesV1 = registriesFor(tplV1, '1.0.0')
+        const database = registriesV1.features.get(featureId)
+        const ctx = scaffoldCtx(projectDir, registriesV1, [database.fqid])
+        await database.execute(ctx)
+        await writeManifest(ctx)
+        return { projectDir, registriesV2: registriesFor(tplV2, '1.1.0') }
+    }
+
+    async function pull(projectDir: string, registries: BattlestackRegistries, overrides: Partial<ParsedArgs> = {}): Promise<{ lines: string[], exitCode: typeof process.exitCode, report: string }> {
+        process.exitCode = undefined
+        const lines = await withCwdCapture(projectDir, () => pullCommand(args(overrides), silentLoader(), registries))
+        const exitCode = process.exitCode
+        process.exitCode = undefined
+        const reportPath = path.join(projectDir, '.battlestack', 'pull', 'REPORT.md')
+        const report = await exists(reportPath) ? await readFile(reportPath, 'utf8') : ''
+        return { lines, exitCode, report }
+    }
+    const generated = (projectDir: string) => exists(path.join(projectDir, sqlRel))
+
+    it('runs db:generate when the pull rewrote a schema file, and names the new migration', async () => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' })
+        const { lines, exitCode } = await pull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, schemaRel), 'utf8')).toBe('v2 schema\n')
+        expect(await generated(projectDir)).toBe(true)
+        expect(lines.some((l) => l.includes('generated 0001_new_index.sql'))).toBe(true)
+        expect(exitCode).toBeUndefined()
+    })
+
+    it.each([
+        ['--skip-install', { skipInstall: true }, writesSql],
+        ['a failing db:generate', {}, 'node -e "process.exit(1)"'],
+        ['a db:generate that exits 0 without writing SQL', {}, promptsWithoutTty],
+    ])('reports db:generate as still to do on %s, and the pull still completes', async (_, overrides, dbGenerate) => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' }, dbGenerate)
+        const { lines, exitCode, report } = await pull(projectDir, registriesV2, overrides)
+
+        expect(await generated(projectDir)).toBe(false)
+        expect(lines.some((l) => l.includes('Schema changed: generated'))).toBe(false)
+        expect(report).toContain('pnpm run db:generate')
+        expect(exitCode).toBe(2)
+        expect((await readManifestRaw(projectDir)).features[0].version).toBe('1.1.0')
+    })
+
+    it('passes on what drizzle-kit said, with a hint, when it stopped at a prompt', async () => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' }, promptsWithoutTty)
+        const { report } = await pull(projectDir, registriesV2)
+
+        expect(report).toContain('Interactive prompts require a TTY terminal')
+        expect(report).toContain('run it in a terminal')
+    })
+
+    it('does not generate while an edited schema file still waits for the user\'s merge', async () => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' })
+        await writeFile(path.join(projectDir, schemaRel), 'my own schema\n')
+        const { exitCode, report } = await pull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, schemaRel), 'utf8')).not.toBe('v2 schema\n')
+        expect(await generated(projectDir)).toBe(false)
+        expect(report).toContain('Schema files still need your merge')
+        expect(report).toContain('server/database/schema/sessions.ts')
+        expect(exitCode).toBe(2)
+    })
+
+    it('generates nothing when the schema bytes are unchanged, though the update reports the file', async () => {
+        // The bump changes only `other.ts`; the schema is still reported as written (converged).
+        const { projectDir, registriesV2 } = await setup({ schema: 'v1 schema\n', other: 'v2\n' })
+        const { lines, report } = await pull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, 'other.ts'), 'utf8')).toBe('v2\n')
+        expect(await generated(projectDir)).toBe(false)
+        expect(lines.some((l) => l.includes('Schema changed'))).toBe(false)
+        expect(report).not.toContain('db:generate')
+    })
+
+    it.each([
+        ['drizzle-kit finds nothing to migrate', {}, `node -e "console.log('No schema changes, nothing to migrate')"`],
+        // Split strings: pnpm echoes the command to stderr, which must not match on its own.
+        ['drizzle-kit finds nothing to migrate behind a warning', {}, `node -e "console.log('No schema' + ' changes, nothing to migrate');process.stderr.write('(node) Deprecation' + 'Warning: something')"`],
+        ['the changed file is not one drizzle-kit reads', { schema: path.join('server', 'database', 'schema', 'README.md') }, writesSql],
+        ['nuxt4:database is not enabled', { featureId: 'nuxt4:other' }, writesSql],
+    ])('reports nothing to do when %s', async (_, opts, dbGenerate) => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' }, dbGenerate, opts)
+        const { exitCode, report } = await pull(projectDir, registriesV2)
+
+        expect(await generated(projectDir)).toBe(false)
+        expect(report).not.toContain('db:generate')
+        expect(exitCode).toBeUndefined()
+    })
+})
+
 describe('battlestack pull: misc plumbing', () => {
-    it('drops an orphaned feature (removed from the CLI) from the manifest without throwing', async () => {
+    it('keeps the record of a feature whose plugin did not load, and flags the pull', async () => {
         const projectDir = await tmp('battlestack-pull-orphan-')
         const tplA = await tmp('battlestack-pull-orphan-a-')
         const tplOrphan = await tmp('battlestack-pull-orphan-o-')
@@ -727,11 +935,103 @@ describe('battlestack pull: misc plumbing', () => {
         registriesV2.features.register(makeFileFeature('test:feat-a', '1.0.0', tplA), origin)
 
         await expect(runPull(projectDir, registriesV2)).resolves.not.toThrow()
+        expect(process.exitCode).toBe(2)
+        process.exitCode = undefined
 
         const manifest = await readManifestRaw(projectDir)
-        expect(manifest.features.find((f) => f.id === fqid('test:feat-orphan'))).toBeUndefined()
-        // The orphan's file is left alone; pull only stops tracking it.
+        // A missing plugin must not unmanage its files: the record survives untouched.
+        expect(manifest.features.find((f) => f.id === fqid('test:feat-orphan'))?.files).toEqual({ 'o.ts': expect.any(String) })
         expect(await readFile(path.join(projectDir, 'o.ts'), 'utf8')).toBe('o-content\n')
+    })
+})
+
+describe('battlestack pull --allow-dirty', () => {
+    it('leaves an uncommitted edit to a tracked file exactly as it was', async () => {
+        const { execFileSync } = await import('node:child_process')
+        const projectDir = await tmp('battlestack-pull-dirty-')
+        const tplDir = await tmp('battlestack-pull-dirty-tpl-')
+        await writeTemplateFile(tplDir, 'a.ts', 'scaffold\n')
+        const git = (...a: string[]) => execFileSync('git', a, {
+            cwd: projectDir,
+            stdio: 'ignore',
+            env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
+        })
+
+        const v1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplDir)
+        v1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, v1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+        await writeFile(path.join(projectDir, 'a.ts'), 'committed edit\n')
+        git('init', '-q')
+        git('add', '-A')
+        git('commit', '-q', '-m', 'init')
+        await writeFile(path.join(projectDir, 'a.ts'), 'uncommitted edit\n')
+
+        // v2 touches only b.ts; a.ts stays recorded by the feature.
+        const v2 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        v2.features.register({
+            ...makeFileFeature('test:feat-a', '2.0.0', tplDir),
+            async update(c) {
+                await writeRecorded(c, 'test:feat-a', 'b.ts', 'new\n')
+                return { written: ['b.ts'], skipped: [], notes: [] }
+            },
+        }, origin)
+
+        await runPull(projectDir, v2, { allowDirty: true, format: false, skipInstall: true })
+        process.exitCode = undefined
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe('uncommitted edit\n')
+    })
+})
+
+describe('battlestack pull: reporting writes a feature did not report', () => {
+    async function setup(prefix: string, v1Content: string): Promise<string> {
+        const projectDir = await tmp(prefix)
+        const tplDir = await tmp(`${prefix}tpl-`)
+        await writeTemplateFile(tplDir, 'a.ts', v1Content)
+        const v1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplDir)
+        v1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, v1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+        return projectDir
+    }
+
+    function v2Writing(content: string): BattlestackRegistries {
+        const v2 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        v2.features.register({
+            ...makeFileFeature('test:feat-a', '2.0.0', '/nonexistent'),
+            // Writes through the drift-aware writer but returns a report without it.
+            async update(c) {
+                await writeRecorded(c, 'test:feat-a', 'a.ts', content)
+                return { written: [], skipped: [], notes: [] }
+            },
+        }, origin)
+        return v2
+    }
+
+    it('counts a merge in the feature line', async () => {
+        const base = 'one\ntwo\nthree\nfour\nfive\n'
+        const projectDir = await setup('battlestack-pull-count-', base)
+        await storeBase(projectDir, Buffer.from(base))
+        await writeFile(path.join(projectDir, 'a.ts'), base.replace('one', 'one, edited'))
+
+        const lines = await withCwdCapture(projectDir, () => pullCommand(args({ skipInstall: true }), silentLoader(), v2Writing(base.replace('five', 'five, upstream'))))
+        process.exitCode = undefined
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe('one, edited\ntwo\nthree\nfour\nfive, upstream\n')
+        expect(lines.join('\n')).toMatch(/test:feat-a: 1 merged/)
+    })
+
+    it('lists a deleted file it restored in the report', async () => {
+        const projectDir = await setup('battlestack-pull-restored-', 'v1\n')
+        await rm(path.join(projectDir, 'a.ts'))
+
+        await withCwdCapture(projectDir, () => pullCommand(args({ skipInstall: true }), silentLoader(), v2Writing('v2\n')))
+        process.exitCode = undefined
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe('v2\n')
+        expect(await readFile(path.join(projectDir, '.battlestack/pull/REPORT.md'), 'utf8')).toMatch(/## New files[\s\S]*- `a\.ts`/)
     })
 })
 
@@ -828,6 +1128,35 @@ describe('battlestack pull: the project name', () => {
         // Settled: the next same-version pull is a no-op again.
         await pullCapturing(projectDir, registries)
         expect(updates).toBe(1)
+    })
+
+    it('keeps the rename pending when a feature fails to re-render', async () => {
+        const projectDir = await scaffoldThenMove()
+        const registries = makeRegistries({ requiredFeatures: [fqid(FEATURE)] })
+        registries.features.register({
+            ...makeNamedFeature('1.0.0'),
+            failureIsNonFatal: true,
+            async update() {
+                throw new Error('boom')
+            },
+        }, origin)
+        await renameProject(projectDir, (await readManifest(projectDir, registries))!, 'shop')
+
+        await pullCapturing(projectDir, registries)
+        process.exitCode = undefined
+
+        expect((await readManifestRaw(projectDir)).renderedName).toBe('my-app')
+    })
+
+    it('keeps the rename pending when a feature\'s plugin did not load', async () => {
+        const projectDir = await scaffoldThenMove()
+        await renameProject(projectDir, (await readManifest(projectDir, registriesAt('1.0.0')))!, 'shop')
+        const withoutPlugin = makeRegistries({ requiredFeatures: [] })
+
+        await pullCapturing(projectDir, withoutPlugin)
+        process.exitCode = undefined
+
+        expect((await readManifestRaw(projectDir)).renderedName).toBe('my-app')
     })
 
     it('a dry-run after `rename` writes nothing and leaves the rename pending', async () => {

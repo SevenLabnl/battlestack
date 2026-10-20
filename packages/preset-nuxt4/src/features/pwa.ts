@@ -24,7 +24,7 @@ const DEDICATED_MASKABLE: Record<string, string> = {
 /** Progressive Web App via `@vite-pwa/nuxt`. Ships the battlestack icon pack; rebrand before launch. */
 export const pwaFeature: Feature = {
     id: 'nuxt4:pwa',
-    version: '1.1.0',
+    version: '1.1.1',
     label: 'Progressive Web App',
     description: 'Offline-capable installable app via @vite-pwa/nuxt.',
     frameworks: ['nuxt4'],
@@ -43,7 +43,7 @@ export const pwaFeature: Feature = {
             {
                 heading: 'PWA',
                 body: [
-                    'Service-worker via `@vite-pwa/nuxt` with `autoUpdate` registration. Manifest is wired in `nuxt.config.ts#pwa` — `@vite-pwa` generates and injects it, so do **not** add a second `public/site.webmanifest`. Icons live at `public/icon-{192,512}.png` plus `public/icon-maskable-{192,512}.png`.',
+                    'Service-worker via `@vite-pwa/nuxt` with `autoUpdate` registration. Manifest is wired in `nuxt.config.ts#pwa`: `@vite-pwa` generates and injects it, so do **not** add a second `public/site.webmanifest`. Icons live at `public/icon-{192,512}.png` plus `public/icon-maskable-{192,512}.png`.',
                     '',
                     'The shipped icons are the battlestack rook. Replace all four with your own branding before launch. The maskable pair is a separate drawing with a 66% safe zone: Android crops it to whatever shape the launcher uses, so it is full-bleed on purpose and must not simply be a copy of the plain icon.',
                     '',
