@@ -105,7 +105,7 @@ async function writeProjectManifest(
     dir: string,
     opts: {
         packageManager?: string
-        features?: Array<{ id: string, version: string, files?: Record<string, string> }>
+        features?: Array<{ id: string, version: string, files?: Record<string, string>, ownedByUser?: string[] }>
         framework?: string
         template?: string
         optedOut?: string[]
@@ -255,6 +255,29 @@ describe('doctorCommand: inside a project', () => {
         expect(text).toContain('drifted.ts')
         expect(text).toContain('pristine.ts')
         expect(text).toContain('missing.ts')
+    })
+
+    it('reports no drift for a path owned under another feature that tracks it', async () => {
+        await writeFile(path.join(tmpDir, 'shared.ts'), 'edited\n', 'utf8')
+        registries.features.register(
+            { id: 'feat:owner', label: 'x', version: '1.0.0', stage: 'FINALIZE', async execute() {} } as Feature,
+            origin,
+        )
+        registries.features.register(
+            { id: 'feat:other', label: 'x', version: '1.0.0', stage: 'FINALIZE', async execute() {} } as Feature,
+            origin,
+        )
+        await writeProjectManifest(tmpDir, {
+            packageManager: 'pnpm',
+            features: [
+                { id: 'doctortest:feat:owner', version: '1.0.0', files: { 'shared.ts': 'old-hash' }, ownedByUser: ['shared.ts'] },
+                { id: 'doctortest:feat:other', version: '1.0.0', files: { 'shared.ts': 'old-hash' } },
+            ],
+        })
+        mockCommands({ pnpm: true })
+
+        const text = (await run()).join('\n')
+        expect(text).not.toContain('edited since install')
     })
 
     it('checks Docker only when nuxt4:database is enabled, and hard-fails a missing daemon', async () => {
