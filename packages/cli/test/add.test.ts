@@ -515,6 +515,24 @@ describe('battlestack add into an existing file', () => {
     })
 })
 
+describe('battlestack add over a path another feature owns', () => {
+    it('leaves the owned file alone and stages nothing', async () => {
+        const p = await project()
+        await writeFile(path.join(p.dir, 'add-opt.txt'), 'the project\'s own file\n')
+        const manifest = await p.manifest()
+        manifest.features[0]!.ownedByUser = ['add-opt.txt']
+        await writeFile(path.join(p.dir, MANIFEST_PATH), JSON.stringify(manifest), 'utf8')
+
+        process.exitCode = undefined
+        await withCwd(p.dir, () => add('add:opt')(p))
+
+        expect(await readFile(path.join(p.dir, 'add-opt.txt'), 'utf8')).toBe('the project\'s own file\n')
+        expect(await fileExists(p.dir, '.battlestack/pull/add-opt.txt.new')).toBe(false)
+        expect(process.exitCode).toBeUndefined()
+        process.exitCode = undefined
+    })
+})
+
 describe('battlestack add after a pull that left work', () => {
     it('keeps the pull\'s items in REPORT.md next to its own', async () => {
         const p = await project()

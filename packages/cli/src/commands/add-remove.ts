@@ -102,10 +102,12 @@ export async function addCommand(args: ParsedArgs, loader: Ora, registries: Batt
     const pm = manifest.packageManager as PackageManager
     const fullEnabled = [...manifest.features.map((f) => f.id), fqid]
     const ctx = buildCtx(projectRoot, manifest, fullEnabled, pm, args, registries)
-    // Pre-primed so writeManifest preserves existing entries. Keyed bare.
+    // Pre-primed so writeManifest preserves existing entries, and the writers skip owned paths. Keyed bare.
     for (const f of manifest.features) {
         if (!registries.features.has(f.id)) continue
-        ctx.state[`files:${registries.features.get(f.id).id}`] = { ...f.files }
+        const bare = registries.features.get(f.id).id
+        ctx.state[`files:${bare}`] = { ...f.files }
+        if (f.ownedByUser) ctx.state[`owned:${bare}`] = [...f.ownedByUser]
     }
 
     ui.section(`Add ${fqid}`)

@@ -146,7 +146,7 @@ export async function repairOverwrites(
         // A file battlestack wrote and never checked out matches the committed bytes, not the filtered ones.
         if (before.has(hashContent(git(ctx.projectDir, ['cat-file', '-p', `HEAD:./${rel}`]).out))) continue
 
-        if (owned.has(rel)) {
+        if (owned.has(rel) && ctx.state.overwrite !== true) {
             await writeFile(abs, head.out)
             repairs.push({ rel, featureId: trackers[0]!.featureId, outcome: 'kept yours, owned' })
             continue
