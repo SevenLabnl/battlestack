@@ -56,6 +56,12 @@
   read every generated migration for dropped columns, and never copy a staged
   schema `.new` over the project's file. It also covers `--force` backups,
   monorepo projects and checking that a second pull exits with code 0.
+- A project scaffolded before the 3-day release-age policy can have a
+  `pnpm-lock.yaml` with packages younger than the policy allows, and pnpm then
+  refuses every script once `pull` adds the policy. `pull` now detects that,
+  skips lint and `db:generate`, and lists the fix in `REPORT.md`:
+  `pnpm clean --lockfile && pnpm install`, then lint, the tests and
+  `db:generate` if the schema changed.
 - A feature whose plugin did not load keeps its manifest record on `pull`
   instead of being dropped, so its files stay managed.
 - `shared:github` drops its records of the deploy workflows it no longer ships.
