@@ -76,6 +76,11 @@
 - The project's own Mastra agents are registered on boot again: Mastra 1.x
   renamed `getAgents()` to `listAgents()`, so only `default` showed up in the AI
   settings. Boot now warns when it finds no agents.
+- `battlestack own` and `disown` apply to every feature that tracks a path, so
+  a file tracked by two features, such as `app/app.config.ts`, is really yours.
+  `pull`, `add`, `doctor` and `remove` treat a path owned under any feature as
+  owned, and `pull` never changes an owned file. Paths owned with an earlier
+  version need no migration.
 - A feature whose plugin did not load keeps its manifest record on `pull`
   instead of being dropped, so its files stay managed.
 - `shared:github` drops its records of the deploy workflows it no longer ships.

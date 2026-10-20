@@ -141,6 +141,20 @@ describe('repairOverwrites', () => {
         expect((ctx.state['files:test:feat'] as Record<string, string>).Dockerfile).toBe(sha256('FROM node\n'))
     })
 
+    it('puts back an owned file a feature wrote over even when it was unedited', async () => {
+        git('init', '-q')
+        await write('Dockerfile', 'FROM node\n')
+        await commitAll()
+        // HEAD matches what battlestack recorded, so the file was never edited.
+        const start = recordedAtStart(manifestWith({ Dockerfile: sha256('FROM node\n') }))
+
+        await write('Dockerfile', 'FROM node:24\n')
+        const ctx = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { 'owned:test:feat': ['Dockerfile'] })
+
+        expect((await repairOverwrites(ctx, start, ctx.registries)).map((r) => r.outcome)).toEqual(['kept yours, owned'])
+        expect(lf(await read('Dockerfile'))).toBe('FROM node\n')
+    })
+
     it('puts back an owned file a feature wrote over, without staging anything', async () => {
         git('init', '-q')
         await write('Dockerfile', 'FROM node\nCOPY patches/ ./patches/\n')

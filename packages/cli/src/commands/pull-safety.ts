@@ -140,17 +140,17 @@ export async function repairOverwrites(
         // `./` resolves against the project directory, and --filters gives the bytes checkout wrote.
         const head = git(ctx.projectDir, ['cat-file', '--filters', `HEAD:./${rel}`])
         if (!head.ok) continue
-        const startByFeature = start.get(rel) ?? new Map<string, string>()
-        const before = new Set(startByFeature.values())
-        if (before.has(hashContent(head.out))) continue
-        // A file battlestack wrote and never checked out matches the committed bytes, not the filtered ones.
-        if (before.has(hashContent(git(ctx.projectDir, ['cat-file', '-p', `HEAD:./${rel}`]).out))) continue
-
+        // An owned file is the project's: pull never changes it, edited or not.
         if (owned.has(rel) && ctx.state.overwrite !== true) {
             await writeFile(abs, head.out)
             repairs.push({ rel, featureId: trackers[0]!.featureId, outcome: 'kept yours, owned' })
             continue
         }
+        const startByFeature = start.get(rel) ?? new Map<string, string>()
+        const before = new Set(startByFeature.values())
+        if (before.has(hashContent(head.out))) continue
+        // A file battlestack wrote and never checked out matches the committed bytes, not the filtered ones.
+        if (before.has(hashContent(git(ctx.projectDir, ['cat-file', '-p', `HEAD:./${rel}`]).out))) continue
 
         if (ctx.state.force === true) {
             const bak = path.join(ctx.projectDir, PULL_DIR, `${rel}.bak`)
@@ -275,7 +275,7 @@ export function renderReport(s: PullSummary): string {
         ),
         ...section(
             'Local edits a feature wrote over',
-            'These features replaced a file that had local edits. Pull put your version back and merged or staged theirs, as listed in the sections above, or under `--force` kept theirs and saved yours as `.battlestack/pull/<path>.bak`. Check the result.',
+            'These features replaced a file that had local edits. Pull put your version back and merged or staged theirs, as listed in the sections above, or under `--force` kept theirs and saved yours as `.battlestack/pull/<path>.bak`. A file you own with `battlestack own` is simply put back. Check the result.',
             repaired,
         ),
         ...section(
