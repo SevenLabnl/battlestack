@@ -2,6 +2,7 @@ import path from 'node:path'
 import { readdir, readFile } from 'node:fs/promises'
 import { exists, hashFile, isFeatureEnabled, resolveProjectPM, run, updateLedger, type RunContext } from '@battlestack/core'
 import { ui } from '@battlestack/tui'
+import { LOCKFILE_BLOCKED_STATE_KEY } from './release-age.js'
 
 /** Drizzle migrations for scaffold and `pull`: production applies only the committed SQL. */
 
@@ -99,6 +100,10 @@ export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map
         || [...schemaAfter].some(([file, hash]) => schemaBefore.get(file) !== hash)
     if (!changed) return
 
+    if (ctx.state[LOCKFILE_BLOCKED_STATE_KEY]) {
+        ledger.actions.push(`The schema changed. After rebuilding the lockfile: ${generateByHand(ctx)}`)
+        return
+    }
     if (ctx.state.skipInstall) {
         ledger.actions.push(`The schema changed and --skip-install skipped db:generate: ${generateByHand(ctx)}`)
         ui.warn('Schema changed; --skip-install skipped db:generate. See .battlestack/pull/REPORT.md')

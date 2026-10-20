@@ -44,7 +44,7 @@ import {
     type RunContext,
     type UpdateReport,
 } from '@battlestack/core'
-import { generatePulledMigration, hashSchemaFiles } from '@battlestack/preset-nuxt4'
+import { checkLockfileAgainstReleaseAge, generatePulledMigration, hashSchemaFiles, hasReleaseAgePolicy } from '@battlestack/preset-nuxt4'
 
 /** Static metadata only. `run` is built per-dispatch in `project.ts`. */
 export const pullReservedMeta: Omit<ReservedCommand, 'run'> = {
@@ -430,6 +430,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
 
         // Before anything writes: the schema files this pull changes need a migration.
         const schemaBefore = await hashSchemaFiles(projectDir)
+        const hadReleaseAgePolicy = await hasReleaseAgePolicy(projectDir)
 
         // Rehydration runs before the update pass, whose doc aggregator reads enabled features.
         await rehydrateMissingFeatures(
@@ -469,8 +470,10 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         }
 
         if (!ctx.dryRun) {
+            // Only the pull that brings in the policy can leave an older lockfile that breaks it.
+            const lockfileBlocked = !hadReleaseAgePolicy && await checkLockfileAgainstReleaseAge(ctx)
             // `--no-format` skips the format pass and its drift re-baseline.
-            if (args.format) {
+            if (args.format && !lockfileBlocked) {
                 await formatAndReconcile(ctx, manifest, registries)
             }
             // A feature that did not run still carries the old name, so the rename stays pending.
