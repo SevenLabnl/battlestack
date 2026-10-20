@@ -256,8 +256,8 @@ importers:
   packages/theme:
     dependencies:
       '@nuxt/kit':
-        specifier: ^4.6.1
-        version: 4.6.1(magic-string@1.4.3)(rolldown@1.2.13)
+        specifier: ^4.6.2
+        version: 4.6.2(magic-string@1.4.3)(rolldown@1.2.13)
 
   packages/tui:
     dependencies:
@@ -463,8 +463,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@nuxt/kit@4.6.1':
-    resolution: {integrity: sha512-ld5+/o4EMqyw6Qy+SdEYkezfprS87+p+xOBhnQgXwyrg1EdtILfLeudQ+hX6UyCnsoF6o0SOw3pjN1P4Tg9O0w==}
+  '@nuxt/kit@4.6.2':
+    resolution: {integrity: sha512-Vn9DJobc30WdR1vrlRcEAFSFy7NV5CWq3o6gxsfrdGb2FmCh0fuDyvbZC30rm2enyiPaOUPafKctFE/ToBjybw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       '@nuxt/schema': ^3.0.0 || ^4.0.0 || ^5.0.0-0
@@ -1265,7 +1265,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@nuxt/kit@4.6.1(magic-string@1.4.3)(rolldown@1.2.13)':
+  '@nuxt/kit@4.6.2(magic-string@1.4.3)(rolldown@1.2.13)':
     dependencies:
       consola: 3.4.2
       defu: 6.1.7
