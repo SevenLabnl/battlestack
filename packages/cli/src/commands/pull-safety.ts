@@ -9,6 +9,7 @@ import {
     hashContent,
     hasConflictMarkers,
     isBinaryPath,
+    ownedAnywhere,
     pruneBases,
     recordedFiles,
     stageUpstream,
@@ -101,7 +102,7 @@ export async function preflight(
 export interface OverwriteRepair {
     rel: string
     featureId: string
-    outcome: 'merged' | 'conflicts' | 'staged' | 'backed up'
+    outcome: 'merged' | 'conflicts' | 'staged' | 'backed up' | 'kept yours, owned'
 }
 
 /** Bare feature id for a manifest id, which may be an fqid. */
@@ -112,9 +113,10 @@ function bareId(registries: BattlestackRegistries, id: string): string {
 /**
  * Catches feature writes that bypassed the drift-aware writers: a tracked or untracked file
  * that held local edits at HEAD and was replaced. The local version is put back and the
- * feature's output is merged into it, or staged when there is no base to merge against.
- * `--force` keeps the feature output and saves the local version as a `.bak`, as the drift-aware
- * writers do; `--overwrite` takes the output as asked.
+ * feature's output is merged into it, or staged when there is no base to merge against. A
+ * path owned under any feature only gets the local version back. `--force` keeps the feature
+ * output and saves the local version as a `.bak`, as the drift-aware writers do; `--overwrite`
+ * takes the output as asked.
  */
 export async function repairOverwrites(
     ctx: RunContext,
@@ -125,6 +127,7 @@ export async function repairOverwrites(
     const ledger = updateLedger(ctx)
     const handled = new Set(ledger.handled)
     const exempt = selfMergedPaths(ctx, registries)
+    const owned = ownedAnywhere(ctx)
     const changed = git(ctx.projectDir, ['diff', '--name-only', '-z', '--relative', 'HEAD']).out.toString().split('\0').filter(Boolean)
     const repairs: OverwriteRepair[] = []
 
@@ -142,6 +145,12 @@ export async function repairOverwrites(
         if (before.has(hashContent(head.out))) continue
         // A file battlestack wrote and never checked out matches the committed bytes, not the filtered ones.
         if (before.has(hashContent(git(ctx.projectDir, ['cat-file', '-p', `HEAD:./${rel}`]).out))) continue
+
+        if (owned.has(rel)) {
+            await writeFile(abs, head.out)
+            repairs.push({ rel, featureId: trackers[0]!.featureId, outcome: 'kept yours, owned' })
+            continue
+        }
 
         if (ctx.state.force === true) {
             const bak = path.join(ctx.projectDir, PULL_DIR, `${rel}.bak`)

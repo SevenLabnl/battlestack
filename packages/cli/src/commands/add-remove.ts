@@ -12,6 +12,7 @@ import {
     readManifest,
     recordOwned,
     run,
+    toPosixRel,
     MANIFEST_PATH,
     writeJson,
     writeManifest,
@@ -255,10 +256,10 @@ export async function removeCommand(args: ParsedArgs, _loader: Ora, registries: 
     // pristine → delete, drifted → leave. Owned files are skipped.
     const pristine: string[] = []
     const drifted: string[] = []
-    const ownedSet = new Set(record.ownedByUser ?? [])
+    const ownedSet = new Set(manifest.features.flatMap((f) => (f.ownedByUser ?? []).map(toPosixRel)))
     for (const [rel, recordedHash] of Object.entries(record.files)) {
         const abs = path.join(projectRoot, rel)
-        const state = await classifyFileState(abs, recordedHash, ownedSet.has(rel))
+        const state = await classifyFileState(abs, recordedHash, ownedSet.has(toPosixRel(rel)))
         if (state === 'pristine' || state === 'missing') pristine.push(rel)
         else if (state === 'drifted') drifted.push(rel)
     }
