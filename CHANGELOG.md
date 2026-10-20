@@ -78,7 +78,9 @@
   `db:generate` if the schema changed.
 - The landing layout has a `#header-actions` target in its header, shown at
   every width, so a page can add an action such as "New chat" with
-  `<Teleport to="#header-actions" defer>` instead of editing the layout.
+  `<Teleport to="#header-actions" defer>` instead of editing the layout. The
+  layout belongs to your project, so `pull` does not change it: the pull that
+  brings this in lists the two lines to add in `REPORT.md`.
 - A prompt can be up to 100,000 characters instead of 10,000, and a prompt that
   cannot be saved shows the reason in the toast instead of a bare 400.
 - The AI settings e2e test sets the model from `NUXT_AI_GATEWAY_CHAT_MODEL`
