@@ -241,6 +241,11 @@ describe('repairOverwrites', () => {
         expect((await repairOverwrites(force, start, force.registries)).map((r) => r.outcome)).toEqual(['backed up'])
         expect(await read('Dockerfile')).toBe('FROM node:24\n')
         expect(lf(await read(path.join('.battlestack', 'pull', 'Dockerfile.bak')))).toBe('FROM node\nCOPY patches/ ./patches/\n')
+
+        // --overwrite also takes an owned file, as confirmed at its prompt.
+        const both = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { overwrite: true, force: true, 'owned:test:feat': ['Dockerfile'] })
+        expect((await repairOverwrites(both, start, both.registries)).map((r) => r.outcome)).toEqual(['backed up'])
+        expect(await read('Dockerfile')).toBe('FROM node:24\n')
     })
 
     it('puts back the record of the feature that wrote the file, not another tracker\'s', async () => {
