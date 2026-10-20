@@ -7,15 +7,22 @@ import { requireRole, requireRouterParam } from '#server/utils/auth'
 import { tryLogAudit } from '#server/utils/audit-bridge'
 import { invalidatePromptCache } from '#server/utils/prompts'
 
+// The column is `text`; this only stops runaway input. Real agent prompts run past 15,000 characters.
+const MAX_CONTENT = 100_000
+
 const schema = z.object({
-    content: z.string().min(1, 'Content is required').max(10_000),
+    content: z.string().min(1, 'Content is required').max(MAX_CONTENT, `Content is longer than ${MAX_CONTENT.toLocaleString('en')} characters`),
 })
 
 export default defineEventHandler(async (event) => {
     await requireRole(event, Role.Admin)
     const id = requireRouterParam(event, 'id')
 
-    const { content } = await readValidatedBody(event, schema.parse)
+    const parsed = schema.safeParse(await readBody(event))
+    if (!parsed.success) {
+        throw createError({ statusCode: 400, statusMessage: parsed.error.issues[0]?.message ?? 'Invalid prompt' })
+    }
+    const { content } = parsed.data
 
     const [updated] = await db
         .update(prompts)
