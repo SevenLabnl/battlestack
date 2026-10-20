@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { BattlestackRegistries, updateLedger, type ProjectManifest, type RunContext } from '@battlestack/core'
+import { BattlestackRegistries, exists, updateLedger, type ProjectManifest, type RunContext } from '@battlestack/core'
 import {
     needsAttention,
     preflight,
@@ -156,6 +156,24 @@ describe('repairOverwrites', () => {
         expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'merged' }])
         expect(lf(await read('Dockerfile'))).toBe('FROM node:24\nWORKDIR /app\nCOPY . .\nRUN build --prod\nCMD start\n')
         expect(updateLedger(ctx).merged).toContain('Dockerfile')
+    })
+
+    it('puts back an owned file a feature wrote over, without staging anything', async () => {
+        git('init', '-q')
+        await write('Dockerfile', 'FROM node\nCOPY patches/ ./patches/\n')
+        git('add', '-A')
+        git('commit', '-q', '-m', 'init')
+        const start = recordedAtStart(manifestWith({ Dockerfile: sha256('FROM node\n') }))
+
+        await write('Dockerfile', 'FROM node:24\n')
+        // Owned under a feature other than the one that wrote it.
+        const ctx = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { 'owned:other:feat': ['Dockerfile'] })
+
+        const repairs = await repairOverwrites(ctx, start, ctx.registries)
+        expect(repairs).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'kept yours, owned' }])
+        expect(lf(await read('Dockerfile'))).toBe('FROM node\nCOPY patches/ ./patches/\n')
+        expect(await exists(path.join(projectDir, '.battlestack/pull/Dockerfile.new'))).toBe(false)
+        expect(updateLedger(ctx).staged).toEqual([])
     })
 
     it('leaves a file alone that was pristine before the pull', async () => {

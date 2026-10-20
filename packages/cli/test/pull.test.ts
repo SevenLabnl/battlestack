@@ -349,6 +349,52 @@ describe('battlestack pull: ownedByUser is inviolable', () => {
         process.exitCode = undefined
     })
 
+    it('CORE PROPERTY: a path owned under one feature is left alone by every other feature that writes it', async () => {
+        const projectDir = await tmp('battlestack-pull-owned-shared-')
+        const ownerTpl = await tmp('battlestack-pull-owned-shared-owner-')
+        const otherV1 = await tmp('battlestack-pull-owned-shared-v1-')
+        const otherV2 = await tmp('battlestack-pull-owned-shared-v2-')
+        await writeTemplateFile(ownerTpl, 'shared.ts', 'v1\n')
+        await writeTemplateFile(otherV1, 'other.ts', 'other\n')
+        await writeTemplateFile(otherV2, 'other.ts', 'other\n')
+        await writeTemplateFile(otherV2, 'shared.ts', 'v2\n')
+
+        // The owner runs first, so the other feature does not defer the shared path to it.
+        const ids = [fqid('test:feat-owner'), fqid('test:feat-other')]
+        const registriesV1 = makeRegistries({ requiredFeatures: ids })
+        const owner = makeFileFeature('test:feat-owner', '1.0.0', ownerTpl, { stage: STAGE.BASE_CONFIG })
+        const otherV1Feature = makeFileFeature('test:feat-other', '1.0.0', otherV1)
+        registriesV1.features.register(owner, origin)
+        registriesV1.features.register(otherV1Feature, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, ids)
+        await owner.execute(ctx)
+        await otherV1Feature.execute(ctx)
+        await writeManifest(ctx)
+
+        // The shape an older `own` left behind: both features track the path, only one owns it.
+        const manifest = await readManifestRaw(projectDir)
+        const sharedHash = await hashFile(path.join(projectDir, 'shared.ts'))
+        manifest.features.find((f) => f.id === fqid('test:feat-owner'))!.ownedByUser = ['shared.ts']
+        manifest.features.find((f) => f.id === fqid('test:feat-other'))!.files['shared.ts'] = sharedHash
+        await writeFile(path.join(projectDir, MANIFEST_PATH), JSON.stringify(manifest, null, 2), 'utf8')
+        const edited = 'mine\n'
+        await writeFile(path.join(projectDir, 'shared.ts'), edited, 'utf8')
+
+        const registriesV2 = makeRegistries({ requiredFeatures: ids })
+        registriesV2.features.register(makeFileFeature('test:feat-owner', '1.0.0', ownerTpl, { stage: STAGE.BASE_CONFIG }), origin)
+        registriesV2.features.register(makeFileFeature('test:feat-other', '2.0.0', otherV2), origin)
+
+        process.exitCode = undefined
+        await runPull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, 'shared.ts'), 'utf8')).toBe(edited)
+        expect(await exists(path.join(projectDir, '.battlestack', 'pull', 'shared.ts.new'))).toBe(false)
+        expect(process.exitCode).toBeUndefined()
+        const after = await readManifestRaw(projectDir)
+        expect(after.features.find((f) => f.id === fqid('test:feat-other'))!.version).toBe('2.0.0')
+        process.exitCode = undefined
+    })
+
     it('retires a moved template through real ownership and version-gated pulls without data loss', async () => {
         const projectDir = await tmp('battlestack-pull-owned-retirement-')
         const tplV1 = await tmp('battlestack-pull-owned-retirement-v1-')
