@@ -42,7 +42,7 @@ const LEVELS: Level[] = ['patch', 'minor', 'major']
 const ID_RE = /\bid:\s*'([^']+)'/
 const ID_CONST_RE = /\bid:\s*([A-Za-z_$][\w$]*)\s*,/
 const VERSION_RE = /(\n\s*version:\s*')(\d+\.\d+\.\d+)(')/
-const TPL_NAME_RE = /(?:templatesDir\(\s*import\.meta\.url\s*(?:,\s*'\.\.'\s*)*,\s*'templates'\s*,|emitTemplate(?:Update)?(?:Many)?\(\s*ctx\s*,\s*'[^']*'\s*,\s*import\.meta\.url\s*,)\s*(\[[^\]]*\]|`[^`]*`|'[^']*')/g
+const TPL_NAME_RE = /(?:templatesDir\(\s*import\.meta\.url\s*(?:,\s*'\.\.'\s*)*,\s*'templates'\s*,|emitTemplate(?:Update)?(?:Many)?\(\s*ctx\s*,\s*(?:'[^']*'|[\w.]+)\s*,\s*import\.meta\.url\s*,)\s*(\[[^\]]*\]|`[^`]*`|'[^']*')/g
 
 /** Aggregating hook -> id of the feature that writes the file it feeds. */
 const WRITERS: Record<string, string> = {
