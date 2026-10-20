@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The generated Dockerfile pins the latest `node:24-alpine` image.
 - `pull` merges upstream changes into files you edited instead of only staging
   them. Edited files get a three-way merge against the version battlestack last
   wrote, with diff3 conflict markers where both sides changed the same lines.
