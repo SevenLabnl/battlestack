@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { readdir, readFile } from 'node:fs/promises'
+import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { exists, hashFile, isFeatureEnabled, resolveProjectPM, run, updateLedger, type RunContext } from '@battlestack/core'
 import { ui } from '@battlestack/tui'
 import { LOCKFILE_BLOCKED_STATE_KEY } from './release-age.js'
@@ -42,7 +42,7 @@ function lastLineOf(text: string): string | undefined {
  * need node_modules. Never throws. drizzle-kit exits 0 on a rename prompt without a TTY and on
  * a schema it cannot load, so only a new SQL file counts as success.
  */
-export async function generateMigration(ctx: RunContext): Promise<GenerateResult> {
+export async function generateMigration(ctx: RunContext, args: string[] = []): Promise<GenerateResult> {
     const before = await migrationFiles(ctx.projectDir)
     let lastLine: string | undefined
     let upToDate = false
@@ -51,7 +51,7 @@ export async function generateMigration(ctx: RunContext): Promise<GenerateResult
             projectDir: ctx.projectDir,
             fallback: String(ctx.state.packageManager ?? 'pnpm'),
         })
-        const result = await run(pm, ['run', 'db:generate'], { cwd: ctx.projectDir, inherit: ctx.debug })
+        const result = await run(pm, ['run', 'db:generate', ...args], { cwd: ctx.projectDir, inherit: ctx.debug })
         lastLine = lastLineOf(result.stderr) ?? lastLineOf(result.stdout)
         upToDate = /no schema changes/i.test(`${result.stdout}\n${result.stderr}`)
     } catch (err) {
@@ -83,7 +83,7 @@ export async function hashSchemaFiles(projectDir: string): Promise<Map<string, s
  */
 export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map<string, string>): Promise<void> {
     if (!isFeatureEnabled(ctx, 'nuxt4:database')) return
-    await warnDroppedAvatarColumn(ctx)
+    await repairDroppedAvatarColumn(ctx)
     const ledger = updateLedger(ctx)
 
     // A staged or conflicted schema file is not on disk in its new form yet, so generating now
@@ -124,21 +124,66 @@ export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map
     ui.warn('Schema changed but no migration was generated. See .battlestack/pull/REPORT.md')
 }
 
+const AVATAR_COLUMN = /\b(DROP|ADD) COLUMN\s+(?:IF (?:NOT )?EXISTS\s+)?"?avatar_key"?/gi
+const BREAKPOINT = '--> statement-breakpoint'
+const RESTORE_SQL = 'ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "avatar_key" text;\n'
+
 /**
  * Earlier pulls staged a users.ts without `avatarKey` on storage projects, and generating from it
- * drops the column, deleting every avatar on deploy. Warns while the migrations end with it dropped.
+ * wrote a migration that deletes every avatar on deploy. While the schema still declares the
+ * column, takes the drop out of that migration and its snapshots, and adds a migration that puts
+ * the column back where the drop already ran.
  */
-async function warnDroppedAvatarColumn(ctx: RunContext): Promise<void> {
+async function repairDroppedAvatarColumn(ctx: RunContext): Promise<void> {
     if (!isFeatureEnabled(ctx, 'nuxt4:storage')) return
     const dir = path.join(ctx.projectDir, MIGRATIONS_DIR)
     let droppedIn: string | undefined
     for (const file of [...await migrationFiles(ctx.projectDir)].sort()) {
         const sql = await readFile(path.join(dir, file), 'utf8')
-        for (const [, op] of sql.matchAll(/\b(DROP|ADD) COLUMN\s+(?:IF (?:NOT )?EXISTS\s+)?"?avatar_key"?/gi)) {
-            droppedIn = op.toUpperCase() === 'DROP' ? file : undefined
-        }
+        for (const [, op] of sql.matchAll(AVATAR_COLUMN)) droppedIn = op!.toUpperCase() === 'DROP' ? file : undefined
     }
-    if (droppedIn) {
-        ui.warn(`server/database/migrations/${droppedIn} drops users.avatar_key, which deletes every avatar on deploy. Remove that migration unless you meant it`)
+    if (!droppedIn) return
+    const where = `server/database/migrations/${droppedIn}`
+    const users = path.join(ctx.projectDir, 'server', 'database', 'schema', 'users.ts')
+    if (!(await exists(users)) || !(await readFile(users, 'utf8')).includes('avatar_key')) {
+        ui.warn(`${where} drops users.avatar_key, which deletes every avatar on deploy. Remove that migration unless you meant it`)
+        return
+    }
+
+    const sqlPath = path.join(dir, droppedIn)
+    const kept = (await readFile(sqlPath, 'utf8')).split(BREAKPOINT).filter((stmt) => !/\bDROP COLUMN\b[^;]*"?avatar_key"?/i.test(stmt))
+    // drizzle runs every statement, so a migration left with none gets a harmless one.
+    await writeFile(sqlPath, kept.length > 0 ? kept.join(BREAKPOINT) : 'SELECT 1;\n')
+    await restoreSnapshotColumn(dir, Number.parseInt(path.basename(droppedIn), 10))
+
+    const ledger = updateLedger(ctx)
+    const restored = ctx.state[LOCKFILE_BLOCKED_STATE_KEY] || ctx.state.skipInstall
+        ? []
+        : (await generateMigration(ctx, ['--custom', '--name=restore_avatar_key'])).created
+    if (restored.length === 1) await writeFile(path.join(dir, restored[0]!), RESTORE_SQL)
+    const restore = restored.length === 1
+        ? `and added server/database/migrations/${restored[0]}, which puts the column back (empty) where it already ran`
+        : `but could not add the migration that puts the column back where it already ran. Run \`${String(ctx.state.packageManager ?? 'pnpm')} run db:generate --custom --name=restore_avatar_key\` and write \`${RESTORE_SQL.trim()}\` into the new file`
+    ledger.actions.push(`${where} dropped users.avatar_key, which deletes every avatar on deploy. Pull took the drop out of it and its snapshots, ${restore}. Avatars are kept wherever it has not run yet; where it did, only a database backup brings them back. Review both and commit them before you deploy.`)
+    ui.warn(`Repaired ${where}, which dropped users.avatar_key. See .battlestack/pull/REPORT.md`)
+}
+
+/** Puts `users.avatar_key` back into the snapshot of migration `fromIdx` and every later one. */
+async function restoreSnapshotColumn(dir: string, fromIdx: number): Promise<void> {
+    const meta = path.join(dir, 'meta')
+    if (!(await exists(meta))) return
+    const snapshots = (await readdir(meta)).filter((f) => /^\d+_snapshot\.json$/.test(f)).sort()
+    let column: unknown = { name: 'avatar_key', type: 'text', primaryKey: false, notNull: false }
+    for (const file of snapshots) {
+        const snap = JSON.parse(await readFile(path.join(meta, file), 'utf8'))
+        const columns = snap.tables?.['public.users']?.columns
+        if (!columns) continue
+        if (Number.parseInt(file, 10) < fromIdx) {
+            column = columns.avatar_key ?? column
+            continue
+        }
+        if (columns.avatar_key) continue
+        columns.avatar_key = column
+        await writeFile(path.join(meta, file), `${JSON.stringify(snap, null, 2)}\n`)
     }
 }
