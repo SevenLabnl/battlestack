@@ -19,6 +19,7 @@ import {
     spawnSyncResolved as safeSpawnSync,
     STAGE_ORDER,
     SUPPORTED_PMS,
+    toPosixRel,
     type BattlestackRegistries,
     type ParsedArgs,
     type ProjectManifest,
@@ -85,6 +86,8 @@ export async function doctorCommand(args: ParsedArgs, _loader: Ora, registries: 
         return a.id.localeCompare(b.id)
     })
 
+    // Owned under one feature means owned under every feature that tracks the path.
+    const ownedSet = new Set(manifest.features.flatMap((f) => (f.ownedByUser ?? []).map(toPosixRel)))
     const reports: FeatureReport[] = []
     for (const record of sortedFeatures) {
         const installed = record.version
@@ -101,11 +104,10 @@ export async function doctorCommand(args: ParsedArgs, _loader: Ora, registries: 
             }
         }
 
-        const ownedSet = new Set(record.ownedByUser ?? [])
         const files: FileStatus[] = []
         for (const [rel, recordedHash] of Object.entries(record.files ?? {})) {
             const abs = path.join(projectRoot, rel)
-            const state = await classifyFileState(abs, recordedHash, ownedSet.has(rel))
+            const state = await classifyFileState(abs, recordedHash, ownedSet.has(toPosixRel(rel)))
             files.push({ rel, state })
         }
 
