@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The generated Dockerfile pins the latest `node:24-alpine` image.
 - The project name recorded in `.battlestack/manifest.json` now always wins over
   the directory name. Before, any project command in a clone, CI checkout or
   renamed directory silently renamed the project to the directory name, and
