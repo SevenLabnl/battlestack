@@ -51,12 +51,15 @@ describe('e2e: ai model admin', () => {
         expect(status).toBe(403)
     })
 
-    it.skipIf(!serverUp)('admin can update a config model', async () => {
+    // The environment's own chat model, so a run against a dev server leaves a model its gateway key may use.
+    const envChatModel = process.env.NUXT_AI_GATEWAY_CHAT_MODEL
+
+    it.skipIf(!serverUp || !envChatModel)('admin can update a config model', async () => {
         const adminCookie = await loginAsAdmin()
         const list = await apiGet<ModelConfig[]>('/api/ai/configs', adminCookie)
         const target = list.data?.[0]
-        if (!target) return
-        const next = 'openai/gpt-5.6-luna'
+        if (!target || !envChatModel) return
+        const next = envChatModel
         const { status, data } = await apiPut<ModelConfig>(
             `/api/ai/configs/${target.id}`,
             { model: next },

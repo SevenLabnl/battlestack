@@ -9,6 +9,7 @@ import {
     hashContent,
     hasConflictMarkers,
     isBinaryPath,
+    ownedAnywhere,
     pruneBases,
     recordedFiles,
     stageUpstream,
@@ -101,7 +102,7 @@ export async function preflight(
 export interface OverwriteRepair {
     rel: string
     featureId: string
-    outcome: 'merged' | 'conflicts' | 'staged' | 'backed up'
+    outcome: 'merged' | 'conflicts' | 'staged' | 'backed up' | 'kept yours, owned'
 }
 
 /** Bare feature id for a manifest id, which may be an fqid. */
@@ -112,9 +113,10 @@ function bareId(registries: BattlestackRegistries, id: string): string {
 /**
  * Catches feature writes that bypassed the drift-aware writers: a tracked or untracked file
  * that held local edits at HEAD and was replaced. The local version is put back and the
- * feature's output is merged into it, or staged when there is no base to merge against.
- * `--force` keeps the feature output and saves the local version as a `.bak`, as the drift-aware
- * writers do; `--overwrite` takes the output as asked.
+ * feature's output is merged into it, or staged when there is no base to merge against. A
+ * path owned under any feature only gets the local version back. `--force` keeps the feature
+ * output and saves the local version as a `.bak`, as the drift-aware writers do; `--overwrite`
+ * takes the output as asked.
  */
 export async function repairOverwrites(
     ctx: RunContext,
@@ -125,6 +127,7 @@ export async function repairOverwrites(
     const ledger = updateLedger(ctx)
     const handled = new Set(ledger.handled)
     const exempt = selfMergedPaths(ctx, registries)
+    const owned = ownedAnywhere(ctx)
     const changed = git(ctx.projectDir, ['diff', '--name-only', '-z', '--relative', 'HEAD']).out.toString().split('\0').filter(Boolean)
     const repairs: OverwriteRepair[] = []
 
@@ -137,6 +140,12 @@ export async function repairOverwrites(
         // `./` resolves against the project directory, and --filters gives the bytes checkout wrote.
         const head = git(ctx.projectDir, ['cat-file', '--filters', `HEAD:./${rel}`])
         if (!head.ok) continue
+        // An owned file is the project's: pull never changes it, edited or not.
+        if (owned.has(rel) && ctx.state.overwrite !== true) {
+            await writeFile(abs, head.out)
+            repairs.push({ rel, featureId: trackers[0]!.featureId, outcome: 'kept yours, owned' })
+            continue
+        }
         const startByFeature = start.get(rel) ?? new Map<string, string>()
         const before = new Set(startByFeature.values())
         if (before.has(hashContent(head.out))) continue
@@ -266,7 +275,7 @@ export function renderReport(s: PullSummary): string {
         ),
         ...section(
             'Local edits a feature wrote over',
-            'These features replaced a file that had local edits. Pull put your version back and merged or staged theirs, as listed in the sections above, or under `--force` kept theirs and saved yours as `.battlestack/pull/<path>.bak`. Check the result.',
+            'These features replaced a file that had local edits. Pull put your version back and merged or staged theirs, as listed in the sections above, or under `--force` kept theirs and saved yours as `.battlestack/pull/<path>.bak`. A file you own with `battlestack own` is simply put back. Check the result.',
             repaired,
         ),
         ...section(
