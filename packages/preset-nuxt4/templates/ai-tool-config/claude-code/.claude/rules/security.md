@@ -55,6 +55,7 @@ const body = await readValidatedBody(event, schema.parse)
 - Secrets in `.env`; never hardcode API keys, passwords, or tokens
 - `.env` is in `.gitignore`; `.env.example` is committed (with placeholder values)
 - Use `useRuntimeConfig()` in server routes for Nuxt env access
+- Nothing secret goes under `runtimeConfig.public`: it is serialized into every page
 - AI gateway key, admin password, session secret: all from `.env`
 
 ## Headers and Cookies
@@ -69,4 +70,5 @@ const body = await readValidatedBody(event, schema.parse)
 - Don't log passwords or sensitive data (seed script is silent)
 - Don't disable ESLint security rules
 - Don't use unsafe code execution patterns
+- Don't render user-controlled content with `v-html`; `{{ }}` escapes it, `v-html` does not, and nothing on the server strips HTML
 - Don't store sessions in localStorage; use httpOnly cookies

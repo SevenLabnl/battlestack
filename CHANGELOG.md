@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The Claude Code rules now ask for `pnpm run typecheck` next to lint and tests,
+  and rule out getting checks green by suppressing them (`@ts-ignore`, `as any`,
+  `eslint-disable`, skipped tests, `--no-verify`). `security.md` adds that nothing
+  secret goes under `runtimeConfig.public` and that user content is never rendered
+  with `v-html`. Existing projects get this via `battlestack pull`.
 - The generated Dockerfile pins the latest `node:24-alpine` image.
 - The project name recorded in `.battlestack/manifest.json` now always wins over
   the directory name. Before, any project command in a clone, CI checkout or
