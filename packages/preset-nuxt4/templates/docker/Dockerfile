@@ -3,7 +3,7 @@
 # Build stage
 
 # Pinned by digest so a rebuild of the same commit gets the same base image.
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS build
 WORKDIR /app
 
 # pnpm-workspace.yaml carries the `allowBuilds:` approvals for native deps and MUST land before install,
@@ -107,7 +107,7 @@ GUARD
 
 # Runtime stage
 
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS runtime
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS runtime
 # The runtime only ever calls `node`; the bundled npm carries its own vulnerable dependencies.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
     /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
