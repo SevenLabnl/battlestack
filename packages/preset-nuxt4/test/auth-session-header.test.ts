@@ -76,3 +76,10 @@ it('warns about the session defaults it cannot add under a non-literal session',
     await authFeature.execute(context())
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('nuxt.config.ts#runtimeConfig.session.sessionHeader'))
 })
+
+it('warns about the public keys it cannot add under a non-literal runtimeConfig.public, as for session', async () => {
+    await writeConfig('const pub = { appName: \'x\' }\nexport default defineNuxtConfig({\n    runtimeConfig: { public: pub },\n})\n')
+    const warn = vi.spyOn(ui, 'warn').mockImplementation(() => {})
+    await authFeature.execute(context())
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('nuxt.config.ts#runtimeConfig.public.allowRegistration'))
+})
