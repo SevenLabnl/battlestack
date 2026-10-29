@@ -84,16 +84,25 @@ describe('securityFeature', () => {
     })
 
     it.each([
-        ['disabled', 'rateLimiter: false,'],
-        ['already gated', 'rateLimiter: process.env.NUXT_RATE_LIMIT_DISABLED === \'true\' ? false : { tokensPerInterval: 1 },'],
-        ['a variable', 'rateLimiter: limits,'],
-    ])('update() leaves a %s rateLimiter alone', async (_, line) => {
+        ['disabled', 'rateLimiter: false,', 0],
+        ['already gated', 'rateLimiter: process.env.NUXT_RATE_LIMIT_DISABLED === \'true\' ? false : { tokensPerInterval: 1 },', 0],
+        ['a variable', 'rateLimiter: limits,', 1],
+    ])('update() leaves a %s rateLimiter alone, with %i note', async (_, line, notes) => {
         const cfgPath = path.join(projectDir, 'nuxt.config.ts')
         const before = `const limits = { tokensPerInterval: 1 }\nexport default defineNuxtConfig({\n    security: {\n        ${line}\n    },\n})\n`
         await writeFile(cfgPath, before, 'utf8')
         const report = await securityFeature.update!(ctx(), null)
         expect(await readFile(cfgPath, 'utf8')).toBe(before)
-        expect(report.notes).toHaveLength(0)
+        expect(report.notes).toHaveLength(notes)
+    })
+
+    it.each(['as any', 'satisfies RateLimiter'])('update() gates a rateLimiter written `{ … } %s`', async (suffix) => {
+        const cfgPath = path.join(projectDir, 'nuxt.config.ts')
+        await writeFile(cfgPath, `export default defineNuxtConfig({\n    security: {\n        rateLimiter: { tokensPerInterval: 50 } ${suffix},\n    },\n})\n`, 'utf8')
+        const report = await securityFeature.update!(ctx(), null)
+        const cfg = await readFile(cfgPath, 'utf8')
+        expect(cfg).toContain(`rateLimiter: process.env.NUXT_RATE_LIMIT_DISABLED === 'true' ? false : { tokensPerInterval: 50 } ${suffix}`)
+        expect(report.notes).toHaveLength(1)
     })
 
     it('update() gates a rateLimiter with nested options, and ignores one in a comment', async () => {

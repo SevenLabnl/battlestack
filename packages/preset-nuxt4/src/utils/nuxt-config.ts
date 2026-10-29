@@ -192,18 +192,25 @@ export class NuxtConfig {
         return this
     }
 
-    /** Wraps an object-literal `security.rateLimiter` as `<gate><object>`, keeping its values. True when it did. */
-    gateRateLimiter(gate: string): boolean {
+    /**
+     * Wraps an object-literal `security.rateLimiter` as `<gate><object>`, keeping its values, and
+     * says whether it did, or found a value it cannot gate (a variable or a call).
+     */
+    gateRateLimiter(gate: string): 'gated' | 'unchanged' | 'not-literal' {
         const security = this.config.security
-        if (security?.$type !== 'object') return false
+        if (security?.$type !== 'object') return 'unchanged'
         // Read from the AST: magicast throws when it proxies an already-gated conditional.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const prop = security.$ast.properties.find((p: any) => (p.key?.name ?? p.key?.value) === 'rateLimiter')
-        if (prop?.value?.type !== 'ObjectExpression') return false
-        const wrapped = parseModule(`const gated = ${gate}${generateCode({ $ast: prop.value }).code}`)
+        const value = prop?.value
+        if (!value || value.type === 'BooleanLiteral' || value.type === 'ConditionalExpression') return 'unchanged'
+        // `{ … } as X` and `{ … } satisfies X` are still an object literal.
+        const literal = value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression' ? value.expression : value
+        if (literal?.type !== 'ObjectExpression') return 'not-literal'
+        const wrapped = parseModule(`const gated = ${gate}${generateCode({ $ast: value }).code}`)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         prop.value = (wrapped.$ast as any).body[0].declarations[0].init
-        return true
+        return 'gated'
     }
 
     async save(): Promise<void> {
