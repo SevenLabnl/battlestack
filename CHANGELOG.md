@@ -30,8 +30,9 @@
   New projects ignore it, and `pull` lists `git rm -r --cached
   .battlestack/base` as a step for a project that committed it.
 - `pull` removes a file a feature no longer ships only after every feature has
-  updated. A file moving to another feature is no longer deleted and written
-  back in the same run, and a pull that stops halfway leaves it in place.
+  updated. A file moving to another feature, whichever of the two updates
+  first, is no longer deleted or written back in the same run, and a pull that
+  stops halfway leaves it in place.
 - `pull` leaves files claimed with `battlestack own` untouched when their
   feature writes them outside its template folder, such as the Dockerfile, and
   no longer drops a feature's `own` entries when that feature declares

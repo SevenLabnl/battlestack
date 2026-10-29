@@ -620,16 +620,37 @@ interface QueuedObsolete {
     recordedHash: string
 }
 
+const DEFERRED_QUEUE_KEY = 'obsolete:deferred'
+
+/** A rel a feature left to a later-ordered owner, kept in case that owner stops shipping it. */
+interface DeferredWrite {
+    featureId: string
+    rel: string
+    content: Buffer
+}
+
 /**
  * Makes `deleteObsoleteFiles` queue pristine deletions until `removeQueuedObsoleteFiles`. A file
  * moving to a feature that updates later in the same run is then never deleted by its old owner.
  */
 export function queueObsoleteDeletions(ctx: RunContext): void {
     ctx.state[OBSOLETE_QUEUE_KEY] = []
+    ctx.state[DEFERRED_QUEUE_KEY] = []
 }
 
-/** Deletes the queued files that no feature tracks now and that are still pristine. Returns their rels. */
+/**
+ * Writes the deferred rels whose later owner dropped them, so a file moving to an earlier feature
+ * is kept. Then deletes the queued files that no feature tracks now and that are still pristine.
+ * Returns the deleted rels.
+ */
 export async function removeQueuedObsoleteFiles(ctx: RunContext): Promise<string[]> {
+    const deferred = (ctx.state[DEFERRED_QUEUE_KEY] as DeferredWrite[] | undefined) ?? []
+    delete ctx.state[DEFERRED_QUEUE_KEY]
+    for (const { featureId, rel, content } of deferred) {
+        const tracked = new Set([...recordedFiles(ctx)].map((r) => toPosix(r.rel)))
+        if (!tracked.has(toPosix(rel))) await writeGuarded(ctx, featureId, rel, content)
+    }
+
     const queue = (ctx.state[OBSOLETE_QUEUE_KEY] as QueuedObsolete[] | undefined) ?? []
     delete ctx.state[OBSOLETE_QUEUE_KEY]
     const tracked = new Set([...recordedFiles(ctx)].map((r) => toPosix(r.rel)))
@@ -752,6 +773,8 @@ export async function updateFromTemplateDirs(
                         await clearArtifacts(ctx, dest, rel)
                     }
                 }
+                const deferred = ctx.state[DEFERRED_QUEUE_KEY] as DeferredWrite[] | undefined
+                deferred?.push({ featureId, rel, content: await readFile(src) })
                 report.notes.push(`${rel}: also shipped by ${laterOwner} (which runs later), left unchanged`)
                 continue
             }
