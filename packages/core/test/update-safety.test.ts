@@ -181,6 +181,42 @@ describe('writes during an update', () => {
         expect(updateLedger(ctx).staged).toEqual([])
     })
 
+    describe('on a core.autocrlf checkout, as on Windows', () => {
+        // Checked out again, so the working copy is CRLF while the recorded hash is of the LF bytes.
+        async function checkedOut(content: string): Promise<void> {
+            git('init', '-q')
+            git('config', 'core.autocrlf', 'true')
+            await write('f.txt', content)
+            git('add', '-A')
+            git('commit', '-q', '-m', 'scaffold')
+            await rm(path.join(projectDir, 'f.txt'))
+            git('checkout', '--', 'f.txt')
+            expect(await read('f.txt')).toBe(content.replaceAll('\n', '\r\n'))
+        }
+
+        it('updates an untouched file instead of merging it into one conflict', async () => {
+            await checkedOut(BASE)
+            const ctx = updatingCtx({ 'test:f': { 'f.txt': sha256(BASE) } })
+
+            await writeRecorded(ctx, 'test:f', 'f.txt', BASE.replace('line five', 'line five, new'))
+
+            expect(await read('f.txt')).toBe(BASE.replace('line five', 'line five, new'))
+            expect(updateLedger(ctx)).toMatchObject({ conflicts: [], staged: [] })
+        })
+
+        it('merges an edited file line by line', async () => {
+            await checkedOut(BASE)
+            const edited = BASE.replace('line two', 'edited').replaceAll('\n', '\r\n')
+            await write('f.txt', edited)
+            const ctx = updatingCtx({ 'test:f': { 'f.txt': sha256(BASE) } })
+
+            await writeRecorded(ctx, 'test:f', 'f.txt', BASE.replace('line five', 'line five, new'))
+
+            expect(await read('f.txt')).toBe(BASE.replace('line two', 'edited').replace('line five', 'line five, new'))
+            expect(updateLedger(ctx)).toMatchObject({ conflicts: [], merged: ['f.txt'] })
+        })
+    })
+
     it('outside an update, writes as before', async () => {
         await write('a.txt', 'local\n')
         const ctx = updatingCtx()
