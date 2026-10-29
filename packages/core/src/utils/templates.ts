@@ -387,7 +387,20 @@ async function classifyForUpdate(
     if (currentHash === newHash) return { state: 'converged', newHash }
     // Matching any feature's last write means nobody edited it since.
     if (recordedHashes.has(currentHash)) return { state: 'pristine', newHash }
+    // core.autocrlf checks out CRLF what battlestack wrote, and recorded, as LF.
+    const lf = isBinaryPath(rel) ? null : withoutCrlf(await readFile(dest))
+    if (lf) {
+        const lfHash = sha256(lf)
+        if (lfHash === newHash) return { state: 'converged', newHash }
+        if (recordedHashes.has(lfHash)) return { state: 'pristine', newHash }
+    }
     return { state: 'drifted', newHash }
+}
+
+/** The content with CRLF line endings turned into LF, or null when it has none. */
+function withoutCrlf(content: Buffer): Buffer | null {
+    const text = content.toString('utf8')
+    return text.includes('\r\n') ? Buffer.from(text.replaceAll('\r\n', '\n')) : null
 }
 
 /** Every hash any feature recorded for `rel`, this run's writes included. */
@@ -588,7 +601,9 @@ async function mergeInPlace(
     const { dest, rel, newContent, newHash, recordedHashes, report } = args
     const base = await findBase(ctx.projectDir, rel, recordedHashes)
     if (!base) return false
-    const current = await readFile(dest)
+    const onDisk = await readFile(dest)
+    // An LF base against a CRLF checkout differs on every line.
+    const current = base.includes('\r\n') ? onDisk : (withoutCrlf(onDisk) ?? onDisk)
     const merged = await threeWayMerge(current, base, newContent, {
         current: `${rel} (yours)`,
         base: `${rel} (upstream before, ${featureId})`,
