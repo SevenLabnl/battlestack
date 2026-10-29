@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import {
     CLIError,
@@ -236,8 +236,38 @@ export interface PullSummary {
 }
 
 export function needsAttention(s: PullSummary): boolean {
-    return s.conflicts.length + s.staged.length + s.backups.length + s.orphans.length + s.actions.length > 0
+    return s.conflicts.length + s.staged.length + s.backups.length + s.orphans.length + s.actions.length + s.unmanaged.length > 0
         || Boolean(s.formatError)
+}
+
+const STEPS_TITLE = 'Steps outside this repository'
+
+/** The steps an earlier report lists that the user has not deleted from it yet. */
+export async function unfinishedSteps(projectDir: string): Promise<string[]> {
+    const dest = path.join(projectDir, REPORT_PATH)
+    if (!(await exists(dest))) return []
+    const steps: string[] = []
+    let inSteps = false
+    for (const line of (await readFile(dest, 'utf8')).split(/\r?\n/)) {
+        if (line.startsWith('## ')) inSteps = line === `## ${STEPS_TITLE}`
+        else if (inSteps && line.startsWith('- ')) steps.push(line.slice(2))
+    }
+    return steps
+}
+
+/** Staged `.new` files (as the rel they belong to) and `.bak` backups still in `.battlestack/pull/`. */
+export async function leftoverArtifacts(projectDir: string): Promise<{ staged: string[], backups: string[] }> {
+    const dir = path.join(projectDir, PULL_DIR)
+    const staged: string[] = []
+    const backups: string[] = []
+    if (!(await exists(dir))) return { staged, backups }
+    for (const entry of await readdir(dir, { recursive: true, withFileTypes: true })) {
+        if (!entry.isFile()) continue
+        const abs = path.join(entry.parentPath, entry.name)
+        if (entry.name.endsWith('.new')) staged.push(toPosixRel(path.relative(dir, abs)).slice(0, -'.new'.length))
+        else if (entry.name.endsWith('.bak')) backups.push(path.relative(projectDir, abs))
+    }
+    return { staged: staged.sort(), backups: backups.sort() }
 }
 
 function section(title: string, intro: string, items: string[]): string[] {
@@ -261,7 +291,7 @@ export function renderReport(s: PullSummary): string {
         ),
         ...section(
             'Staged for a manual merge',
-            'No earlier upstream version of these files was found, so there was nothing to merge against. Your file is unchanged. The new upstream version is in `.battlestack/pull/<path>.new`. Compare the two and carry over what you want. The `.patch` next to it replaces your file wholesale, so do not apply it blindly.',
+            'No earlier upstream version of these files was found, so there was nothing to merge against. Your file is unchanged. The new upstream version is in `.battlestack/pull/<path>.new`. Compare the two and carry over what you want, then delete the `.new` and the `.patch`. The `.patch` replaces your file wholesale, so do not apply it blindly. A later pull lists every `.new` still there.',
             s.staged.map((r) => `\`${r}\``),
         ),
         ...section(
@@ -271,12 +301,12 @@ export function renderReport(s: PullSummary): string {
         ),
         ...section(
             'Backups of regenerated files',
-            'These files are regenerated on every pull. Your edited version was saved here. Move anything worth keeping to `CLAUDE.project.md` or a file of your own, then delete the backup.',
+            'These files are regenerated on every pull. Your edited version was saved here. Move anything worth keeping to `CLAUDE.project.md` or a file of your own, then delete the backup. A later pull lists every backup still there.',
             s.backups.map((r) => `\`${r}\``),
         ),
         ...section(
-            'Steps outside this repository',
-            'Pull cannot do these for you.',
+            STEPS_TITLE,
+            'Pull cannot do these for you. Delete a line here once its step is done: a later pull lists again every line still here.',
             s.actions,
         ),
         ...section(
