@@ -96,7 +96,7 @@ describe('landingShellFeature: the header actions slot on an existing project', 
         const c = ctx()
         await landingShellFeature.update!(c, prev)
         expect(await readFile(path.join(projectDir, LAYOUT), 'utf8')).toBe(layout)
-        return updateLedger(c).actions
+        return updateLedger(c).suggestions
     }
 
     it('lists the step to add it, once, on the pull that brings it in', async () => {

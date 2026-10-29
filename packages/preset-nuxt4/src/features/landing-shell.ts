@@ -49,8 +49,8 @@ async function suggestHeaderActions(ctx: RunContext, fromVersion: string | undef
     if (!(await exists(layout))) return
     const content = await readFile(layout, 'utf8')
     if (!content.includes('<UHeader') || content.includes('header-actions')) return
-    updateLedger(ctx).actions.push(
-        'Optional: to let a page add an action to the app header with `<Teleport to="#header-actions" defer>`, add '
+    updateLedger(ctx).suggestions.push(
+        'To let a page add an action to the app header with `<Teleport to="#header-actions" defer>`, add '
         + '`<div id="header-actions" class="contents" />` inside `<UHeader>` in `app/layouts/default.vue`, and '
         + '`:ui="{ center: \'flex\' }"` on `<UHeader>` so it shows on mobile (give the `UNavigationMenu` there `class="hidden lg:flex"`). '
         + 'Pull leaves the layout alone because it is yours.',
