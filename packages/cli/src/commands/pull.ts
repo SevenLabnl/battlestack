@@ -5,7 +5,6 @@ import type { Ora } from 'ora'
 import { confirmOverwriteOwned, ui } from '@battlestack/tui'
 import { formatAndReconcile } from './format-project.js'
 import {
-    baseDirIsTracked,
     isGitRepo,
     missingAtStart,
     leftoverArtifacts,
@@ -483,9 +482,6 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             await writeManifest(ctx, { rendered: renderedAll })
             const written = await readManifest(projectDir, registries)
             if (written) await pruneStoredBases(projectDir, written)
-            if (safety.git && baseDirIsTracked(projectDir)) {
-                updateLedger(ctx).actions.push('`.battlestack/base/` is now a local cache that git ignores. Stop tracking it: `git rm -r --cached .battlestack/base`')
-            }
             await generatePulledMigration(ctx, schemaBefore)
         }
 

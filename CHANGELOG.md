@@ -6,7 +6,8 @@
 - `pull` merges upstream changes into files you edited instead of only staging
   them. Edited files get a three-way merge against the version battlestack last
   wrote, with diff3 conflict markers where both sides changed the same lines.
-  Those versions are cached in `.battlestack/base/`, or found in git history.
+  Those versions are kept in `.battlestack/base/`, which should be committed;
+  a project's first merge finds them in git history.
 - `pull` no longer overwrites local work. A feature new to the project stages
   its file when you already have one at that path, the Dockerfile is merged
   like any other file, and a check after the update restores and merges any
@@ -28,9 +29,6 @@
   and lists the dropping migration in `REPORT.md`, so you can take the drop
   out wherever it has not run yet. It does not edit that migration itself,
   since the migrator would run an edited migration again.
-- `.battlestack/base/` is a local merge cache and no longer belongs in git.
-  New projects ignore it, and `pull` lists `git rm -r --cached
-  .battlestack/base` as a step for a project that committed it.
 - `pull` removes a file a feature no longer ships only after every feature has
   updated. A file moving to another feature, whichever of the two updates
   first, is no longer deleted or written back in the same run, and a pull that
