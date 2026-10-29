@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { patchNuxtConfig } from '../utils/nuxt-config.js'
+import { patchNuxtConfig, type NuxtConfig } from '../utils/nuxt-config.js'
 import { isFeatureEnabled, type Feature } from '@battlestack/core'
 import { STAGE } from '@battlestack/core/constants/stages.js'
 
@@ -104,7 +104,7 @@ export const securityFeature: Feature = {
     },
 
     async update(ctx, _prev) {
-        let gated = false
+        let gate: ReturnType<NuxtConfig['gateRateLimiter']> = 'unchanged'
         await patchNuxtConfig(ctx.projectDir, (c) => {
             c.mutate((cfg) => {
                 if (!cfg.security) {
@@ -112,9 +112,13 @@ export const securityFeature: Feature = {
                 }
             })
             // Projects scaffolded before the gate carry a bare object that e2e runs cannot switch off.
-            gated = c.gateRateLimiter(RATE_LIMIT_GATE)
+            gate = c.gateRateLimiter(RATE_LIMIT_GATE)
         })
-        const notes = gated ? ['security: rateLimiter now turns off with NUXT_RATE_LIMIT_DISABLED=true (dev and e2e only)'] : []
+        const notes = {
+            'gated': ['security: rateLimiter now turns off with NUXT_RATE_LIMIT_DISABLED=true (dev and e2e only)'],
+            'not-literal': [`security: nuxt.config.ts#security.rateLimiter is not an object literal, so it was not gated. To let dev and e2e runs turn it off with NUXT_RATE_LIMIT_DISABLED=true, write it as \`${RATE_LIMIT_GATE}<your options>\``],
+            'unchanged': [],
+        }[gate]
         return { written: ['nuxt.config.ts'], skipped: [], notes }
     },
 }
