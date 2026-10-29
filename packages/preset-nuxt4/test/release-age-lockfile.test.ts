@@ -45,12 +45,15 @@ it.skipIf(process.platform === 'win32')('records one step to rebuild a lockfile 
 })
 
 it.skipIf(process.platform === 'win32').each([
-    ['the lockfile passes', '', 0],
-    ['pnpm fails for another reason', '[ERR_PNPM_FETCH_404] not found', 1],
-])('records nothing when %s', async (_, output, code) => {
+    ['the lockfile passes', '', 0, 0],
+    ['pnpm fails for another reason, saying so', '[ERR_PNPM_OUTDATED_LOCKFILE] Cannot install with "frozen-lockfile"', 1, 1],
+])('records nothing when %s', async (_, output, code, warnings) => {
     await fakePnpm(output, code)
     const ctx = mockRunContext({ projectDir, state: { packageManager: 'pnpm' } })
 
     expect(await checkLockfileAgainstReleaseAge(ctx)).toBe(false)
     expect(updateLedger(ctx).actions).toHaveLength(0)
+    const about = vi.mocked(ui.warn).mock.calls.filter(([m]) => String(m).includes('Could not check pnpm-lock.yaml'))
+    expect(about).toHaveLength(warnings)
+    if (warnings) expect(String(about[0]![0])).toContain('ERR_PNPM_OUTDATED_LOCKFILE')
 })
