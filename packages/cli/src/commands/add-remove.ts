@@ -155,7 +155,8 @@ export async function addCommand(args: ParsedArgs, loader: Ora, registries: Batt
     }
     if (needsAttention(leftover)) {
         const reportPath = await writeAddReport(projectRoot, fqid, leftover)
-        ui.warn(`Added ${fqid}, merging into ${ledger.conflicts.length + ledger.staged.length} existing file(s) that need a look`)
+        const files = ledger.conflicts.length + ledger.staged.length
+        ui.warn(files > 0 ? `Added ${fqid}, merging into ${files} existing file(s) that need a look` : `Added ${fqid}, with steps left`)
         ui.dim(`  Next steps: ${reportPath}`)
         process.exitCode = NEEDS_ATTENTION_EXIT_CODE
     } else {
