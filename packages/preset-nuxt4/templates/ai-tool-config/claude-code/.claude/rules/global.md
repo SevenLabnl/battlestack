@@ -1,7 +1,7 @@
 ## Project Conventions
 
 - Default package manager is **pnpm**. `bun`, `npm`, `yarn` also work; match the project's `packageManager` field. Use `pnpm add`, `pnpm dlx`, `pnpm run`.
-- Always run `pnpm run lint` and `pnpm test` before considering work complete.
+- Always run `pnpm run lint`, `pnpm run typecheck` and `pnpm test` before considering work complete. Fix the cause of a failure; never get green with `@ts-ignore`, `as any`, `eslint-disable`, a skipped or deleted test, or `git commit --no-verify`.
 - The workflows in `.claude/skills/` only load when invoked, so reach for them yourself: `task-arbiter` before a task, `brainstorming` before a new feature, `test-driven-development` while coding, `systematic-debugging` for a bug, `verification-before-completion` before calling it done.
 
 ## Upgrading: `battlestack pull`

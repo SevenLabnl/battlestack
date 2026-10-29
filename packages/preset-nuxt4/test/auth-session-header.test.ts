@@ -44,7 +44,7 @@ it('refuses the session header without dropping the project\'s own session keys'
     await authFeature.execute(context())
 
     const config = await readFile(path.join(projectDir, 'nuxt.config.ts'), 'utf8')
-    expect(config).toMatch(/session:\s*\{\s*maxAge: 3600,\s*sessionHeader: false,?\s*\}/)
+    expect(config).toMatch(/session:\s*\{\s*maxAge: 3600,\s*password: '',\s*sessionHeader: false,?\s*\}/)
 })
 
 const runs: [string, (ctx: RunContext) => Promise<unknown>][] = [

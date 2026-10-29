@@ -2,7 +2,16 @@
 
 ## Unreleased
 
-- The generated Dockerfile pins the latest `node:24-alpine` image.
+- A generated project's `nuxt.config.ts` sets `runtimeConfig.session.password`
+  to `''`, nuxt-auth-utils' own default, so it type-checks on Nuxt releases
+  that require the key. `NUXT_SESSION_PASSWORD` still sets it.
+- The Claude Code rules now ask for `pnpm run typecheck` next to lint and tests,
+  and rule out getting checks green by suppressing them (`@ts-ignore`, `as any`,
+  `eslint-disable`, skipped tests, `--no-verify`). `security.md` adds that nothing
+  secret goes under `runtimeConfig.public` and that user content is never rendered
+  with `v-html`. Existing projects get this via `battlestack pull`.
+- The generated Dockerfile pins the latest `node:24-alpine` image
+  (`sha256:06d7adf`).
 - `pull` merges upstream changes into files you edited instead of only staging
   them. Edited files get a three-way merge against the version battlestack last
   wrote, with diff3 conflict markers where both sides changed the same lines.

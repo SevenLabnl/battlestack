@@ -2,6 +2,7 @@
  * Feature version gate.
  *
  *   pnpm bump:check [baseRef]   CI gate: fail when a changed feature was not bumped
+ *   pnpm bump:check --fix       patch-bump every feature the gate would fail on
  *   pnpm bump --list            every feature, version, status
  *   pnpm bump --changed         only features with changes
  *   pnpm bump <id> <level>      rewrite one version (patch|minor|major)
@@ -101,6 +102,16 @@ async function runCheck(argv: string[]): Promise<void> {
     const writerOffenders = await collectWriterOffenders(features, base)
     if (offenders.length === 0 && writerOffenders.length === 0) {
         console.log('OK: every changed feature carries a version bump')
+        return
+    }
+
+    if (argv.includes('--fix')) {
+        const ids = new Set([...offenders.map((f) => f.id), ...writerOffenders.map((w) => w.writerId)])
+        for (const id of ids) {
+            const target = features.find((f) => f.id === id)
+            if (!target) fail(`no feature with id "${id}"`)
+            await applyBump(target, 'patch')
+        }
         return
     }
 

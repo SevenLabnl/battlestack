@@ -28,8 +28,8 @@ updates:
       prefix: "ci"
     labels: ["dependencies", "github_actions", "skip-changelog"]
 
-  # The digest-pinned base image the scaffold emits. These PRs fail the bump and changelog checks
-  # until `shared:docker`'s version in src/features/docker.ts is bumped and an entry added by hand.
+  # The digest-pinned base image the scaffold emits. The dependabot-bump workflow adds the
+  # `shared:docker` bump and a changelog line these PRs need.
   - package-ecosystem: docker
     directory: /packages/preset-nuxt4/templates/docker
     schedule:
