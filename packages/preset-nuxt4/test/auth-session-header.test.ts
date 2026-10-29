@@ -47,14 +47,17 @@ it('refuses the session header without dropping the project\'s own session keys'
     expect(config).toMatch(/session:\s*\{\s*maxAge: 3600,\s*sessionHeader: false,?\s*\}/)
 })
 
-it.each([
-    ['true', 1],
-    ['process.env.ALLOW_HEADER === \'1\'', 1],
-    ['false', 0],
-])('keeps `sessionHeader: %s` on pull, with %i warning about it', async (value, warnings) => {
+const runs: [string, (ctx: RunContext) => Promise<unknown>][] = [
+    ['pull', (ctx) => authFeature.update!(ctx, { id: 'nuxt4:nuxt4:auth', version: '1.10.0', files: {} })],
+    ['add', (ctx) => authFeature.execute(ctx)],
+]
+
+const headerValues = [['true', 1], ['process.env.ALLOW_HEADER === \'1\'', 1], ['false', 0]] as const
+
+it.each(runs.flatMap(([command, run]) => headerValues.map(([value, warnings]) => [value, command, warnings, run] as const)))('keeps `sessionHeader: %s` on %s, with %i warning about it', async (value, _, warnings, run) => {
     await writeConfig(`export default defineNuxtConfig({\n    runtimeConfig: { session: { sessionHeader: ${value} } },\n})\n`)
     const warn = vi.spyOn(ui, 'warn').mockImplementation(() => {})
-    await authFeature.update!(context(), { id: 'nuxt4:nuxt4:auth', version: '1.10.0', files: {} })
+    await run(context())
 
     const config = await readFile(path.join(projectDir, 'nuxt.config.ts'), 'utf8')
     expect(config).toContain(`sessionHeader: ${value}`)

@@ -178,6 +178,9 @@ export const authFeature: Feature = {
     async execute(ctx) {
         await emitTemplate(ctx, 'nuxt4:auth', import.meta.url, 'auth')
         await postPatches(ctx.projectDir)
+        // `battlestack add` merges into an existing nuxt.config.ts, which may keep its own `sessionHeader`.
+        const warning = await sessionHeaderWarning(ctx.projectDir)
+        if (warning) ui.warn(warning)
         await emitRecoveryHookStub(ctx)
         await emitAuditStub(ctx)
     },
