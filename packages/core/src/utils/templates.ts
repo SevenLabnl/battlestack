@@ -601,9 +601,7 @@ async function mergeInPlace(
     const { dest, rel, newContent, newHash, recordedHashes, report } = args
     const base = await findBase(ctx.projectDir, rel, recordedHashes)
     if (!base) return false
-    const onDisk = await readFile(dest)
-    // An LF base against a CRLF checkout differs on every line.
-    const current = base.includes('\r\n') ? onDisk : (withoutCrlf(onDisk) ?? onDisk)
+    const current = await readFile(dest)
     const merged = await threeWayMerge(current, base, newContent, {
         current: `${rel} (yours)`,
         base: `${rel} (upstream before, ${featureId})`,

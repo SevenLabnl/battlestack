@@ -108,6 +108,12 @@ describe('findBase', () => {
         expect((await findBase(projectDir, 'f.txt', [sha256(BASE)]))?.toString()).toBe(BASE)
     })
 
+    it('merges a CRLF checkout against LF versions line by line', async () => {
+        const crlf = (text: string): Buffer => Buffer.from(text.replaceAll('\n', '\r\n'))
+        const merged = await threeWayMerge(crlf(BASE.replace('line two', 'edited')), Buffer.from(BASE), Buffer.from(BASE.replace('line five', 'new')), { current: 'c', base: 'b', upstream: 'u' })
+        expect(merged).toEqual({ content: Buffer.from(BASE.replace('line two', 'edited').replace('line five', 'new')), conflicts: false })
+    })
+
     it('finds a file battlestack wrote as LF under core.autocrlf, as on a Windows runner', async () => {
         git('init', '-q')
         git('config', 'core.autocrlf', 'true')
