@@ -140,10 +140,13 @@ export async function threeWayMerge(
     upstream: Buffer,
     labels: { current: string, base: string, upstream: string },
 ): Promise<MergeResult | null> {
+    // A core.autocrlf checkout is CRLF while battlestack's versions are LF, which differ on every line.
+    const lfOnly = !base.includes('\r\n') && !upstream.includes('\r\n')
+    const ours = lfOnly ? Buffer.from(current.toString('utf8').replaceAll('\r\n', '\n')) : current
     const dir = await mkdtemp(path.join(os.tmpdir(), 'battlestack-merge-'))
     try {
         const files = { current: path.join(dir, 'current'), base: path.join(dir, 'base'), upstream: path.join(dir, 'upstream') }
-        await writeFile(files.current, current)
+        await writeFile(files.current, ours)
         await writeFile(files.base, base)
         await writeFile(files.upstream, upstream)
         const result = spawnSync('git', [
