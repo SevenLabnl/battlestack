@@ -14,6 +14,16 @@ export const BASE_DIR = path.join('.battlestack', 'base')
 
 const GIT_HISTORY_DEPTH = 200
 
+const BASE_README = [
+    '# Merge bases for `battlestack pull`',
+    '',
+    'Each file here is a version battlestack wrote into this project, named by its sha256.',
+    'The next `battlestack pull` merges upstream changes into your edited files against them.',
+    'Commit this directory and keep it: without it, those files can only be staged for a manual merge.',
+    'battlestack removes entries it no longer needs.',
+    '',
+].join('\n')
+
 const HASH_NAME = /^[0-9a-f]{64}$/
 
 export async function storeBase(projectDir: string, content: Buffer): Promise<string> {
@@ -24,6 +34,8 @@ export async function storeBase(projectDir: string, content: Buffer): Promise<st
         await mkdir(dir, { recursive: true })
         await writeFile(dest, content)
     }
+    const readme = path.join(dir, 'README.md')
+    if (!(await exists(readme))) await writeFile(readme, BASE_README)
     return hash
 }
 

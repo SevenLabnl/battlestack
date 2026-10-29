@@ -195,9 +195,10 @@ The manifest is battlestack's own record: which features are enabled, which
 versions produced which files, content hashes for drift detection, and which
 paths you have claimed as yours.
 
-**Commit it**: it is what makes `battlestack pull` and `battlestack doctor` work
-for everybody on the team rather than just the person who ran the scaffold.
-`.battlestack/base/` next to it is a local merge cache and stays out of git.
+**Commit it**, together with `.battlestack/base/`, which keeps the versions
+battlestack last wrote for the files you edited. Both are what make
+`battlestack pull` and `battlestack doctor` work for everybody on the team rather
+than just the person who ran the scaffold.
 
 You do not normally edit it. `battlestack own` and `battlestack disown` are the
 supported way to change file ownership. See
