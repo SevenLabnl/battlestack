@@ -8,9 +8,27 @@ import { LOCKFILE_BLOCKED_STATE_KEY } from './release-age.js'
 
 // drizzle.config.ts reads `./server/database/schema/*.ts`; other files there never reach a migration.
 const SCHEMA_FILE = /^server\/database\/schema\/[^/]+\.ts$/
-const MIGRATIONS_DIR = path.join('server', 'database', 'migrations')
-function generateByHand(ctx: RunContext): string {
-    return `run \`${String(ctx.state.packageManager ?? 'pnpm')} run db:generate\` and commit the SQL in server/database/migrations/ before you deploy`
+const DEFAULT_MIGRATIONS_DIR = 'server/database/migrations'
+
+/** The posix rel of drizzle's `out` folder, as the project's drizzle.config.ts sets it. */
+async function migrationsRel(projectDir: string): Promise<string> {
+    const config = path.join(projectDir, 'drizzle.config.ts')
+    if (!(await exists(config))) return DEFAULT_MIGRATIONS_DIR
+    const out = /\bout\s*:\s*['"`]([^'"`]+)['"`]/.exec(await readFile(config, 'utf8'))?.[1]
+    return out ? path.posix.normalize(out).replace(/\/$/, '') : DEFAULT_MIGRATIONS_DIR
+}
+
+/** `npm run` takes flags after the script name for itself unless `--` comes first; pnpm passes a `--` on to the script. */
+function runScriptArgs(pm: string, script: string, args: string[]): string[] {
+    return pm === 'npm' && args.length > 0 ? ['run', script, '--', ...args] : ['run', script, ...args]
+}
+
+function packageManagerOf(ctx: RunContext): string {
+    return String(ctx.state.packageManager ?? 'pnpm')
+}
+
+function generateByHand(ctx: RunContext, migrations: string): string {
+    return `run \`${packageManagerOf(ctx)} run db:generate\` and commit the SQL in ${migrations}/ before you deploy`
 }
 
 export interface GenerateResult {
@@ -23,7 +41,7 @@ export interface GenerateResult {
 }
 
 async function migrationFiles(projectDir: string): Promise<Set<string>> {
-    const dir = path.join(projectDir, MIGRATIONS_DIR)
+    const dir = path.join(projectDir, await migrationsRel(projectDir))
     if (!(await exists(dir))) return new Set()
     const entries = await readdir(dir, { recursive: true, withFileTypes: true })
     return new Set(entries
@@ -49,9 +67,9 @@ export async function generateMigration(ctx: RunContext, args: string[] = []): P
     try {
         const pm = await resolveProjectPM({
             projectDir: ctx.projectDir,
-            fallback: String(ctx.state.packageManager ?? 'pnpm'),
+            fallback: packageManagerOf(ctx),
         })
-        const result = await run(pm, ['run', 'db:generate', ...args], { cwd: ctx.projectDir, inherit: ctx.debug })
+        const result = await run(pm, runScriptArgs(pm, 'db:generate', args), { cwd: ctx.projectDir, inherit: ctx.debug })
         lastLine = lastLineOf(result.stderr) ?? lastLineOf(result.stdout)
         upToDate = /no schema changes/i.test(`${result.stdout}\n${result.stderr}`)
     } catch (err) {
@@ -85,12 +103,13 @@ export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map
     if (!isFeatureEnabled(ctx, 'nuxt4:database')) return
     await repairDroppedAvatarColumn(ctx)
     const ledger = updateLedger(ctx)
+    const migrations = await migrationsRel(ctx.projectDir)
 
     // A staged or conflicted schema file is not on disk in its new form yet, so generating now
     // would miss its change, and a file with conflict markers does not load at all.
     const pending = [...new Set([...ledger.staged, ...ledger.conflicts])].map((rel) => rel.replaceAll('\\', '/')).filter((rel) => SCHEMA_FILE.test(rel)).sort()
     if (pending.length > 0) {
-        ledger.actions.push(`Schema files still need your merge (${pending.join(', ')}). Finish them, then ${generateByHand(ctx)}`)
+        ledger.actions.push(`Schema files still need your merge (${pending.join(', ')}). Finish them, then ${generateByHand(ctx, migrations)}`)
         ui.warn('Schema update not applied yet, so no migration was generated. See .battlestack/pull/REPORT.md')
         return
     }
@@ -101,11 +120,11 @@ export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map
     if (!changed) return
 
     if (ctx.state[LOCKFILE_BLOCKED_STATE_KEY]) {
-        ledger.actions.push(`The schema changed. After rebuilding the lockfile: ${generateByHand(ctx)}`)
+        ledger.actions.push(`The schema changed. After rebuilding the lockfile: ${generateByHand(ctx, migrations)}`)
         return
     }
     if (ctx.state.skipInstall) {
-        ledger.actions.push(`The schema changed and --skip-install skipped db:generate: ${generateByHand(ctx)}`)
+        ledger.actions.push(`The schema changed and --skip-install skipped db:generate: ${generateByHand(ctx, migrations)}`)
         ui.warn('Schema changed; --skip-install skipped db:generate. See .battlestack/pull/REPORT.md')
         return
     }
@@ -120,52 +139,72 @@ export async function generatePulledMigration(ctx: RunContext, schemaBefore: Map
     }
     const why = lastLine ? ` drizzle-kit said: ${lastLine}.` : ''
     const rename = /tty|interactive/i.test(lastLine ?? '') ? ' A renamed column or table needs the prompt, so run it in a terminal.' : ''
-    ledger.actions.push(`The schema changed but db:generate wrote no migration.${why}${rename} To finish, ${generateByHand(ctx)}`)
+    ledger.actions.push(`The schema changed but db:generate wrote no migration.${why}${rename} To finish, ${generateByHand(ctx, migrations)}`)
     ui.warn('Schema changed but no migration was generated. See .battlestack/pull/REPORT.md')
 }
 
-const AVATAR_COLUMN = /\b(DROP|ADD) COLUMN\s+(?:IF (?:NOT )?EXISTS\s+)?"?avatar_key"?/gi
-const BREAKPOINT = '--> statement-breakpoint'
+// Only `users.avatar_key`: a project may drop a column of that name from its own tables.
+const AVATAR_COLUMN = /\bALTER TABLE\s+(?:"public"\.)?"users"\s+(DROP|ADD) COLUMN\s+(?:IF (?:NOT )?EXISTS\s+)?"avatar_key"/gi
+const DECLARES_AVATAR = /\(\s*['"`]avatar_key['"`]/
+const RESTORE_NAME = 'restore_avatar_key'
 const RESTORE_SQL = 'ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "avatar_key" text;\n'
 
 /**
  * Earlier pulls staged a users.ts without `avatarKey` on storage projects, and generating from it
  * wrote a migration that deletes every avatar on deploy. While the schema still declares the
- * column, takes the drop out of that migration and its snapshots, and adds a migration that puts
- * the column back where the drop already ran.
+ * column, adds a migration that puts it back and restores it in drizzle's snapshots from there on.
+ * The dropping migration stays as it is: it may have run already, and the project's migrator
+ * would run an edited one again.
  */
 async function repairDroppedAvatarColumn(ctx: RunContext): Promise<void> {
     if (!isFeatureEnabled(ctx, 'nuxt4:storage')) return
-    const dir = path.join(ctx.projectDir, MIGRATIONS_DIR)
+    const migrations = await migrationsRel(ctx.projectDir)
+    const dir = path.join(ctx.projectDir, migrations)
     let droppedIn: string | undefined
     for (const file of [...await migrationFiles(ctx.projectDir)].sort()) {
         const sql = await readFile(path.join(dir, file), 'utf8')
         for (const [, op] of sql.matchAll(AVATAR_COLUMN)) droppedIn = op!.toUpperCase() === 'DROP' ? file : undefined
     }
     if (!droppedIn) return
-    const where = `server/database/migrations/${droppedIn}`
+    const where = `${migrations}/${droppedIn}`
     const users = path.join(ctx.projectDir, 'server', 'database', 'schema', 'users.ts')
-    if (!(await exists(users)) || !(await readFile(users, 'utf8')).includes('avatar_key')) {
+    if (!(await exists(users)) || !DECLARES_AVATAR.test(await readFile(users, 'utf8'))) {
         ui.warn(`${where} drops users.avatar_key, which deletes every avatar on deploy. Remove that migration unless you meant it`)
         return
     }
 
-    const sqlPath = path.join(dir, droppedIn)
-    const kept = (await readFile(sqlPath, 'utf8')).split(BREAKPOINT).filter((stmt) => !/\bDROP COLUMN\b[^;]*"?avatar_key"?/i.test(stmt))
-    // drizzle runs every statement, so a migration left with none gets a harmless one.
-    await writeFile(sqlPath, kept.length > 0 ? kept.join(BREAKPOINT) : 'SELECT 1;\n')
-    await restoreSnapshotColumn(dir, Number.parseInt(path.basename(droppedIn), 10))
-
-    const ledger = updateLedger(ctx)
-    const restored = ctx.state[LOCKFILE_BLOCKED_STATE_KEY] || ctx.state.skipInstall
+    const pm = packageManagerOf(ctx)
+    const created = ctx.state[LOCKFILE_BLOCKED_STATE_KEY] || ctx.state.skipInstall
         ? []
-        : (await generateMigration(ctx, ['--custom', '--name=restore_avatar_key'])).created
-    if (restored.length === 1) await writeFile(path.join(dir, restored[0]!), RESTORE_SQL)
-    const restore = restored.length === 1
-        ? `and added server/database/migrations/${restored[0]}, which puts the column back (empty) where it already ran`
-        : `but could not add the migration that puts the column back where it already ran. Run \`${String(ctx.state.packageManager ?? 'pnpm')} run db:generate --custom --name=restore_avatar_key\` and write \`${RESTORE_SQL.trim()}\` into the new file`
-    ledger.actions.push(`${where} dropped users.avatar_key, which deletes every avatar on deploy. Pull took the drop out of it and its snapshots, ${restore}. Avatars are kept wherever it has not run yet; where it did, only a database backup brings them back. Review both and commit them before you deploy.`)
-    ui.warn(`Repaired ${where}, which dropped users.avatar_key. See .battlestack/pull/REPORT.md`)
+        : (await generateMigration(ctx, ['--custom', `--name=${RESTORE_NAME}`])).created
+    // Only the empty file `--custom` writes: anything else is a real migration this must not overwrite.
+    let restored: string | undefined
+    for (const file of created.filter((f) => path.basename(f, '.sql').endsWith(`_${RESTORE_NAME}`))) {
+        if ((await readFile(path.join(dir, file), 'utf8')).trim() === '') restored = file
+    }
+    const restoredIdx = restored ? await journalIdx(dir, restored) : undefined
+    if (restored && restoredIdx !== undefined) {
+        await writeFile(path.join(dir, restored), RESTORE_SQL)
+        await restoreSnapshotColumn(dir, restoredIdx)
+    }
+
+    const restore = restored && restoredIdx !== undefined
+        ? `Pull added ${migrations}/${restored}, which puts the column back (empty) after it`
+        : `Pull could not add the migration that puts the column back. Run \`${pm} run db:generate ${pm === 'npm' ? '-- ' : ''}--custom --name=${RESTORE_NAME}\`, write \`${RESTORE_SQL.trim()}\` into the new file, and add \`avatar_key\` back to users in its snapshot`
+    updateLedger(ctx).actions.push(`${where} drops users.avatar_key, which deletes every avatar on deploy. ${restore}. Where that migration has not run in any database yet, delete its \`DROP COLUMN "avatar_key"\` statement before you deploy to keep the avatars; where it has run, only a database backup brings them back. Do not edit it where it has run, as the migrator would run it again. Review and commit before you deploy.`)
+    ui.warn(`${where} drops users.avatar_key. See .battlestack/pull/REPORT.md`)
+}
+
+/** drizzle's index of a migration file, from the journal, so a `timestamp` prefix works too. */
+async function journalIdx(dir: string, file: string): Promise<number | undefined> {
+    const journal = path.join(dir, 'meta', '_journal.json')
+    const tag = path.basename(file, '.sql')
+    if (await exists(journal)) {
+        const entries = (JSON.parse(await readFile(journal, 'utf8')) as { entries?: { idx: number, tag: string }[] }).entries ?? []
+        const entry = entries.find((e) => e.tag === tag)
+        if (entry) return entry.idx
+    }
+    return /^\d{4}_/.test(tag) ? Number.parseInt(tag, 10) : undefined
 }
 
 /** Puts `users.avatar_key` back into the snapshot of migration `fromIdx` and every later one. */

@@ -64,7 +64,7 @@ When the report lists a migration step instead, finish it yourself:
 
 A staged `.new` for a schema file is the upstream version only, without the project's own columns. Never copy it over the project's file: generating a migration from it drops those columns. Merge it line by line like any other staged file.
 
-If pull warns that a migration drops a column a feature needs, such as `users.avatar_key` on a project with storage, that migration came from an earlier upgrade and would delete data on the next deploy. Tell the user before doing anything else. Unless they meant it, remove that migration together with its entry in `server/database/migrations/meta/_journal.json` and its snapshot, restore the column in the schema, and generate again.
+If pull warns that a migration drops a column a feature needs, such as `users.avatar_key` on a project with storage, that migration came from an earlier upgrade and would delete data on the next deploy. Tell the user before doing anything else. Pull has already added a migration that puts the column back. Ask the user whether the dropping migration has run in any database. Where it has not, delete its `DROP COLUMN` statement before the deploy. Never edit or remove a migration that has run: the migrator would run it again.
 
 ## New files and restored files
 

@@ -22,10 +22,10 @@
   file dropped the `avatar_key` column. The database feature now ships
   `users.ts` with `avatarKey` when storage is on, and an edited `users.ts` is
   merged instead of staged. If an earlier pull already led to a migration that
-  drops `avatar_key`, `pull` repairs it: it takes the drop out of that
-  migration and drizzle's snapshots, and adds a migration that puts the column
-  back where the drop already ran. Avatars are kept wherever that migration has
-  not run yet. Review both migrations before you deploy.
+  drops `users.avatar_key`, `pull` adds a migration that puts the column back
+  and lists the dropping migration in `REPORT.md`, so you can take the drop
+  out wherever it has not run yet. It does not edit that migration itself,
+  since the migrator would run an edited migration again.
 - `.battlestack/base/` is a local merge cache and no longer belongs in git.
   New projects ignore it, and `pull` lists `git rm -r --cached
   .battlestack/base` as a step for a project that committed it.
