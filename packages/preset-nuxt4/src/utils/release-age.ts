@@ -2,7 +2,7 @@ import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
-import { exists, updateLedger, type RunContext } from '@battlestack/core'
+import { exists, resolveSpawn, updateLedger, type RunContext } from '@battlestack/core'
 import { ui } from '@battlestack/tui'
 
 const execFileAsync = promisify(execFile)
@@ -29,17 +29,27 @@ export async function checkLockfileAgainstReleaseAge(ctx: RunContext): Promise<b
     if (!(await hasReleaseAgePolicy(ctx.projectDir))) return false
     let output = ''
     try {
-        await execFileAsync('pnpm', ['install', '--frozen-lockfile', '--lockfile-only'], {
+        // Resolved, so Windows finds `pnpm.cmd`.
+        const pnpm = resolveSpawn('pnpm', ['install', '--frozen-lockfile', '--lockfile-only'], { cwd: ctx.projectDir })
+        await execFileAsync(pnpm.file, pnpm.args, {
             cwd: ctx.projectDir,
             env: { ...process.env, CI: 'true' },
             maxBuffer: 16 * 1024 * 1024,
+            shell: pnpm.shell,
+            windowsVerbatimArguments: pnpm.windowsVerbatimArguments,
         })
         return false
     } catch (err) {
-        const e = err as { stdout?: string, stderr?: string }
-        output = `${e.stdout ?? ''}\n${e.stderr ?? ''}`
+        const e = err as { stdout?: string, stderr?: string, message?: string }
+        output = `${e.stdout ?? ''}\n${e.stderr ?? ''}`.trim() || (e.message ?? '')
     }
-    if (!/ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION/.test(output)) return false
+    if (!/ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION/.test(output)) {
+        // Offline, or a lockfile behind package.json: the check says nothing either way.
+        const lines = output.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+        const reason = lines.findLast((l) => l.includes('ERR_PNPM')) ?? lines.at(-1)
+        ui.warn(`Could not check pnpm-lock.yaml against the release-age policy${reason ? ` (${reason})` : ''}. If pnpm later refuses with ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION, rebuild it with ${REBUILD}`)
+        return false
+    }
     ctx.state[LOCKFILE_BLOCKED_STATE_KEY] = true
     updateLedger(ctx).actions.push(
         `\`pnpm-lock.yaml\` predates the 3-day release-age policy this pull added, and holds packages younger than it allows, so pnpm refuses to run scripts. Rebuild it with ${REBUILD}, then run \`pnpm run lint:fix\` and the tests. The rebuild can change resolved versions: review the lockfile diff.`,
