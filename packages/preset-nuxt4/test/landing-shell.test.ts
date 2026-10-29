@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { hashFile, type InstalledFeatureRecord, type RunContext } from '@battlestack/core'
+import { hashFile, updateLedger, type InstalledFeatureRecord, type RunContext } from '@battlestack/core'
 
 import { nuxtUiFeature } from '../src/features/nuxt-ui.js'
 import { landingShellFeature } from '../src/features/landing-shell.js'
@@ -82,5 +82,33 @@ describe('landingShellFeature: overwritten files stay in baseline', () => {
         }
         const report = await nuxtUiFeature.update!(ctx(), prev)
         expect(report.skipped).toEqual([])
+    })
+})
+
+describe('landingShellFeature: the header actions slot on an existing project', () => {
+    const LAYOUT = 'app/layouts/default.vue'
+    const OLD_LAYOUT = '<template>\n    <UHeader>\n        <UNavigationMenu :items="nav" />\n    </UHeader>\n</template>\n'
+
+    async function pullFrom(version: string, layout: string): Promise<string[]> {
+        await writeFile(path.join(projectDir, LAYOUT), layout, 'utf8')
+        // Structural, so the project owns the layout and pull leaves it alone.
+        const prev: InstalledFeatureRecord = { id: FEATURE_ID, version, files: {}, ownedByUser: [LAYOUT] }
+        const c = ctx()
+        await landingShellFeature.update!(c, prev)
+        expect(await readFile(path.join(projectDir, LAYOUT), 'utf8')).toBe(layout)
+        return updateLedger(c).suggestions
+    }
+
+    it('lists the step to add it, once, on the pull that brings it in', async () => {
+        const actions = await pullFrom('1.4.2', OLD_LAYOUT)
+        expect(actions).toHaveLength(1)
+        expect(actions[0]).toContain('<div id="header-actions" class="contents" />')
+    })
+
+    it.each([
+        ['the layout already has it', '1.4.2', OLD_LAYOUT.replace('</UHeader>', '<div id="header-actions" class="contents" />\n    </UHeader>')],
+        ['the project is past that version', '1.4.3', OLD_LAYOUT],
+    ])('lists nothing when %s', async (_, version, layout) => {
+        expect(await pullFrom(version, layout)).toHaveLength(0)
     })
 })

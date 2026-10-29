@@ -3,7 +3,8 @@
         <!-- Column layout: the footer sits at the bottom of a short page instead of under the fold of a long one.
              The comment lives inside the root element on purpose: `vue/no-multiple-template-root` counts one at
              the template root as a second root node. -->
-        <UHeader>
+        <!-- The centre slot shows at every width, so page actions teleported into #header-actions stay visible on mobile. -->
+        <UHeader :ui="{ center: 'flex' }">
             <template #left>
                 <!-- `/`, not `/dashboard`: this feature emits `app/pages/index.vue`, so `/` always exists while `/dashboard` only exists
                      when `nuxt4:dashboard-shell` is installed; also avoids the brand and first nav item pointing at the same destination. -->
@@ -16,7 +17,15 @@
                 </UButton>
             </template>
 
-            <UNavigationMenu :items="nav" />
+            <UNavigationMenu
+                :items="nav"
+                class="hidden lg:flex"
+            />
+            <!-- A page adds actions here with `<Teleport to="#header-actions" defer>`, rendered client-side only. -->
+            <div
+                id="header-actions"
+                class="contents"
+            />
 
             <template #right>
                 <!-- `v-if`: an empty `topbar` still renders a real <nav>, so `#right`'s

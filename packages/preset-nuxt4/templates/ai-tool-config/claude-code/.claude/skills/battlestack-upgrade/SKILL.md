@@ -92,6 +92,8 @@ Steps outside the repository, such as GitHub variables or secrets, cannot be don
 
 A step stays in `REPORT.md`, and every later pull lists it again and exits with code 2, until its line is deleted from the report. Delete the line of each step you finished. Leave the steps you handed to the user: they delete each line once it is done.
 
+Items under Optional are suggestions, such as a layout change a new version supports. Nothing breaks without them and they do not count as work left. Pass them on to the user instead of applying them.
+
 ## Finishing
 
 Install, then run the checks the project's CI runs:

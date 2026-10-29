@@ -12,6 +12,8 @@ import {
     readManifest,
     recordOwned,
     run,
+    ownedPaths,
+    toPosixRel,
     MANIFEST_PATH,
     writeJson,
     writeManifest,
@@ -101,10 +103,12 @@ export async function addCommand(args: ParsedArgs, loader: Ora, registries: Batt
     const pm = manifest.packageManager as PackageManager
     const fullEnabled = [...manifest.features.map((f) => f.id), fqid]
     const ctx = buildCtx(projectRoot, manifest, fullEnabled, pm, args, registries)
-    // Pre-primed so writeManifest preserves existing entries. Keyed bare.
+    // Pre-primed so writeManifest preserves existing entries, and the writers skip owned paths. Keyed bare.
     for (const f of manifest.features) {
         if (!registries.features.has(f.id)) continue
-        ctx.state[`files:${registries.features.get(f.id).id}`] = { ...f.files }
+        const bare = registries.features.get(f.id).id
+        ctx.state[`files:${bare}`] = { ...f.files }
+        if (f.ownedByUser) ctx.state[`owned:${bare}`] = [...f.ownedByUser]
     }
 
     ui.section(`Add ${fqid}`)
@@ -256,10 +260,10 @@ export async function removeCommand(args: ParsedArgs, _loader: Ora, registries: 
     // pristine → delete, drifted → leave. Owned files are skipped.
     const pristine: string[] = []
     const drifted: string[] = []
-    const ownedSet = new Set(record.ownedByUser ?? [])
+    const ownedSet = ownedPaths(manifest)
     for (const [rel, recordedHash] of Object.entries(record.files)) {
         const abs = path.join(projectRoot, rel)
-        const state = await classifyFileState(abs, recordedHash, ownedSet.has(rel))
+        const state = await classifyFileState(abs, recordedHash, ownedSet.has(toPosixRel(rel)))
         if (state === 'pristine' || state === 'missing') pristine.push(rel)
         else if (state === 'drifted') drifted.push(rel)
     }

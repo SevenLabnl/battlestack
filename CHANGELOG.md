@@ -76,6 +76,25 @@
   skips lint and `db:generate`, and lists the fix in `REPORT.md`:
   `pnpm clean --lockfile && pnpm install`, then lint, the tests and
   `db:generate` if the schema changed.
+- The landing layout has a `#header-actions` target in its header, shown at
+  every width, so a page can add an action such as "New chat" with
+  `<Teleport to="#header-actions" defer>` instead of editing the layout. The
+  layout belongs to your project, so `pull` does not change it: the pull that
+  brings this in lists the edits to make under Optional in `REPORT.md`,
+  without counting them as work left.
+- A prompt can be up to 100,000 characters instead of 10,000, and a prompt that
+  cannot be saved shows the reason in the toast instead of a bare 400.
+- The AI settings e2e test sets the model from `NUXT_AI_GATEWAY_CHAT_MODEL`
+  instead of a hard-coded one, so a run against a dev server no longer leaves a
+  model the gateway key may not be allowed to use.
+- The project's own Mastra agents are registered on boot again: Mastra 1.x
+  renamed `getAgents()` to `listAgents()`, so only `default` showed up in the AI
+  settings. Boot now warns when it finds no agents.
+- `battlestack own` and `disown` apply to every feature that tracks a path, so
+  a file tracked by two features, such as `app/app.config.ts`, is really yours.
+  `pull`, `add`, `doctor` and `remove` treat a path owned under any feature as
+  owned, and `pull` never changes an owned file. Paths owned with an earlier
+  version need no migration.
 - A feature whose plugin did not load keeps its manifest record on `pull`
   instead of being dropped, so its files stay managed.
 - `shared:github` drops its records of the deploy workflows it no longer ships.

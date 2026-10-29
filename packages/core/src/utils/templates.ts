@@ -252,10 +252,11 @@ export async function snapshotTrackedHashes(
     ctx: RunContext,
     features: TrackedFeatureFiles[],
 ): Promise<Map<string, string>> {
+    const owned = ownedAcross(ctx, features)
     const snap = new Map<string, string>()
     for (const f of features) {
         for (const rel of Object.keys(f.recorded)) {
-            if (f.owned.has(rel)) continue
+            if (owned.has(toPosix(rel))) continue
             const abs = path.join(ctx.projectDir, rel)
             if (await exists(abs)) snap.set(snapKey(f.featureId, rel), await hashFile(abs))
         }
@@ -269,11 +270,12 @@ export async function reconcilePostFormat(
     features: TrackedFeatureFiles[],
     preHashes: Map<string, string>,
 ): Promise<void> {
+    const owned = ownedAcross(ctx, features)
     for (const f of features) {
         const stateKey = `files:${f.featureId}`
         if (!ctx.state[stateKey]) ctx.state[stateKey] = { ...f.recorded }
         for (const rel of Object.keys(f.recorded)) {
-            if (f.owned.has(rel)) continue
+            if (owned.has(toPosix(rel))) continue
             const pre = preHashes.get(snapKey(f.featureId, rel))
             if (pre === undefined) continue // absent on disk before formatting
             const recordedHash = f.recorded[rel]
@@ -376,11 +378,11 @@ async function classifyForUpdate(
     dest: string,
     rel: string,
     newContent: Buffer,
-    ownedSet: Set<string>,
+    isOwned: boolean,
     recordedHashes: Set<string>,
 ): Promise<{ state: UpdateState, newHash: string }> {
     const newHash = sha256(newContent)
-    if (ownedSet.has(rel)) return { state: 'owned', newHash }
+    if (isOwned) return { state: 'owned', newHash }
     if (!(await exists(dest))) return { state: 'missing', newHash }
 
     const currentHash = await hashFile(dest)
@@ -433,6 +435,8 @@ export interface UpdateLedger {
     staged: string[]
     /** Steps a person has to take, reported by features whose `execute` has no report to return. */
     actions: string[]
+    /** Optional changes a person may make. Unlike `actions`, they leave the pull without work left. */
+    suggestions: string[]
 }
 
 export function updateLedger(ctx: RunContext): UpdateLedger {
@@ -444,9 +448,10 @@ export function updateLedger(ctx: RunContext): UpdateLedger {
         existing.conflicts ??= []
         existing.staged ??= []
         existing.actions ??= []
+        existing.suggestions ??= []
         return existing as UpdateLedger
     }
-    const ledger: UpdateLedger = { handled: [], merged: [], conflicts: [], staged: [], actions: [] }
+    const ledger: UpdateLedger = { handled: [], merged: [], conflicts: [], staged: [], actions: [], suggestions: [] }
     ctx.state[LEDGER_STATE_KEY] = ledger
     return ledger
 }
@@ -455,9 +460,23 @@ function pushOnce(list: string[], rel: string): void {
     if (!list.includes(rel)) list.push(rel)
 }
 
-/** The feature's owned rels, which `pull` seeds from the manifest's `ownedByUser`. */
-function ownedRelsFor(ctx: RunContext, featureId: string): Set<string> {
-    return new Set((ctx.state[`owned:${featureId}`] as string[] | undefined) ?? [])
+/**
+ * Posix rels owned under any feature, which `pull` seeds from the manifest's `ownedByUser`.
+ * Ownership is per path: a rel one feature owns is off limits to every feature's writes.
+ */
+export function ownedAnywhere(ctx: RunContext): Set<string> {
+    const owned = new Set<string>()
+    for (const [key, value] of Object.entries(ctx.state)) {
+        if (!key.startsWith('owned:') || !Array.isArray(value)) continue
+        for (const rel of value as string[]) owned.add(toPosix(rel))
+    }
+    return owned
+}
+
+function ownedAcross(ctx: RunContext, features: TrackedFeatureFiles[]): Set<string> {
+    const owned = ownedAnywhere(ctx)
+    for (const f of features) for (const rel of f.owned) owned.add(toPosix(rel))
+    return owned
 }
 
 /**
@@ -475,7 +494,7 @@ export async function writeGuarded(
 ): Promise<UpdateReport> {
     const dest = path.join(ctx.projectDir, rel)
     const recordedHashes = recordedHashesFor(ctx, rel)
-    const owned = new Set([...ownedSet, ...ownedRelsFor(ctx, featureId)])
+    const owned = ownedSet.has(rel) || ownedAnywhere(ctx).has(toPosix(rel))
     const { state, newHash } = await classifyForUpdate(dest, rel, content, owned, recordedHashes)
     const recorded = (ctx.state[`files:${featureId}`] as Record<string, string> | undefined)?.[rel]
     await applyUpdateState(ctx, featureId, { state, dest, rel, newContent: content, newHash, recordedHash: recorded, recordedHashes, report })
@@ -695,6 +714,7 @@ export async function deleteObsoleteFiles(
     // `prev.id` may be the manifest fqid while state maps key on the bare `featureId`,
     // and an earlier feature's update in this same run may have re-baselined our map.
     const live = (ctx.state[`files:${featureId}`] as Record<string, string> | undefined) ?? {}
+    const owned = ownedAnywhere(ctx)
     for (const [rel, prevHash] of Object.entries(prev.files)) {
         if (seen.has(rel)) continue
         const recordedHash = live[rel] ?? prevHash
@@ -702,7 +722,7 @@ export async function deleteObsoleteFiles(
         if (trackedElsewhere.has(toPosix(rel))) continue
         const dest = path.join(ctx.projectDir, rel)
         if (!(await exists(dest))) continue
-        if (ownedSet.has(rel)) {
+        if (ownedSet.has(rel) || owned.has(toPosix(rel))) {
             report.notes.push(
                 `file no longer shipped but user-owned, left in place: ${rel}; review and remove manually if no longer needed`,
             )
@@ -755,6 +775,7 @@ export async function updateFromTemplateDirs(
     }
 
     for (const p of ownedSet) recordOwned(ctx, featureId, p)
+    const owned = ownedAnywhere(ctx)
 
     const { deferredToLater, trackedElsewhere } = sharedRelOwnership(ctx, featureId)
 
@@ -799,7 +820,7 @@ export async function updateFromTemplateDirs(
                 dest,
                 rel,
                 newContent,
-                ownedSet,
+                owned.has(toPosix(rel)),
                 recordedHashes,
             )
             await applyUpdateState(ctx, featureId, {

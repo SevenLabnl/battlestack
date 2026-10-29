@@ -9,6 +9,7 @@ import {
     hashContent,
     hasConflictMarkers,
     isBinaryPath,
+    ownedAnywhere,
     pruneBases,
     recordedFiles,
     stageUpstream,
@@ -101,7 +102,7 @@ export async function preflight(
 export interface OverwriteRepair {
     rel: string
     featureId: string
-    outcome: 'merged' | 'conflicts' | 'staged' | 'backed up'
+    outcome: 'merged' | 'conflicts' | 'staged' | 'backed up' | 'kept yours, owned'
 }
 
 /** Bare feature id for a manifest id, which may be an fqid. */
@@ -112,9 +113,10 @@ function bareId(registries: BattlestackRegistries, id: string): string {
 /**
  * Catches feature writes that bypassed the drift-aware writers: a tracked or untracked file
  * that held local edits at HEAD and was replaced. The local version is put back and the
- * feature's output is merged into it, or staged when there is no base to merge against.
- * `--force` keeps the feature output and saves the local version as a `.bak`, as the drift-aware
- * writers do; `--overwrite` takes the output as asked.
+ * feature's output is merged into it, or staged when there is no base to merge against. A
+ * path owned under any feature only gets the local version back. `--force` keeps the feature
+ * output and saves the local version as a `.bak`, as the drift-aware writers do; `--overwrite`
+ * takes the output as asked.
  */
 export async function repairOverwrites(
     ctx: RunContext,
@@ -125,11 +127,14 @@ export async function repairOverwrites(
     const ledger = updateLedger(ctx)
     const handled = new Set(ledger.handled)
     const exempt = selfMergedPaths(ctx, registries)
+    const owned = ownedAnywhere(ctx)
     const changed = git(ctx.projectDir, ['diff', '--name-only', '-z', '--relative', 'HEAD']).out.toString().split('\0').filter(Boolean)
     const repairs: OverwriteRepair[] = []
 
     for (const rel of changed) {
-        if (handled.has(rel) || isExempt(rel, exempt)) continue
+        // A guarded writer marks an owned rel handled without writing it, so a direct patch after it still needs undoing.
+        const isOwned = owned.has(rel) && ctx.state.overwrite !== true
+        if (!isOwned && (handled.has(rel) || isExempt(rel, exempt))) continue
         const trackers = trackersOf(ctx, rel)
         if (trackers.length === 0) continue
         const abs = path.join(ctx.projectDir, rel)
@@ -138,6 +143,19 @@ export async function repairOverwrites(
         const head = git(ctx.projectDir, ['cat-file', '--filters', `HEAD:./${rel}`])
         if (!head.ok) continue
         const startByFeature = start.get(rel) ?? new Map<string, string>()
+        // An owned file is the project's: pull never changes it, edited or not.
+        if (isOwned) {
+            const upstream = hashContent(await readFile(abs))
+            const writer = trackers.find((t) => t.hash === upstream) ?? trackers[0]!
+            await writeFile(abs, head.out)
+            for (const tracker of trackers) {
+                const previous = [...startByFeature].find(([id]) => bareId(registries, id) === tracker.featureId)?.[1]
+                if (previous) tracker.files[tracker.rel] = previous
+                else delete tracker.files[tracker.rel]
+            }
+            repairs.push({ rel, featureId: writer.featureId, outcome: 'kept yours, owned' })
+            continue
+        }
         const before = new Set(startByFeature.values())
         if (before.has(hashContent(head.out))) continue
         // A file battlestack wrote and never checked out matches the committed bytes, not the filtered ones.
@@ -226,6 +244,8 @@ export interface PullSummary {
     added: string[]
     orphans: string[]
     actions: string[]
+    /** Shown once and not counted as work left. */
+    suggestions?: string[]
     formatError?: string
     repairs: OverwriteRepair[]
 }
@@ -291,7 +311,7 @@ export function renderReport(s: PullSummary): string {
         ),
         ...section(
             'Local edits a feature wrote over',
-            'These features replaced a file that had local edits. Pull put your version back and merged or staged theirs, as listed in the sections above, or under `--force` kept theirs and saved yours as `.battlestack/pull/<path>.bak`. Check the result.',
+            'These features replaced a file that had local edits. Pull put your version back and merged or staged theirs, as listed in the sections above, or under `--force` kept theirs and saved yours as `.battlestack/pull/<path>.bak`. A file you own with `battlestack own` is simply put back. Check the result.',
             repaired,
         ),
         ...section(
@@ -303,6 +323,11 @@ export function renderReport(s: PullSummary): string {
             STEPS_TITLE,
             'Pull cannot do these for you. Delete a line here once its step is done: a later pull lists again every line still here.',
             s.actions,
+        ),
+        ...section(
+            'Optional',
+            'Nothing breaks without these. This report lists each one once.',
+            s.suggestions ?? [],
         ),
         ...section(
             'Features from plugins that did not load',
