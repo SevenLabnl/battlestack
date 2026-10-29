@@ -184,6 +184,17 @@ describe('essentialsFeature: default favicon and app icons', () => {
         expect(await readNuxtConfig()).not.toContain('/favicon.svg')
     })
 
+    it.each([
+        ['a bound rel', '<link :rel="\'icon\'" href="/brand.svg">'],
+        ['an unquoted rel', '<link rel=icon href="/brand.svg">'],
+    ])('adds no icon links when the app sets them with %s', async (_, link) => {
+        await mkdir(path.join(projectDir, 'app'), { recursive: true })
+        await writeFile(path.join(projectDir, 'app', 'app.vue'), `<template>\n    ${link}\n</template>\n`, 'utf8')
+        await essentialsFeature.execute(ctx())
+
+        expect(await readNuxtConfig()).not.toContain('/favicon.svg')
+    })
+
     it('removes template links an earlier pull added once a layout sets its own', async () => {
         await essentialsFeature.execute(ctx())
         expect(await readNuxtConfig()).toContain('/favicon.svg')

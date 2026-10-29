@@ -121,8 +121,12 @@ function isIconRel(rel: unknown): boolean {
     return rel.toLowerCase().split(/\s+/).some((token) => ICON_RELS.has(token))
 }
 
-/** Matches `rel: 'icon'` (a `useHead` link) and `rel="icon"` (a `<link>` in a template). */
-const REL_IN_SOURCE = /\brel\s*[:=]\s*(['"`])([^'"`]*)\1/g
+/** Matches `rel: 'icon'` (a `useHead` link), `rel="icon"`, `rel=icon` and `:rel="'icon'"` (a `<link>` in a template). */
+const REL_IN_SOURCE = /\brel\s*[:=]\s*(?:(['"`])(.*?)\1|([^\s>'"`]+))/g
+
+function relValue(match: RegExpMatchArray): string {
+    return (match[2] ?? match[3] ?? '').replace(/['"`]/g, '')
+}
 
 /**
  * Whether `app/app.vue` or a layout under `app/layouts/` declares an icon link. A plain
@@ -148,7 +152,7 @@ async function vueSourcesDeclareIcon(projectDir: string): Promise<boolean> {
             throw error
         }
         for (const m of source.matchAll(REL_IN_SOURCE)) {
-            if (isIconRel(m[2])) return true
+            if (isIconRel(relValue(m))) return true
         }
     }
     return false
