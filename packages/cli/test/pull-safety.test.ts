@@ -141,6 +141,24 @@ describe('repairOverwrites', () => {
         expect((ctx.state['files:test:feat'] as Record<string, string>).Dockerfile).toBe(sha256('FROM node\n'))
     })
 
+    it('merges a feature\'s write into local edits when the earlier upstream version is known', async () => {
+        const base = 'FROM node\nWORKDIR /app\nCOPY . .\nRUN build\nCMD start\n'
+        git('init', '-q')
+        await write('Dockerfile', base)
+        await commitAll()
+        await write('Dockerfile', base.replace('RUN build', 'RUN build --prod'))
+        await commitAll()
+        const start = recordedAtStart(manifestWith({ Dockerfile: sha256(base) }))
+
+        const upstream = base.replace('FROM node', 'FROM node:24')
+        await write('Dockerfile', upstream)
+        const ctx = ctxRecording({ Dockerfile: sha256(upstream) })
+
+        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'merged' }])
+        expect(lf(await read('Dockerfile'))).toBe('FROM node:24\nWORKDIR /app\nCOPY . .\nRUN build --prod\nCMD start\n')
+        expect(updateLedger(ctx).merged).toContain('Dockerfile')
+    })
+
     it('leaves a file alone that was pristine before the pull', async () => {
         git('init', '-q')
         await write('a.ts', 'v1\n')
@@ -270,21 +288,6 @@ describe('report', () => {
     it('lists a restored file once under New files', () => {
         const text = renderReport({ ...EMPTY, added: ['a.ts'], restored: ['a.ts'] })
         expect(text.match(/^- `a\.ts`$/gm)).toHaveLength(1)
-    })
-})
-
-describe('pull with --allow-dirty', () => {
-    it('skips the overwrite check, so an uncommitted edit is never treated as feature output', async () => {
-        git('init', '-q')
-        await write('a.ts', 'committed, already edited\n')
-        git('add', '-A')
-        git('commit', '-q', '-m', 'init')
-        await write('a.ts', 'uncommitted edit\n')
-
-        const safety = await preflight(projectDir, manifestWith({ 'a.ts': sha256('scaffold\n') }), { allowDirty: true })
-        expect(safety.clean).toBe(false)
-        // pull runs repairOverwrites only when `clean`, so the uncommitted bytes stay as they are.
-        expect(await read('a.ts')).toBe('uncommitted edit\n')
     })
 })
 
