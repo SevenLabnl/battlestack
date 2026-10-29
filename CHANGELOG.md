@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- A generated project's `nuxt.config.ts` sets `runtimeConfig.session.password`
+  to `''`, nuxt-auth-utils' own default, so it type-checks on Nuxt releases
+  that require the key. `NUXT_SESSION_PASSWORD` still sets it.
 - The Claude Code rules now ask for `pnpm run typecheck` next to lint and tests,
   and rule out getting checks green by suppressing them (`@ts-ignore`, `as any`,
   `eslint-disable`, skipped tests, `--no-verify`). `security.md` adds that nothing
