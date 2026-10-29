@@ -79,6 +79,15 @@ describe('e2e: auth flow', () => {
         expect((await apiGet('/api/auth/sessions', other)).status).toBe(200)
     })
 
+    it.skipIf(!serverUp)('a live session is refused when sent only as a session header', async () => {
+        // `sessionHeader: false` turns the header off entirely, so even a valid session needs the cookie.
+        const cookie = await loginAsAdmin()
+        const sealed = cookie.slice(cookie.indexOf('=') + 1)
+        const viaHeader = await fetch(`${BASE_URL}/api/auth/sessions`, { headers: { 'x-nuxt-session-session': sealed } })
+        expect(viaHeader.status).toBe(401)
+        expect((await apiGet('/api/auth/sessions', cookie)).status).toBe(200)
+    })
+
     if (!serverUp) {
         // Surface the skip reason once so the dev sees why the suite is empty.
         it('e2e suite skipped, no server up at TEST_BASE_URL', () => {

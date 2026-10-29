@@ -1,13 +1,17 @@
 import path from 'node:path'
 import { writeFile as fsWriteFile } from 'node:fs/promises'
-import { generateCode, loadFile } from 'magicast'
+import { generateCode, loadFile, parseModule } from 'magicast'
 import { defaultObject, mergeDefaults, pushUnique, pushUniqueAll } from '@battlestack/core/utils/ts-file.js'
+import { ui } from '@battlestack/tui'
 
 type Mod = Awaited<ReturnType<typeof loadFile>>
+
+const RUNTIME_CONFIG = 'nuxt.config.ts#runtimeConfig'
 
 export class NuxtConfig {
     private readonly mod: Mod
     private readonly filePath: string
+    private readonly skipped: string[] = []
 
     private constructor(mod: Mod, filePath: string) {
         this.mod = mod
@@ -27,7 +31,7 @@ export class NuxtConfig {
 
     /**
      * Adds a Nuxt layer to `extends`. The project's own `nuxt.config.ts` always outranks
-     * every layer, and among layers the earliest entry wins — so appending is the safe
+     * every layer, and among layers the earliest entry wins, so appending is the safe
      * order: a layer added later never shadows one an earlier feature already relied on.
      */
     addExtends(layer: string): this {
@@ -79,6 +83,19 @@ export class NuxtConfig {
         return [...(this.config.app?.head?.link ?? [])]
     }
 
+    /** Removes the `app.head.link` entries matching `match`. Returns how many it removed. */
+    removeHeadLinks(match: (link: Record<string, string>) => boolean): number {
+        const links = this.config.app?.head?.link
+        if (!links) return 0
+        let removed = 0
+        for (let i = links.length - 1; i >= 0; i--) {
+            if (!match({ ...links[i] })) continue
+            links.splice(i, 1)
+            removed++
+        }
+        return removed
+    }
+
     /** Append a `<meta>` to `app.head.meta`. Idempotent on name. See `addHeadLink` re: the spread. */
     addHeadMeta(meta: Record<string, string>): this {
         this.config.app ||= {}
@@ -127,27 +144,22 @@ export class NuxtConfig {
         return this
     }
 
-    /** Adds the `runtimeConfig` keys the project lacks; existing values and comments stay. */
     mergeRuntimeConfig(patch: Record<string, unknown>): this {
-        mergeDefaults(this.config, 'runtimeConfig', patch)
+        this.skipped.push(...mergeDefaults(this.config, 'runtimeConfig', patch, RUNTIME_CONFIG))
         return this
     }
 
-    /** Adds the `runtimeConfig.public` keys the project lacks; existing values and comments stay. */
     mergeRuntimePublic(patch: Record<string, unknown>): this {
-        this.config.runtimeConfig ||= {}
-        mergeDefaults(this.config.runtimeConfig, 'public', patch)
-        return this
+        return this.mergeRuntimeConfig({ public: patch })
+    }
+
+    skippedDefaults(): string[] {
+        return [...this.skipped]
     }
 
     /** Sets a `runtimeConfig.public` key only when absent, never clobbering a user value. */
     setRuntimePublicDefault(key: string, value: unknown): this {
-        this.config.runtimeConfig ||= {}
-        this.config.runtimeConfig.public ||= {}
-        if (this.config.runtimeConfig.public[key] == null) {
-            this.config.runtimeConfig.public[key] = value
-        }
-        return this
+        return this.mergeRuntimePublic({ [key]: value })
     }
 
     /** Append a JSON file to `i18n.locales[code].files`. Idempotent. */
@@ -180,6 +192,27 @@ export class NuxtConfig {
         return this
     }
 
+    /**
+     * Wraps an object-literal `security.rateLimiter` as `<gate><object>`, keeping its values, and
+     * says whether it did, or found a value it cannot gate (a variable or a call).
+     */
+    gateRateLimiter(gate: string): 'gated' | 'unchanged' | 'not-literal' {
+        const security = this.config.security
+        if (security?.$type !== 'object') return 'unchanged'
+        // Read from the AST: magicast throws when it proxies an already-gated conditional.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const prop = security.$ast.properties.find((p: any) => (p.key?.name ?? p.key?.value) === 'rateLimiter')
+        const value = prop?.value
+        if (!value || value.type === 'BooleanLiteral' || value.type === 'ConditionalExpression') return 'unchanged'
+        // `{ … } as X` and `{ … } satisfies X` are still an object literal.
+        const literal = value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression' ? value.expression : value
+        if (literal?.type !== 'ObjectExpression') return 'not-literal'
+        const wrapped = parseModule(`const gated = ${gate}${generateCode({ $ast: value }).code}`)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        prop.value = (wrapped.$ast as any).body[0].declarations[0].init
+        return 'gated'
+    }
+
     async save(): Promise<void> {
         // Matches the project's ESLint style: single quotes, indent 4. magicast only honours styles
         // under `format`, and detects the rest from the file, never wider than 2.
@@ -200,6 +233,9 @@ export async function patchNuxtConfig(
     const cfg = await NuxtConfig.load(projectDir)
     await fn(cfg)
     await cfg.save()
+    for (const skipped of cfg.skippedDefaults()) {
+        ui.warn(`${skipped} not added: its parent is not an object literal. Set it yourself.`)
+    }
 }
 
 // magicast appends a new key last; `nuxt/nuxt-config-keys-order` puts `extends` right after the ids.

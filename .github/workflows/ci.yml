@@ -130,10 +130,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: bump-check
     timeout-minutes: 30
-    # Without a reachable database the DB-gated template tests skip themselves
-    # and the file reports one passing assertion that the database is down, so
-    # the suite is green having tested nothing. With this service the fullstack
-    # scaffold runs 35 tests instead of 4.
+    # The DB-gated tests skip themselves without postgres, and the storage e2e
+    # tests upload to rustfs. The Test step fails if either suite was skipped.
     services:
       postgres:
         image: pgvector/pgvector:pg18
@@ -183,8 +181,7 @@ jobs:
         run: pnpm build
 
       # `nuxt4-fullstack` enables the most features, so it emits the most
-      # template code. Docker is not started: lint, typecheck and the non-DB
-      # tests do not need it, and the DB-gated tests skip themselves.
+      # template code.
       - name: Scaffold
         run: |
           mkdir -p "$RUNNER_TEMP/scaffold"
@@ -215,17 +212,15 @@ jobs:
         working-directory: ${{ runner.temp }}/scaffold/ci-app
         run: pnpm run db:push
 
-      # The e2e tests need a running app, and without one they skip themselves.
-      # A production build, so they run against what ships. `--env-file` does not
-      # override the job env, so the services above win over `.env`'s ports, and
-      # `.env`'s NUXT_RATE_LIMIT_DISABLED keeps the repeated logins under the limit.
+      # A production build, so the e2e tests run against what ships. `--env-file`
+      # does not override the job env, so the services above win over `.env`.
       - name: Start the app
         working-directory: ${{ runner.temp }}/scaffold/ci-app
         run: |
           pnpm run build
           pnpm run db:seed
           node --env-file=.env .output/server/index.mjs > server.log 2>&1 &
-          curl -fsS --retry 60 --retry-delay 1 --retry-all-errors "$TEST_BASE_URL/api/health" || { cat server.log; exit 1; }
+          curl -fsS --connect-timeout 2 --max-time 5 --retry 60 --retry-delay 1 --retry-all-errors "$TEST_BASE_URL/api/health"
 
       # `--reporter=verbose` because the markers are passing tests' titles, which
       # the default reporter does not print. An unreachable database or app
@@ -243,6 +238,10 @@ jobs:
             echo "::error::e2e tests skipped; the app was not reachable at $TEST_BASE_URL"
             exit 1
           fi
+
+      - name: Show the app's server log
+        if: failure()
+        run: cat "$RUNNER_TEMP/scaffold/ci-app/server.log" || true
 
       # The e2e server above runs `.output` beside the project's node_modules, where a
       # package aliased under an `npm:` name still resolves. Only the image build proves

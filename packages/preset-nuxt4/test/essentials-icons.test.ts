@@ -138,6 +138,89 @@ describe('essentialsFeature: default favicon and app icons', () => {
         expect(cfg).not.toContain('/apple-touch-icon.png')
         expect(cfg.match(/\/favicon\.svg/g)).toHaveLength(1)
     })
+
+    const writeConfigWithLinks = (links: string[]): Promise<void> => writeFile(
+        path.join(projectDir, 'nuxt.config.ts'),
+        `export default defineNuxtConfig({\n    app: { head: { link: [${links.join(', ')}] } },\n})\n`,
+        'utf8',
+    )
+
+    it('adds no icon links when the project declares only an apple-touch-icon', async () => {
+        await writeConfigWithLinks(["{ rel: 'apple-touch-icon', href: '/brand/touch.png' }"])
+        await essentialsFeature.execute(ctx())
+
+        const cfg = await readNuxtConfig()
+        expect(cfg).not.toContain('/favicon.ico')
+        expect(cfg).not.toContain('/favicon.svg')
+        expect(cfg).not.toContain('/apple-touch-icon.png')
+    })
+
+    it('adds no icon links when the rel differs only in case', async () => {
+        await writeConfigWithLinks(["{ rel: 'Apple-Touch-Icon', href: '/brand/touch.png' }"])
+        await essentialsFeature.execute(ctx())
+
+        expect(await readNuxtConfig()).not.toContain('/favicon.svg')
+    })
+
+    it('treats a legacy `shortcut icon` link as the project\'s own branding', async () => {
+        await writeConfigWithLinks(["{ rel: 'shortcut icon', href: '/brand.ico' }"])
+        await essentialsFeature.execute(ctx())
+
+        const cfg = await readNuxtConfig()
+        expect(cfg).not.toContain('/favicon.ico')
+        expect(cfg).not.toContain('/favicon.svg')
+        expect(cfg).not.toContain('/apple-touch-icon.png')
+    })
+
+    it('adds no icon links when a layout sets them through useHead', async () => {
+        await mkdir(path.join(projectDir, 'app', 'layouts'), { recursive: true })
+        await writeFile(
+            path.join(projectDir, 'app', 'layouts', 'default.vue'),
+            "<script setup lang=\"ts\">\nuseHead({ link: [{ rel: 'icon', href: '/brand.svg' }] })\n</script>\n",
+            'utf8',
+        )
+        await essentialsFeature.execute(ctx())
+
+        expect(await readNuxtConfig()).not.toContain('/favicon.svg')
+    })
+
+    it.each([
+        ['a bound rel', '<link :rel="\'icon\'" href="/brand.svg">'],
+        ['an unquoted rel', '<link rel=icon href="/brand.svg">'],
+    ])('adds no icon links when the app sets them with %s', async (_, link) => {
+        await mkdir(path.join(projectDir, 'app'), { recursive: true })
+        await writeFile(path.join(projectDir, 'app', 'app.vue'), `<template>\n    ${link}\n</template>\n`, 'utf8')
+        await essentialsFeature.execute(ctx())
+
+        expect(await readNuxtConfig()).not.toContain('/favicon.svg')
+    })
+
+    it('removes template links an earlier pull added once a layout sets its own', async () => {
+        await essentialsFeature.execute(ctx())
+        expect(await readNuxtConfig()).toContain('/favicon.svg')
+        await mkdir(path.join(projectDir, 'app', 'layouts'), { recursive: true })
+        await writeFile(
+            path.join(projectDir, 'app', 'layouts', 'default.vue'),
+            "<script setup lang=\"ts\">\nuseHead({ link: [{ rel: 'icon', href: '/brand.svg' }] })\n</script>\n",
+            'utf8',
+        )
+        const prev: InstalledFeatureRecord = { id: 'nuxt4:essentials', version: '1.2.2', files: {}, ownedByUser: [] }
+        const report = await essentialsFeature.update!(ctx(), prev)
+
+        const cfg = await readNuxtConfig()
+        expect(cfg).not.toContain('/favicon.ico')
+        expect(cfg).not.toContain('/favicon.svg')
+        expect(cfg).not.toContain('/apple-touch-icon.png')
+        expect(report.notes.join('\n')).toMatch(/template favicon links were removed/)
+    })
+
+    it('reports the skipped links on pull', async () => {
+        await writeConfigWithLinks(["{ rel: 'icon', href: '/brand.svg' }"])
+        const prev: InstalledFeatureRecord = { id: 'nuxt4:essentials', version: '1.2.2', files: {}, ownedByUser: [] }
+        const report = await essentialsFeature.update!(ctx(), prev)
+
+        expect(report.notes.join('\n')).toMatch(/template favicon links were not added/)
+    })
 })
 
 describe('essentialsFeature: icon ownership', () => {

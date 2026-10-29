@@ -19,6 +19,8 @@ const SUBTREES: Record<string, { feature: string, gatedBy?: string }> = {
     'mastra-admin': { feature: 'nuxt4:mastra', gatedBy: 'nuxt4:user-admin' },
     'health/with-db': { feature: 'nuxt4:health', gatedBy: 'nuxt4:database' },
     'health/env-only': { feature: 'nuxt4:health' },
+    'database-users/base': { feature: 'nuxt4:database' },
+    'database-users/with-storage': { feature: 'nuxt4:database', gatedBy: 'nuxt4:storage' },
     'chat/http': { feature: 'nuxt4:chat' },
     'chat/ws-nitro': { feature: 'nuxt4:chat' },
     'ai-tool-config/claude-code': { feature: 'shared:ai-tool-config' },

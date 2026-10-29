@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -17,6 +17,7 @@ import {
 } from '@battlestack/core'
 import { addCommand, removeCommand } from '../src/commands/add-remove.js'
 import { pullCommand } from '../src/commands/pull.js'
+import { writeReport } from '../src/commands/pull-safety.js'
 import { buildRegistries, defaultArgs, withCwd, withCwdCapture } from './test-utils.js'
 
 const NS = 'addtest'
@@ -496,5 +497,58 @@ describe('battlestack add --dry-run', () => {
 
         expect(lines.join('\n')).toMatch(/dry-run/)
         expect(await p.manifest()).toEqual(before)
+    })
+})
+
+describe('battlestack add into an existing file', () => {
+    it('keeps the project\'s file, stages the feature\'s version and flags the run', async () => {
+        const p = await project()
+        await writeFile(path.join(p.dir, 'add-opt.txt'), 'the project\'s own file\n')
+
+        await withCwd(p.dir, () => add('add:opt')(p))
+
+        expect(await readFile(path.join(p.dir, 'add-opt.txt'), 'utf8')).toBe('the project\'s own file\n')
+        expect(await readFile(path.join(p.dir, '.battlestack', 'pull', 'add-opt.txt.new'), 'utf8')).toBe('add:opt\n')
+        expect(await fileExists(p.dir, '.battlestack/pull/REPORT.md')).toBe(true)
+        expect(process.exitCode).toBe(2)
+        process.exitCode = undefined
+    })
+})
+
+describe('battlestack add after a pull that left work', () => {
+    it('keeps the pull\'s items in REPORT.md next to its own', async () => {
+        const p = await project()
+        await writeReport(p.dir, {
+            merged: [], conflicts: ['app/conflicted.ts'], staged: [], backups: [], unmanaged: [], restored: [],
+            added: [], orphans: [], actions: ['Run the new database migration'], repairs: [],
+        })
+        await writeFile(path.join(p.dir, 'add-opt.txt'), 'the project\'s own file\n')
+
+        await withCwd(p.dir, () => add('add:opt')(p))
+
+        const report = await readFile(path.join(p.dir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        expect(report).toContain('`add-opt.txt`')
+        expect(report).toContain('`app/conflicted.ts`')
+        expect(report).toContain('Run the new database migration')
+        expect(report.indexOf('`add-opt.txt`')).toBeLessThan(report.indexOf('# battlestack pull report'))
+        process.exitCode = undefined
+    })
+})
+
+describe('battlestack remove of a feature whose plugin is not loaded', () => {
+    it('drops only the record and leaves the files', async () => {
+        const p = await project()
+        const manifestPath = path.join(p.dir, MANIFEST_PATH)
+        const m = await p.manifest()
+        m.features.push({ id: 'gone:feature', version: '1.0.0', files: { 'gone.txt': 'abc' } })
+        await writeFile(manifestPath, JSON.stringify(m))
+        await writeFile(path.join(p.dir, 'gone.txt'), 'still here\n')
+
+        await withCwd(p.dir, () => removeCommand(defaultArgs({ projectName: 'gone:feature' }), undefined as never, p.registries))
+
+        const after = await p.manifest()
+        expect(after.features.map((f) => f.id)).not.toContain('gone:feature')
+        expect(after.optedOut).toContain('gone:feature')
+        expect(await readFile(path.join(p.dir, 'gone.txt'), 'utf8')).toBe('still here\n')
     })
 })

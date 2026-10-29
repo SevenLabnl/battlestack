@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { rm } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import type { Ora } from 'ora'
 import {
     classifyFileState,
@@ -12,6 +12,7 @@ import {
     readManifest,
     recordOwned,
     run,
+    MANIFEST_PATH,
     writeJson,
     writeManifest,
     type BattlestackRegistries,
@@ -22,11 +23,14 @@ import {
     type ReservedCommand,
     type RunContext,
     resolveProjectName,
+    UPDATING_STATE_KEY,
+    updateLedger,
     type ProjectManifest,
 } from '@battlestack/core'
 import { applyEnv, collectEnvForFeature } from '@battlestack/preset-nuxt4'
 import { ui } from '@battlestack/tui'
 import { formatAndReconcile } from './format-project.js'
+import { needsAttention, NEEDS_ATTENTION_EXIT_CODE, renderReport, REPORT_PATH, writeReport, type PullSummary } from './pull-safety.js'
 
 /** Static metadata only. `run` is built per-dispatch in `project.ts`. */
 export const addReservedMeta: Omit<ReservedCommand, 'run'> = {
@@ -144,7 +148,20 @@ export async function addCommand(args: ParsedArgs, loader: Ora, registries: Batt
     await writeManifest(ctx)
 
     ui.blank()
-    ui.ok(`Added ${fqid}`)
+    const ledger = updateLedger(ctx)
+    const leftover: PullSummary = {
+        merged: ledger.merged, conflicts: ledger.conflicts, staged: ledger.staged,
+        backups: [], unmanaged: [], restored: [], added: [], orphans: [], actions: ledger.actions, repairs: [],
+    }
+    if (needsAttention(leftover)) {
+        const reportPath = await writeAddReport(projectRoot, fqid, leftover)
+        const files = ledger.conflicts.length + ledger.staged.length
+        ui.warn(files > 0 ? `Added ${fqid}, merging into ${files} existing file(s) that need a look` : `Added ${fqid}, with steps left`)
+        ui.dim(`  Next steps: ${reportPath}`)
+        process.exitCode = NEEDS_ATTENTION_EXIT_CODE
+    } else {
+        ui.ok(`Added ${fqid}`)
+    }
 
     if (envDiff.newKeys.length > 0) {
         ui.blank()
@@ -162,6 +179,18 @@ export async function addCommand(args: ParsedArgs, loader: Ora, registries: Batt
         ui.dim('  .env was not modified; update manually to adopt the new defaults.')
     }
     ui.blank()
+}
+
+/** Puts add's leftovers above an earlier report rather than replacing it, so a pull's unfinished items stay listed. */
+async function writeAddReport(projectRoot: string, fqid: string, leftover: PullSummary): Promise<string> {
+    const dest = path.join(projectRoot, REPORT_PATH)
+    if (!(await exists(dest))) return writeReport(projectRoot, leftover)
+    const rendered = renderReport(leftover)
+    const sections = rendered.slice(rendered.indexOf('\n## ') + 1)
+    const intro = `Adding ${fqid} left work to finish. The report of an earlier run follows it.`
+    const prior = await readFile(dest, 'utf8')
+    await writeFile(dest, [`# battlestack add ${fqid}`, '', intro, '', sections, prior].join('\n'))
+    return REPORT_PATH
 }
 
 export async function removeCommand(args: ParsedArgs, _loader: Ora, registries: BattlestackRegistries): Promise<void> {
@@ -190,6 +219,21 @@ export async function removeCommand(args: ParsedArgs, _loader: Ora, registries: 
             ErrorCode.UNSUPPORTED_FEATURE,
             `Feature is not installed: ${featureId}`,
         )
+    }
+
+    // No plugin to ask which files are safe to delete, so only the record goes.
+    if (!registries.features.has(featureId)) {
+        if (args.dryRun) {
+            ui.info(`dry-run: would drop the record of ${featureId} and leave its files on disk`)
+            return
+        }
+        manifest.features = manifest.features.filter((f) => f.id !== featureId)
+        manifest.optedOut = [...new Set([...(manifest.optedOut ?? []), featureId])]
+        manifest.updatedAt = new Date().toISOString()
+        await writeJson(path.join(projectRoot, MANIFEST_PATH), manifest)
+        ui.ok(`Dropped the record of ${featureId}, whose plugin is not loaded.`)
+        ui.dim(`  Its ${Object.keys(record.files).length} file(s) stay on disk and are no longer managed.`)
+        return
     }
 
     const template = registries.templates.get(manifest.template)
@@ -369,7 +413,7 @@ function buildCtx(
         framework: registries.frameworks.get(manifest.framework),
         template: registries.templates.get(manifest.template),
         enabledFeatures: new Set(enabled),
-        state: { packageManager: pm, skipInstall: args.skipInstall },
+        state: { packageManager: pm, skipInstall: args.skipInstall, [UPDATING_STATE_KEY]: !args.dryRun },
         debug: args.debug,
         dryRun: args.dryRun,
         registries,

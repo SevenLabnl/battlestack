@@ -1,7 +1,9 @@
 import path from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { randomBytes } from 'node:crypto'
 import {
     allocatePort,
+    defaultPort,
     CLIError,
     ErrorCode,
     hashFile,
@@ -12,6 +14,8 @@ import {
     recordFile,
     resolveProjectPM,
     run,
+    storeBase,
+    templatesDir,
     writeFileEnsured,
     writeJson,
     STAGE,
@@ -22,7 +26,7 @@ import {
 } from '@battlestack/core'
 import { applyDbExtensions, waitForPgReady } from '@battlestack/core/utils/db.js'
 import { ui } from '@battlestack/tui'
-import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
+import { emitTemplate, emitTemplateUpdateMany } from '../utils/emit-template.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
 
 /** Sets `state.seeded` on the `nuxt4:database` manifest record. No-op when already `true`. */
@@ -45,8 +49,8 @@ export async function isDatabaseSeeded(projectDir: string, featureFqid: string):
 const COMPOSE_FILE = 'docker-compose.yml'
 
 function buildComposeYml(ctx: RunContext): string {
-    const dbPort = allocatePort(ctx.projectName, 'db')
-    const appPort = allocatePort(ctx.projectName, 'app')
+    const dbPort = defaultPort(ctx.projectName, 'db')
+    const appPort = defaultPort(ctx.projectName, 'app')
     const hasAuth = isFeatureEnabled(ctx, 'nuxt4:auth')
     const hasStorage = isFeatureEnabled(ctx, 'nuxt4:storage')
     const hasRedis = isFeatureEnabled(ctx, 'nuxt4:redis')
@@ -168,8 +172,8 @@ function buildComposeYml(ctx: RunContext): string {
     const volumes: string[] = ['    db_data:']
 
     if (hasAuth) {
-        const smtp = allocatePort(ctx.projectName, 'smtp')
-        const mailUi = allocatePort(ctx.projectName, 'mail-ui')
+        const smtp = defaultPort(ctx.projectName, 'smtp')
+        const mailUi = defaultPort(ctx.projectName, 'mail-ui')
         services.push(`    mailpit:
         image: axllent/mailpit:latest
         restart: unless-stopped
@@ -185,8 +189,8 @@ function buildComposeYml(ctx: RunContext): string {
     }
 
     if (hasStorage) {
-        const s3Api = allocatePort(ctx.projectName, 's3-api')
-        const s3Console = allocatePort(ctx.projectName, 's3-console')
+        const s3Api = defaultPort(ctx.projectName, 's3-api')
+        const s3Console = defaultPort(ctx.projectName, 's3-console')
         services.push(`    rustfs:
         image: rustfs/rustfs:latest
         restart: unless-stopped
@@ -205,7 +209,7 @@ function buildComposeYml(ctx: RunContext): string {
     }
 
     if (hasRedis) {
-        const redisPort = allocatePort(ctx.projectName, 'redis')
+        const redisPort = defaultPort(ctx.projectName, 'redis')
         // No named volume: rate-limit counters are short-TTL. Postgres is the durable store.
         services.push(`    redis:
         image: redis:7-alpine
@@ -251,7 +255,7 @@ async function registerRuntimeConfig(projectDir: string): Promise<void> {
 /** PostgreSQL 18 in Docker, Drizzle ORM, users schema, seed script. */
 export const databaseFeature: Feature = {
     id: 'nuxt4:database',
-    version: '1.7.3',
+    version: '1.7.5',
     label: 'PostgreSQL + Drizzle ORM (Docker)',
     frameworks: ['nuxt4'],
     stage: STAGE.DATABASE,
@@ -440,6 +444,7 @@ export const databaseFeature: Feature = {
         }
 
         await emitTemplate(ctx, 'nuxt4:database', import.meta.url, 'database')
+        await emitTemplate(ctx, 'nuxt4:database', import.meta.url, usersTemplate(ctx))
 
         await emitCompose(ctx)
 
@@ -458,7 +463,8 @@ export const databaseFeature: Feature = {
     },
 
     async update(ctx, prev) {
-        const report = await emitTemplateUpdate(ctx, 'nuxt4:database', import.meta.url, 'database', prev)
+        await storeUsersBase(ctx)
+        const report = await emitTemplateUpdateMany(ctx, 'nuxt4:database', import.meta.url, ['database', usersTemplate(ctx)], prev)
         await emitCompose(ctx)
         await registerRuntimeConfig(ctx.projectDir)
         report.written.push(COMPOSE_FILE)
@@ -626,4 +632,19 @@ export const databaseFeature: Feature = {
             },
         }
     },
+}
+
+/** `nuxt4:storage` adds `avatarKey` to users.ts, so the file ships with it whenever storage is on. */
+function usersTemplate(ctx: RunContext): string {
+    return isFeatureEnabled(ctx, 'nuxt4:storage') ? 'database-users/with-storage' : 'database-users/base'
+}
+
+/**
+ * Storage projects recorded users.ts before storage patched it, so no commit holds that version.
+ * Storing it gives an edited users.ts a merge base instead of a manual merge.
+ */
+export async function storeUsersBase(ctx: RunContext): Promise<void> {
+    if (!isFeatureEnabled(ctx, 'nuxt4:storage')) return
+    const base = templatesDir(import.meta.url, '..', '..', 'templates', 'database-users', 'base', 'server', 'database', 'schema', 'users.ts')
+    await storeBase(ctx.projectDir, await readFile(base))
 }

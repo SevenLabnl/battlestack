@@ -13,7 +13,7 @@ only has to state its own concern.
 | Ruleset | Source | Enforces |
 | --- | --- | --- |
 | `Require PR approval` | Organization (`SevenLabnl`) | One approving review, stale reviews dismissed on push, review threads resolved, no deletion, no force-push. |
-| `Require CI to pass` | This repository | The six CI checks must succeed before a pull request can merge. |
+| `Require CI to pass` | This repository | The eight CI checks must succeed before a pull request can merge. |
 
 The organization ruleset also covers `development`, `staging` and `master`, and
 changing it needs organization admin. That is why the CI requirement is a
@@ -45,7 +45,7 @@ Contexts are matched by the job's **display name**, not its key. Renaming a job'
 request waits forever on a check that will never report under the old name.
 Rename the job and this file together.
 
-`ci.yml` triggers on every `pull_request` with no path filter, so all six always
+`ci.yml` triggers on every `pull_request` with no path filter, so all eight always
 run. That matters: a required check that never reports blocks a pull request
 indefinitely rather than failing it.
 
@@ -79,17 +79,20 @@ list.
 
 ## Deliberate choices
 
-**Strict mode is off.** `strict_required_status_checks_policy: false`, so a
-branch does not have to be up to date with `main` to merge. Turning it on means
-rebasing every pull request whenever `main` moves, and `allow_update_branch` is
-`false`, so there is no one-click update to do it with. Enable both together or
-neither.
+**Strict mode is on.** `strict_required_status_checks_policy: true`, so a branch
+must be up to date with `main` before it merges, and CI runs again on the updated
+branch. Without it, two pull requests that each pass alone can break `main`
+together. The bump-check gate is the likely case, because it diffs against
+`origin/main`, so two branches bumping the same feature to the same version both
+pass and the second breaks after merge.
 
-The trade is real: without strict mode, two pull requests that each pass alone
-can break `main` together. The bump-check gate is the likely case, because it
-diffs against `origin/main`, so two branches bumping the same feature to the same
-version both pass and the second breaks after merge. Worth knowing rather than
-being surprised by.
+The cost is updating every pull request whenever `main` moves. The repository's
+`allow_update_branch` setting adds an "Update branch" button for that. It is not
+part of the ruleset, so it is applied on its own:
+
+```
+gh api -X PATCH repos/SevenLabnl/battlestack -F allow_update_branch=true
+```
 
 **No bypass actors.** Nobody can merge past a failing check. The organization
 ruleset grants a `pull_requests_only` bypass for the approval requirement, which
