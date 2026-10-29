@@ -68,7 +68,8 @@
   finish schema merges first, run `db:generate` in a terminal for renames,
   read every generated migration for dropped columns, and never copy a staged
   schema `.new` over the project's file. It also covers `--force` backups,
-  monorepo projects and checking that a second pull exits with code 0.
+  monorepo projects, deleting each finished step from `REPORT.md`, and checking
+  that a second pull exits with code 0 once nothing is left.
 - A project scaffolded before the 3-day release-age policy can have a
   `pnpm-lock.yaml` with packages younger than the policy allows, and pnpm then
   refuses every script once `pull` adds the policy. `pull` now detects that,
