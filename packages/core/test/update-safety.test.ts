@@ -235,13 +235,13 @@ describe('defaultPort', () => {
 })
 
 describe('pruneBases', () => {
-    it('keeps the bases still needed, and removes the directory once none are', async () => {
+    it('keeps the README and the bases still needed, and removes the directory once none are', async () => {
         const { pruneBases } = await import('../src/utils/merge.js')
         const keep = await storeBase(projectDir, Buffer.from('keep\n'))
         const drop = await storeBase(projectDir, Buffer.from('drop\n'))
         await pruneBases(projectDir, new Set([keep]))
         expect(await exists(path.join(projectDir, BASE_DIR, drop))).toBe(false)
-        expect(await exists(path.join(projectDir, BASE_DIR, keep))).toBe(true)
+        expect(await exists(path.join(projectDir, BASE_DIR, 'README.md'))).toBe(true)
         await pruneBases(projectDir, new Set())
         expect(await exists(path.join(projectDir, BASE_DIR))).toBe(false)
     })

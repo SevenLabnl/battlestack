@@ -194,11 +194,6 @@ function isExempt(rel: string, exempt: string[]): boolean {
     return exempt.some((e) => (e.endsWith('/') ? rel.startsWith(e) : rel === e))
 }
 
-/** `.battlestack/base/` became an ignored local cache; earlier projects committed it. */
-export function baseDirIsTracked(projectDir: string): boolean {
-    return git(projectDir, ['ls-files', '--', '.battlestack/base']).out.toString().trim() !== ''
-}
-
 /** Recorded files this pull created that git does not know yet. */
 export function newlyAddedFiles(ctx: RunContext): string[] {
     const r = git(ctx.projectDir, ['ls-files', '--others', '--exclude-standard', '-z'])
