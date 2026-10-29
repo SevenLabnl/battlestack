@@ -13,6 +13,7 @@ import {
     readManifest,
     recordOwned,
     run,
+    ownedPaths,
     toPosixRel,
     MANIFEST_PATH,
     writeJson,
@@ -297,7 +298,7 @@ async function removeLocked(args: ParsedArgs, registries: BattlestackRegistries,
     // pristine → delete, drifted → leave. Owned files are skipped.
     const pristine: string[] = []
     const drifted: string[] = []
-    const ownedSet = new Set(manifest.features.flatMap((f) => (f.ownedByUser ?? []).map(toPosixRel)))
+    const ownedSet = ownedPaths(manifest)
     for (const [rel, recordedHash] of Object.entries(record.files)) {
         const abs = path.join(projectRoot, rel)
         const state = await classifyFileState(abs, recordedHash, ownedSet.has(toPosixRel(rel)))
