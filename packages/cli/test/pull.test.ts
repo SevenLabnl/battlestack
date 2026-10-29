@@ -681,8 +681,11 @@ describe('battlestack pull: rehydrating missing features (fqid defaultEnabledOpt
     })
 })
 
-describe('battlestack pull: a file moving to a later feature', () => {
-    // Mirrors nuxt4:vitest (NAMING) handing test/e2e/api/auth.test.ts to nuxt4:auth (AUTH).
+// `later` mirrors nuxt4:vitest (NAMING) handing test/e2e/api/auth.test.ts to nuxt4:auth (AUTH).
+describe.each([
+    ['later', STAGE.NAMING, STAGE.AUTH],
+    ['earlier', STAGE.AUTH, STAGE.NAMING],
+])('battlestack pull: a file moving to an %s feature', (_, fromStage, toStage) => {
     const movedRel = path.join('test', 'e2e', 'moved.test.ts')
     const movedContent = 'export const moved = true\n'
     // The new owner sorts first by id, as nuxt4:auth does before nuxt4:vitest, while its stage runs later.
@@ -709,8 +712,8 @@ describe('battlestack pull: a file moving to a later feature', () => {
         const required = enabledBare.map(fqid)
         const registriesV1 = makeRegistries({ requiredFeatures: required })
         const v1 = [
-            makeFileFeature(ids.from, '1.0.0', fromV1, { stage: STAGE.NAMING }),
-            makeFileFeature(ids.to, '1.0.0', toV1, { stage: STAGE.AUTH }),
+            makeFileFeature(ids.from, '1.0.0', fromV1, { stage: fromStage }),
+            makeFileFeature(ids.to, '1.0.0', toV1, { stage: toStage }),
         ].filter((f) => enabledBare.includes(f.id))
         for (const f of v1) registriesV1.features.register(f, origin)
         const ctx = scaffoldCtx(projectDir, registriesV1, required)
@@ -718,8 +721,8 @@ describe('battlestack pull: a file moving to a later feature', () => {
         await writeManifest(ctx)
 
         const registriesV2 = makeRegistries({ requiredFeatures: required })
-        registriesV2.features.register(makeFileFeature(ids.from, '1.1.0', fromV2, { stage: STAGE.NAMING }), origin)
-        registriesV2.features.register(makeFileFeature(ids.to, '1.1.0', toV2, { stage: STAGE.AUTH }), origin)
+        registriesV2.features.register(makeFileFeature(ids.from, '1.1.0', fromV2, { stage: fromStage }), origin)
+        registriesV2.features.register(makeFileFeature(ids.to, '1.1.0', toV2, { stage: toStage }), origin)
         return { projectDir, registriesV2 }
     }
 
@@ -734,6 +737,15 @@ describe('battlestack pull: a file moving to a later feature', () => {
         const manifest = await readManifestRaw(projectDir)
         expect(Object.keys(filesOf(manifest, FROM) ?? {})).not.toContain(movedRel)
         expect(Object.keys(filesOf(manifest, TO) ?? {})).toContain(movedRel)
+    })
+
+    it('leaves the moved file and its record alone on a second pull', async () => {
+        const { projectDir, registriesV2 } = await setup([FROM, TO])
+        await runPull(projectDir, registriesV2)
+        await runPull(projectDir, registriesV2)
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(movedContent)
+        expect(Object.keys(filesOf(await readManifestRaw(projectDir), TO) ?? {})).toContain(movedRel)
     })
 
     it('writes the new owner\'s changed version when the old owner updates first', async () => {
