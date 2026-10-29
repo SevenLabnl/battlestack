@@ -240,6 +240,8 @@ export interface PullSummary {
     added: string[]
     orphans: string[]
     actions: string[]
+    /** Shown once and not counted as work left. */
+    suggestions?: string[]
     formatError?: string
     repairs: OverwriteRepair[]
 }
@@ -333,6 +335,11 @@ export function renderReport(s: PullSummary): string {
             STEPS_TITLE,
             'Pull cannot do these for you. Delete a line here once its step is done: a later pull lists again every line still here.',
             s.actions,
+        ),
+        ...section(
+            'Optional',
+            'Nothing breaks without these. This report lists each one once.',
+            s.suggestions ?? [],
         ),
         ...section(
             'Features from plugins that did not load',
