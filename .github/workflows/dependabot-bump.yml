@@ -1,0 +1,66 @@
+name: Dependabot feature bump
+
+# A Dependabot PR that changes a template a scaffold emits (the Dockerfile's base image, for one)
+# must bump that feature's version, or existing projects never get it on `battlestack pull`, and
+# it needs a changelog line. This adds both to the PR, as a person would.
+#
+# `pull_request_target` runs with this repository's secrets, which a Dependabot-triggered
+# `pull_request` run cannot read. The push uses RELEASE_PR_TOKEN because GitHub starts no
+# workflows for a GITHUB_TOKEN push, so the required checks would never run on the new commit.
+# Nothing from the PR is installed or built: the bump script needs only Node's own modules.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    name: Bump features whose templates changed
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the PR branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PR_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Bump the features the version gate would fail on
+        env:
+          BUMP_CHECK_BASE: origin/${{ github.event.pull_request.base.ref }}
+        run: npx -y tsx@4.23.15 scripts/bump-check.ts --check --fix
+
+      - name: Add a changelog line
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BASE: origin/${{ github.event.pull_request.base.ref }}
+        run: |
+          git diff --quiet -- packages && exit 0
+          git diff --quiet "$BASE" -- CHANGELOG.md || exit 0
+          # "fix(docker): bump node from a to b in /x" -> "Bump node from a to b in /x."
+          line="$(printf '%s' "$TITLE" | sed -E 's/^[a-z]+(\([^)]*\))?!?: //; s/^./\U&/; s/\.?$/./')"
+          node -e '
+            const fs = require("fs")
+            const s = fs.readFileSync("CHANGELOG.md", "utf8")
+            const head = "## Unreleased\n\n"
+            if (!s.includes(head)) process.exit(1)
+            fs.writeFileSync("CHANGELOG.md", s.replace(head, `${head}- ${process.argv[1]}\n`))
+          ' "$line"
+
+      - name: Commit and push
+        run: |
+          git diff --quiet && { echo "No feature needed a bump."; exit 0; }
+          git config user.name "battlestack-bot"
+          git config user.email "battlestack-bot@users.noreply.github.com"
+          git commit -am "chore: bump the features this dependency update changes"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
