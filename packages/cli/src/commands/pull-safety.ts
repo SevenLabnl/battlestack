@@ -132,7 +132,9 @@ export async function repairOverwrites(
     const repairs: OverwriteRepair[] = []
 
     for (const rel of changed) {
-        if (handled.has(rel) || isExempt(rel, exempt)) continue
+        // A guarded writer marks an owned rel handled without writing it, so a direct patch after it still needs undoing.
+        const isOwned = owned.has(rel) && ctx.state.overwrite !== true
+        if (!isOwned && (handled.has(rel) || isExempt(rel, exempt))) continue
         const trackers = trackersOf(ctx, rel)
         if (trackers.length === 0) continue
         const abs = path.join(ctx.projectDir, rel)
@@ -140,13 +142,20 @@ export async function repairOverwrites(
         // `./` resolves against the project directory, and --filters gives the bytes checkout wrote.
         const head = git(ctx.projectDir, ['cat-file', '--filters', `HEAD:./${rel}`])
         if (!head.ok) continue
+        const startByFeature = start.get(rel) ?? new Map<string, string>()
         // An owned file is the project's: pull never changes it, edited or not.
-        if (owned.has(rel) && ctx.state.overwrite !== true) {
+        if (isOwned) {
+            const upstream = hashContent(await readFile(abs))
+            const writer = trackers.find((t) => t.hash === upstream) ?? trackers[0]!
             await writeFile(abs, head.out)
-            repairs.push({ rel, featureId: trackers[0]!.featureId, outcome: 'kept yours, owned' })
+            for (const tracker of trackers) {
+                const previous = [...startByFeature].find(([id]) => bareId(registries, id) === tracker.featureId)?.[1]
+                if (previous) tracker.files[tracker.rel] = previous
+                else delete tracker.files[tracker.rel]
+            }
+            repairs.push({ rel, featureId: writer.featureId, outcome: 'kept yours, owned' })
             continue
         }
-        const startByFeature = start.get(rel) ?? new Map<string, string>()
         const before = new Set(startByFeature.values())
         if (before.has(hashContent(head.out))) continue
         // A file battlestack wrote and never checked out matches the committed bytes, not the filtered ones.

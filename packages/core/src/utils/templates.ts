@@ -711,6 +711,7 @@ export async function deleteObsoleteFiles(
     // `prev.id` may be the manifest fqid while state maps key on the bare `featureId`,
     // and an earlier feature's update in this same run may have re-baselined our map.
     const live = (ctx.state[`files:${featureId}`] as Record<string, string> | undefined) ?? {}
+    const owned = ownedAnywhere(ctx)
     for (const [rel, prevHash] of Object.entries(prev.files)) {
         if (seen.has(rel)) continue
         const recordedHash = live[rel] ?? prevHash
@@ -718,7 +719,7 @@ export async function deleteObsoleteFiles(
         if (trackedElsewhere.has(toPosix(rel))) continue
         const dest = path.join(ctx.projectDir, rel)
         if (!(await exists(dest))) continue
-        if (ownedSet.has(rel) || ownedAnywhere(ctx).has(toPosix(rel))) {
+        if (ownedSet.has(rel) || owned.has(toPosix(rel))) {
             report.notes.push(
                 `file no longer shipped but user-owned, left in place: ${rel}; review and remove manually if no longer needed`,
             )

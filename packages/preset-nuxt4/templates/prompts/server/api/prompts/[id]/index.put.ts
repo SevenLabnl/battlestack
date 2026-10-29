@@ -7,7 +7,7 @@ import { requireRole, requireRouterParam } from '#server/utils/auth'
 import { tryLogAudit } from '#server/utils/audit-bridge'
 import { invalidatePromptCache } from '#server/utils/prompts'
 
-// The column is `text`; this only stops runaway input. Real agent prompts run past 15,000 characters.
+// The column is `text`, so this only stops runaway input; it must fit a full agent prompt.
 const MAX_CONTENT = 100_000
 
 const schema = z.object({

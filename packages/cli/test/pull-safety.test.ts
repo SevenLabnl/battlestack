@@ -190,6 +190,21 @@ describe('repairOverwrites', () => {
         expect(updateLedger(ctx).staged).toEqual([])
     })
 
+    it('puts back an owned file a direct patch changed after a guarded writer skipped it', async () => {
+        git('init', '-q')
+        await write('app.config.ts', "primary: 'blue'\n")
+        await commitAll()
+        const start = recordedAtStart(manifestWith({ 'app.config.ts': sha256("primary: 'blue'\n") }))
+
+        await write('app.config.ts', "primary: 'brand'\n")
+        const ctx = ctxRecording({ 'app.config.ts': sha256("primary: 'brand'\n") }, projectDir, { 'owned:test:feat': ['app.config.ts'] })
+        updateLedger(ctx).handled.push('app.config.ts')
+
+        expect((await repairOverwrites(ctx, start, ctx.registries)).map((r) => r.outcome)).toEqual(['kept yours, owned'])
+        expect(lf(await read('app.config.ts'))).toBe("primary: 'blue'\n")
+        expect((ctx.state['files:test:feat'] as Record<string, string>)['app.config.ts']).toBe(sha256("primary: 'blue'\n"))
+    })
+
     it('leaves a file alone that was pristine before the pull', async () => {
         git('init', '-q')
         await write('a.ts', 'v1\n')

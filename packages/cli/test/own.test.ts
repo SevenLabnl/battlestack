@@ -255,6 +255,22 @@ describe('battlestack own / disown', () => {
         }
     })
 
+    it('disown does not make a feature that only owns a path track it again', async () => {
+        const id = 'test:feat-own-9'
+        const h = await setup(id, { 'a.ts': '1\n' })
+        handles.push(h)
+        await writeFile(path.join(h.projectDir, 'retired.ts'), 'mine\n', 'utf8')
+        const manifest = await h.readManifest()
+        manifest.features[0]!.ownedByUser = ['retired.ts']
+        await writeFile(path.join(h.projectDir, MANIFEST_PATH), JSON.stringify(manifest), 'utf8')
+
+        await withCwd(h.projectDir, () => disownCommand(args(['disown', 'retired.ts']), undefined as never))
+
+        const rec = (await h.readManifest()).features[0]!
+        expect(rec.ownedByUser).toBeUndefined()
+        expect('retired.ts' in rec.files).toBe(false)
+    })
+
     it('disown errors when the file does not exist on disk', async () => {
         const id = 'test:feat-own-6'
         const h = await setup(id, { 'a.ts': '1\n' })

@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
-import { STAGE, hashFile, rebaselineRecordedFile, type Feature, type RunContext } from '@battlestack/core'
+import { STAGE, hashFile, ownedAnywhere, rebaselineRecordedFile, type Feature, type RunContext } from '@battlestack/core'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
 
@@ -80,17 +80,19 @@ export const battlestackThemeFeature: Feature = {
 
     async update(ctx, prev) {
         const result = await emitTemplateUpdate(ctx, 'nuxt4:battlestack-theme', import.meta.url, 'battlestack-theme', prev)
-        await wireTheme(ctx)
+        // The alias patch bypasses the drift-aware writer, so an owned app config is left alone.
+        const owned = ctx.state.overwrite === true ? new Set<string>() : ownedAnywhere(ctx)
+        await wireTheme(ctx, owned)
         return result
     },
 }
 
-async function wireTheme(ctx: RunContext): Promise<void> {
+async function wireTheme(ctx: RunContext, owned: Set<string> = new Set()): Promise<void> {
     await patchNuxtConfig(ctx.projectDir, (c) => {
         c.addExtends('@battlestack/theme')
     })
     await importThemeCss(ctx)
-    await applyColorAliases(ctx)
+    if (!owned.has('app/app.config.ts')) await applyColorAliases(ctx)
 }
 
 /**

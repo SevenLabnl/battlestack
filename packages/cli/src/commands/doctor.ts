@@ -19,6 +19,7 @@ import {
     spawnSyncResolved as safeSpawnSync,
     STAGE_ORDER,
     SUPPORTED_PMS,
+    ownedPaths,
     toPosixRel,
     type BattlestackRegistries,
     type ParsedArgs,
@@ -86,8 +87,7 @@ export async function doctorCommand(args: ParsedArgs, _loader: Ora, registries: 
         return a.id.localeCompare(b.id)
     })
 
-    // Owned under one feature means owned under every feature that tracks the path.
-    const ownedSet = new Set(manifest.features.flatMap((f) => (f.ownedByUser ?? []).map(toPosixRel)))
+    const ownedSet = ownedPaths(manifest)
     const reports: FeatureReport[] = []
     for (const record of sortedFeatures) {
         const installed = record.version
