@@ -255,6 +255,7 @@ describe('report', () => {
         expect(needsAttention({ ...EMPTY, conflicts: ['a'] })).toBe(true)
         expect(needsAttention({ ...EMPTY, actions: ['set a variable'] })).toBe(true)
         expect(needsAttention({ ...EMPTY, formatError: 'eslint exited 1' })).toBe(true)
+        expect(needsAttention({ ...EMPTY, unmanaged: ['an edited file no feature ships'] })).toBe(true)
     })
 
     it('explains how to resolve each kind of leftover', () => {

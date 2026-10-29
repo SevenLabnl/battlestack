@@ -8,7 +8,9 @@ import {
     baseDirIsTracked,
     isGitRepo,
     missingAtStart,
+    leftoverArtifacts,
     needsAttention,
+    unfinishedSteps,
     NEEDS_ATTENTION_EXIT_CODE,
     newlyAddedFiles,
     preflight,
@@ -361,6 +363,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         const safety = args.dryRun || args.skillsOnly
             ? { git: false, clean: false }
             : await preflight(projectDir, manifest, { allowDirty: args.allowDirty === true, replacing: args.force || args.overwrite })
+        const earlierSteps = args.dryRun ? [] : await unfinishedSteps(projectDir)
         const startRecorded = recordedAtStart(manifest)
         const missingBefore = await missingAtStart(projectDir, startRecorded)
 
@@ -523,16 +526,18 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         for (const rel of missingBefore) {
             if (await exists(path.join(projectDir, rel))) restored.push(rel)
         }
+        // What an earlier run left and the user has not finished stays listed, and keeps the exit code.
+        const leftover = await leftoverArtifacts(projectDir)
         const summary: PullSummary = {
             merged: ledger.merged,
             conflicts: ledger.conflicts,
-            staged: ledger.staged,
-            backups: collected.backups,
+            staged: [...new Set([...ledger.staged, ...leftover.staged])],
+            backups: [...new Set([...collected.backups, ...leftover.backups])],
             unmanaged: collected.unmanaged,
             restored: [...new Set(restored.map(toPosixRel))],
             added: safety.git ? newlyAddedFiles(ctx) : [],
             orphans: orphans.map((f) => f.id),
-            actions: [...new Set([...collected.actions, ...ledger.actions])],
+            actions: [...new Set([...collected.actions, ...ledger.actions, ...earlierSteps])],
             formatError: ctx.state['format:error'] as string | undefined,
             repairs,
         }

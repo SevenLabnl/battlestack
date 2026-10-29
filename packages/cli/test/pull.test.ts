@@ -877,6 +877,34 @@ describe('battlestack pull: a schema change ships with its migration', () => {
         expect((await readManifestRaw(projectDir)).features[0].version).toBe('1.1.0')
     })
 
+    it('keeps a step an earlier pull left until the user deletes it from the report', async () => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' })
+        await pull(projectDir, registriesV2, { skipInstall: true })
+
+        const again = await pull(projectDir, registriesV2)
+        expect(again.report).toContain('pnpm run db:generate')
+        expect(again.exitCode).toBe(2)
+
+        const reportPath = path.join(projectDir, '.battlestack', 'pull', 'REPORT.md')
+        await writeFile(reportPath, again.report.split('\n').filter((l) => !l.includes('db:generate')).join('\n'))
+        const done = await pull(projectDir, registriesV2)
+        expect(done.report).not.toContain('db:generate')
+        expect(done.exitCode).toBeUndefined()
+    })
+
+    it('keeps a staged file listed while its .new is there', async () => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' })
+        await writeFile(path.join(projectDir, schemaRel), 'my own schema\n')
+        await pull(projectDir, registriesV2)
+
+        const again = await pull(projectDir, registriesV2)
+        expect(again.report).toMatch(/## Staged for a manual merge[\s\S]*server\/database\/schema\/sessions\.ts/)
+        expect(again.exitCode).toBe(2)
+
+        await rm(path.join(projectDir, '.battlestack', 'pull'), { recursive: true })
+        expect((await pull(projectDir, registriesV2)).exitCode).toBeUndefined()
+    })
+
     it('passes on what drizzle-kit said, with a hint, when it stopped at a prompt', async () => {
         const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' }, promptsWithoutTty)
         const { report } = await pull(projectDir, registriesV2)
