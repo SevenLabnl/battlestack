@@ -36,6 +36,9 @@ export async function storeBase(projectDir: string, content: Buffer): Promise<st
     }
     const readme = path.join(dir, 'README.md')
     if (!(await exists(readme))) await writeFile(readme, BASE_README)
+    // A checkout under core.autocrlf would turn LF bases into CRLF, which differ from upstream on every line.
+    const attributes = path.join(dir, '.gitattributes')
+    if (!(await exists(attributes))) await writeFile(attributes, '* -text\n')
     return hash
 }
 
@@ -61,7 +64,12 @@ export async function findBase(projectDir: string, rel: string, hashes: Iterable
     if (wanted.size === 0) return null
     for (const hash of wanted) {
         const stored = path.join(projectDir, BASE_DIR, hash)
-        if (await exists(stored)) return readFile(stored)
+        if (!(await exists(stored))) continue
+        // A base committed before its .gitattributes may have been checked out as CRLF.
+        const content = await readFile(stored)
+        if (sha256(content) === hash) return content
+        const lf = Buffer.from(content.toString('utf8').replaceAll('\r\n', '\n'))
+        if (sha256(lf) === hash) return lf
     }
     return findBaseInGit(projectDir, rel, wanted)
 }
