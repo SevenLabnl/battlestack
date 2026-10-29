@@ -435,6 +435,8 @@ export interface UpdateLedger {
     staged: string[]
     /** Steps a person has to take, reported by features whose `execute` has no report to return. */
     actions: string[]
+    /** Optional changes a person may make. Unlike `actions`, they leave the pull without work left. */
+    suggestions: string[]
 }
 
 export function updateLedger(ctx: RunContext): UpdateLedger {
@@ -446,9 +448,10 @@ export function updateLedger(ctx: RunContext): UpdateLedger {
         existing.conflicts ??= []
         existing.staged ??= []
         existing.actions ??= []
+        existing.suggestions ??= []
         return existing as UpdateLedger
     }
-    const ledger: UpdateLedger = { handled: [], merged: [], conflicts: [], staged: [], actions: [] }
+    const ledger: UpdateLedger = { handled: [], merged: [], conflicts: [], staged: [], actions: [], suggestions: [] }
     ctx.state[LEDGER_STATE_KEY] = ledger
     return ledger
 }

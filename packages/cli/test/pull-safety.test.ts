@@ -336,6 +336,13 @@ describe('report', () => {
         expect(text).not.toMatch(/—/)
     })
 
+    it('lists a suggestion under Optional without counting it as work left', () => {
+        const summary = { ...EMPTY, suggestions: ['Add the header actions slot'] }
+        expect(needsAttention(summary)).toBe(false)
+        expect(renderReport(summary)).toMatch(/## Optional[\s\S]*- Add the header actions slot/)
+        expect(renderReport(summary)).toContain('Nothing needs attention')
+    })
+
     it('lists a restored file once under New files', () => {
         const text = renderReport({ ...EMPTY, added: ['a.ts'], restored: ['a.ts'] })
         expect(text.match(/^- `a\.ts`$/gm)).toHaveLength(1)

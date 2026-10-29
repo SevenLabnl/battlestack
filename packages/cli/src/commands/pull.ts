@@ -534,6 +534,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             added: safety.git ? newlyAddedFiles(ctx) : [],
             orphans: orphans.map((f) => f.id),
             actions: [...new Set([...collected.actions, ...ledger.actions, ...earlierSteps])],
+            suggestions: ledger.suggestions,
             formatError: ctx.state['format:error'] as string | undefined,
             repairs,
         }
