@@ -204,6 +204,28 @@ describe('writes during an update', () => {
             expect(updateLedger(ctx)).toMatchObject({ conflicts: [], staged: [] })
         })
 
+        it('merges against a stored base that a checkout turned into CRLF', async () => {
+            await write(path.join(BASE_DIR, sha256(BASE)), BASE.replaceAll('\n', '\r\n'))
+            await write('f.txt', BASE.replace('line two', 'edited'))
+            const ctx = updatingCtx({ 'test:f': { 'f.txt': sha256(BASE) } })
+
+            await writeRecorded(ctx, 'test:f', 'f.txt', BASE.replace('line five', 'line five, new'))
+
+            expect(await read('f.txt')).toBe(BASE.replace('line two', 'edited').replace('line five', 'line five, new'))
+            expect(updateLedger(ctx)).toMatchObject({ conflicts: [], merged: ['f.txt'] })
+        })
+
+        it('keeps stored bases LF through a checkout', async () => {
+            git('init', '-q')
+            git('config', 'core.autocrlf', 'true')
+            const hash = await storeBase(projectDir, Buffer.from(BASE))
+            git('add', '-A')
+            git('commit', '-q', '-m', 'bases')
+            await rm(path.join(projectDir, BASE_DIR, hash))
+            git('checkout', '--', '.')
+            expect(await read(path.join(BASE_DIR, hash))).toBe(BASE)
+        })
+
         it('merges an edited file line by line', async () => {
             await checkedOut(BASE)
             const edited = BASE.replace('line two', 'edited').replaceAll('\n', '\r\n')
