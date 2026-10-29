@@ -30,7 +30,7 @@ function titleCase(slug: string): string {
 /** Session auth on `nuxt-auth-utils`. The sealed cookie carries an opaque sessionId. */
 export const authFeature: Feature = {
     id: 'nuxt4:auth',
-    version: '1.10.7',
+    version: '1.10.8',
     label: 'Session-based auth (argon2id)',
     frameworks: ['nuxt4'],
     stage: STAGE.AUTH,
@@ -360,7 +360,8 @@ async function postPatches(projectDir: string): Promise<void> {
             rateLimitDisabled: false,
             // h3 also accepts the sealed session from an `x-<name>-session` header, which
             // `02.session-revocation.ts` never sees (it checks the cookie): refuse that path.
-            session: { sessionHeader: false },
+            // `password` is nuxt-auth-utils' own default; Nuxt's runtimeConfig type requires it.
+            session: { password: '', sessionHeader: false },
         })
         c.mergeRuntimePublic({
             appUrl: '',
