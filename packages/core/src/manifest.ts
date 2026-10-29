@@ -256,6 +256,11 @@ export function toPosixRel(rel: string): string {
     return rel.replaceAll(path.sep, '/')
 }
 
+/** Posix rels owned under any feature: ownership is per path, not per feature. */
+export function ownedPaths(manifest: ProjectManifest): Set<string> {
+    return new Set(manifest.features.flatMap((f) => (f.ownedByUser ?? []).map(toPosixRel)))
+}
+
 /** One entry of a `files:<featureId>` map in `ctx.state`. */
 export interface RecordedFile {
     featureId: string

@@ -148,7 +148,8 @@ export async function disownCommand(args: ParsedArgs, _loader: Ora): Promise<voi
         const currentHash = await hashFile(abs)
         // Every tracker's baseline moves, or a non-owner's stale hash reads as drift right away.
         for (const feature of features) {
-            feature.files[rel] = currentHash
+            // A feature that only owns the path no longer ships it; tracking it would let its next update delete the file as obsolete.
+            if (rel in feature.files) feature.files[rel] = currentHash
             const list = (feature.ownedByUser ?? []).filter((p) => p !== rel)
             if (list.length > 0) feature.ownedByUser = list
             else delete feature.ownedByUser

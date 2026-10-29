@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
-import { STAGE, exists, isFeatureEnabled, hashFile, rebaselineRecordedFile, recordFile, updateLedger, type Feature, type RunContext } from '@battlestack/core'
+import { STAGE, exists, isFeatureEnabled, hashFile, ownedAnywhere, rebaselineRecordedFile, recordFile, updateLedger, type Feature, type RunContext } from '@battlestack/core'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
 import { applyColorAliases } from './battlestack-theme.js'
 
@@ -28,8 +28,10 @@ export const landingShellFeature: Feature = {
 
     async update(ctx, prev) {
         const report = await emitTemplateUpdate(ctx, this.id, import.meta.url, 'landing-shell', prev)
-        await applyVariants(ctx, this.id)
-        if (isFeatureEnabled(ctx, 'nuxt4:battlestack-theme')) await applyColorAliases(ctx)
+        // The patches below bypass the drift-aware writer, so they honor ownership themselves.
+        const owned = ctx.state.overwrite === true ? new Set<string>() : ownedAnywhere(ctx)
+        if (!owned.has('app/layouts/default.vue')) await applyVariants(ctx, this.id)
+        if (isFeatureEnabled(ctx, 'nuxt4:battlestack-theme') && !owned.has('app/app.config.ts')) await applyColorAliases(ctx)
         await suggestHeaderActions(ctx, prev?.version)
         return report
     },
