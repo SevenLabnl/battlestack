@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Bump node from `06d7adf` to `8a32c8c` in /packages/preset-nuxt4/templates/docker.
 - A generated project's `nuxt.config.ts` sets `runtimeConfig.session.password`
   to `''`, nuxt-auth-utils' own default, so it type-checks on Nuxt releases
   that require the key. `NUXT_SESSION_PASSWORD` still sets it.
