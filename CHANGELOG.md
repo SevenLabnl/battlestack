@@ -75,6 +75,9 @@
   conflict markers. A local edit that a feature wrote over is kept as
   `.battlestack/pull/<path>.bak` under `--force`, and replaced under
   `--overwrite`.
+- When `pull` puts back your edits and stages a feature's file, every feature
+  tracking that file keeps its earlier record, so the next pull merges against
+  the version you actually have.
 - A file `pull` stages after putting back your edits now gets a `.patch` next
   to the `.new`, as the report says. The report lists a restored file once, and
   each feature's line counts merges, conflicts and staged files from all of its

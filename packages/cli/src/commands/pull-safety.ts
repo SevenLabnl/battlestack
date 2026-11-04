@@ -110,11 +110,8 @@ function bareId(registries: BattlestackRegistries, id: string): string {
 }
 
 /**
- * Catches feature writes that bypassed the drift-aware writers: a tracked or untracked file
- * that held local edits at HEAD and was replaced. The local version is put back and the
- * feature's output is merged into it, or staged when there is no base to merge against.
- * `--force` keeps the feature output and saves the local version as a `.bak`, as the drift-aware
- * writers do; `--overwrite` takes the output as asked.
+ * Puts back local edits at HEAD that a feature wrote over without the drift check, then merges
+ * or stages the feature's output. `--force` keeps the output and saves a `.bak`.
  */
 export async function repairOverwrites(
     ctx: RunContext,
@@ -170,10 +167,12 @@ export async function repairOverwrites(
             continue
         }
         await writeFile(abs, head.out)
-        // Not merged, so the record goes back to what this feature recorded before the pull, or away if it had none.
-        const previous = [...startByFeature].find(([id]) => bareId(registries, id) === featureId)?.[1]
-        if (previous) tracker.files[tracker.rel] = previous
-        else delete tracker.files[tracker.rel]
+        // The file is back to HEAD, so every tracker's record goes back to its pre-pull hash, or away if it had none.
+        for (const t of trackers) {
+            const previous = [...startByFeature].find(([id]) => bareId(registries, id) === t.featureId)?.[1]
+            if (previous) t.files[t.rel] = previous
+            else delete t.files[t.rel]
+        }
         await stageUpstream(ctx.projectDir, rel, head.out, upstream, { binary: isBinaryPath(rel) })
         ledger.staged.push(rel)
         repairs.push({ rel, featureId, outcome: 'staged' })
