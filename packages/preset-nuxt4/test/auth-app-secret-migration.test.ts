@@ -209,10 +209,12 @@ describe('the 0.5 session password guard', () => {
 it('keeps the Nuxt 4.6 floor in package.json when auth is removed', () => {
     const ctx = context()
     const auth = ctx.registries.features.get('nuxt4:auth').fqid
-    for (const template of ctx.registries.templates.all()) {
-        const remaining = template.requiredFeatures
-            .filter((id) => id !== auth && ctx.registries.features.has(id))
-            .flatMap((id) => ctx.registries.features.get(id).collectDeps?.(ctx)?.prod ?? [])
-        expect(remaining, template.id).toContain('nuxt@^4.6.0')
-    }
+    const withAuth = ctx.registries.templates.all()
+        .filter((t) => [...t.requiredFeatures, ...t.optionalFeatures].some((id) => ctx.registries.features.get(id).fqid === auth))
+    expect(withAuth.map((t) => t.id)).toContain('nuxt4-fullstack')
+    const missing = withAuth.filter((template) => !template.requiredFeatures
+        .filter((id) => ctx.registries.features.has(id) && ctx.registries.features.get(id).fqid !== auth)
+        .flatMap((id) => ctx.registries.features.get(id).collectDeps?.(ctx)?.prod ?? [])
+        .includes('nuxt@^4.6.0'))
+    expect(missing.map((t) => t.id)).toEqual([])
 })
