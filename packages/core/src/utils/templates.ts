@@ -161,7 +161,10 @@ export async function classifyFileState(
     return (await diskHashes(absPath)).includes(recordedHash) ? 'pristine' : 'drifted'
 }
 
-/** The file's hash, then its LF hash when it has CRLF endings: core.autocrlf checks out as CRLF what battlestack recorded as LF. */
+/**
+ * The file's hash, then its hash with LF endings when it has CRLF ones: core.autocrlf checks
+ * out as CRLF what battlestack recorded as LF.
+ */
 async function diskHashes(abs: string): Promise<string[]> {
     const content = await readFile(abs)
     const lf = isBinaryPath(abs) ? null : withoutCrlf(content)
@@ -325,10 +328,8 @@ interface SharedRelOwnership {
 }
 
 /**
- * Consults the other enabled features' `files:` state maps (pre-seeded from the manifest
- * by `pull`/`add`) plus the scaffold execution order. Features missing from the registry,
- * or a `featureId` that isn't registered, degrade to empty results, and the update then
- * behaves as if the file were unshared.
+ * Which of `featureId`'s rels other enabled features also track, by their `files:` maps and
+ * the scaffold order. An unregistered feature counts as sharing nothing.
  */
 function sharedRelOwnership(ctx: RunContext, featureId: string): SharedRelOwnership {
     const deferredToLater = new Map<string, string>()
@@ -678,9 +679,10 @@ export async function removeQueuedObsoleteFiles(ctx: RunContext): Promise<string
     return removed
 }
 
-/** Deletes pristine files no longer shipped. User-owned or modified ones stay, with a note.
- *  A rel another enabled feature still tracks is only dropped from this feature's
- *  records, because the file is that feature's to keep. */
+/**
+ * Deletes pristine files no longer shipped. User-owned or modified ones stay, with a note, and
+ * one another feature still tracks is only dropped from this feature's records.
+ */
 export async function deleteObsoleteFiles(
     ctx: RunContext,
     featureId: string,
