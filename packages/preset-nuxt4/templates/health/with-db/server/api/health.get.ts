@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import { db } from '#server/database/client'
 import { sql } from 'drizzle-orm'
-import { checkEnvVars, sessionPasswordFrom } from '#server/utils/health-checks'
+import { checkEnvVars, appSecretFrom } from '#server/utils/health-checks'
 import { bootState } from '#server/utils/boot-tasks'
 
 type HealthBody = {
@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     const builtAt = text(publicConfig.appBuiltAt)
 
     const databaseUrl = String((config as Record<string, unknown>).databaseUrl ?? '')
-    const missingEnv = checkEnvVars(sessionPasswordFrom(config), databaseUrl)
+    const missingEnv = checkEnvVars(appSecretFrom(config), databaseUrl)
     if (missingEnv.length > 0) {
         return respond(
             event,

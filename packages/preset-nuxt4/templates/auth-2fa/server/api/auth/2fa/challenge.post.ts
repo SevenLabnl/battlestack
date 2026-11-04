@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
 
     const { mfaToken, code } = await readValidatedBody(event, schema.parse)
 
-    const userId = consumeMfaChallenge(mfaToken)
+    const userId = await consumeMfaChallenge(mfaToken)
     if (!userId) {
         throw createError({ statusCode: 401, statusMessage: 'Invalid or expired challenge' })
     }

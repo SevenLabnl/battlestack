@@ -22,7 +22,7 @@ import {
  */
 export const docsFeature: Feature = {
     id: 'nuxt4:docs',
-    version: '1.1.3',
+    version: '1.1.4',
     label: 'Generate AGENTS.md + CLAUDE.md + README.md',
     frameworks: ['nuxt4'],
     stage: STAGE.DOCS,

@@ -255,7 +255,7 @@ async function registerRuntimeConfig(projectDir: string): Promise<void> {
 /** PostgreSQL 18 in Docker, Drizzle ORM, users schema, seed script. */
 export const databaseFeature: Feature = {
     id: 'nuxt4:database',
-    version: '1.7.5',
+    version: '1.7.6',
     label: 'PostgreSQL + Drizzle ORM (Docker)',
     frameworks: ['nuxt4'],
     stage: STAGE.DATABASE,
@@ -373,7 +373,7 @@ export const databaseFeature: Feature = {
                     '- **Poolers.** `LISTEN` needs a session-mode connection. Behind PgBouncer in transaction',
                     '  mode, cross-replica invalidation silently degrades to the cache TTL; point',
                     '  `NUXT_DATABASE_URL` at session mode or directly at Postgres.',
-                    '- **Secrets.** `NUXT_SESSION_PASSWORD` and any encryption key must be the same value on',
+                    '- **Secrets.** `NUXT_APP_SECRET` and any encryption key must be the same value on',
                     '  every replica, delivered from one shared secret.',
                     '',
                     '### Database extensions (`server/database/extensions/*.sql`)',

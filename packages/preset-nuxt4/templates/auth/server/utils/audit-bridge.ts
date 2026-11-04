@@ -1,5 +1,7 @@
 import type { H3Event } from 'h3'
+import type { RequestEvent } from 'nuxt/server'
 import { logAuditEvent } from '#server/utils/audit'
+import { toH3Event } from '#server/utils/auth'
 
 export interface TryLogAuditOptions {
     onError?: (err: Error) => void
@@ -7,7 +9,7 @@ export interface TryLogAuditOptions {
 
 /** Log an audit event when `nuxt:audit-log` is installed; no-op otherwise. */
 export async function tryLogAudit(
-    event: H3Event | null,
+    event: H3Event | RequestEvent | null,
     action: string,
     userId: string | null,
     metadata?: Record<string, unknown>,
@@ -16,7 +18,7 @@ export async function tryLogAudit(
     if (useRuntimeConfig().public.auditLog !== true) return
     try {
         await logAuditEvent(
-            event,
+            event && toH3Event(event),
             action as Parameters<typeof logAuditEvent>[1],
             userId,
             metadata,

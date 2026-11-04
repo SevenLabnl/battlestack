@@ -177,9 +177,11 @@ On a machine without a browser, `--no-browser` prints the URL instead.
 
 ### Login says the session secret is too short
 
-`NUXT_SESSION_PASSWORD` must be at least 32 characters. If it still holds a
+`NUXT_APP_SECRET` must be at least 32 characters. If it still holds a
 placeholder, `battlestack pull` replaces it with a generated value, or set one
-yourself and restart.
+yourself and restart. A project from before nuxt-auth-utils 0.6 used
+`NUXT_SESSION_PASSWORD`; `battlestack pull` renames it in `.env`, but a deployed
+environment needs `NUXT_APP_SECRET` set by hand.
 
 ### Passkeys do not work
 

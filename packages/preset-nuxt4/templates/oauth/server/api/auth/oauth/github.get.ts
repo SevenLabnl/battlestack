@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import { sendRedirect } from 'nuxt/server'
 import { db } from '#server/database/client'
 import { users, Role, type Role as RoleT } from '#server/database/schema/users'
 import { oauthAccounts } from '#server/database/schema/oauth-accounts'
