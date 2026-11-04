@@ -1,3 +1,4 @@
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -114,6 +115,18 @@ describe('gitignoreFeature: fetched AI-agent skill content (.agents/)', () => {
         // would hide why `.agents/` is still being linted.
         expect(await readEslint()).toBe(rewritten)
         expect(warn).toHaveBeenCalledWith(expect.stringContaining('.agents/**'))
+    })
+})
+
+describe('gitignoreFeature: pull state', () => {
+    // The manifest records merged hashes whose bytes live only in `.battlestack/base/`, so every clone needs it.
+    it('keeps stored merge bases committed and pull artifacts ignored', async () => {
+        await gitignoreFeature.execute(ctx())
+        execFileSync('git', ['init', '-q'], { cwd: projectDir })
+        const ignored = (rel: string): boolean =>
+            spawnSync('git', ['-c', 'core.excludesFile=', 'check-ignore', '-q', '--no-index', rel], { cwd: projectDir }).status === 0
+        expect(ignored('.battlestack/base/0123abcd')).toBe(false)
+        expect(ignored('.battlestack/pull/REPORT.md')).toBe(true)
     })
 })
 
