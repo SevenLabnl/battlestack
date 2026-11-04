@@ -10,6 +10,7 @@ import {
     leftoverArtifacts,
     needsAttention,
     unfinishedSteps,
+    unmanagedLeft,
     NEEDS_ATTENTION_EXIT_CODE,
     newlyAddedFiles,
     preflight,
@@ -32,6 +33,7 @@ import {
     removeQueuedObsoleteFiles,
     skillsOutcome,
     toPosixRel,
+    trackersOf,
     updateLedger,
     UPDATING_STATE_KEY,
     writeManifest,
@@ -363,6 +365,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             ? { git: false, clean: false }
             : await preflight(projectDir, manifest, { allowDirty: args.allowDirty === true, replacing: args.force || args.overwrite })
         const earlierSteps = args.dryRun ? [] : await unfinishedSteps(projectDir)
+        const earlierUnmanaged = args.dryRun ? [] : await unmanagedLeft(projectDir)
         const startRecorded = recordedAtStart(manifest)
         const missingBefore = await missingAtStart(projectDir, startRecorded)
 
@@ -536,7 +539,10 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             conflicts: ledger.conflicts,
             staged: [...new Set([...ledger.staged, ...leftover.staged])],
             backups: [...new Set([...collected.backups, ...leftover.backups])],
-            unmanaged: collected.unmanaged,
+            unmanaged: [...new Set([
+                ...collected.unmanaged.map(toPosixRel),
+                ...earlierUnmanaged.filter((rel) => trackersOf(ctx, rel).length === 0),
+            ])],
             restored: [...new Set(restored.map(toPosixRel))],
             added: safety.git ? newlyAddedFiles(ctx) : [],
             orphans: orphans.map((f) => f.id),

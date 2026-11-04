@@ -982,6 +982,76 @@ describe('battlestack pull: a schema change ships with its migration', () => {
     })
 })
 
+describe('battlestack pull: what an earlier pull left stays listed', () => {
+    const reportPath = (projectDir: string): string => path.join(projectDir, '.battlestack', 'pull', 'REPORT.md')
+
+    async function pull(projectDir: string, registries: BattlestackRegistries): Promise<{ exitCode: typeof process.exitCode, report: string }> {
+        process.exitCode = undefined
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registries))
+        const exitCode = process.exitCode
+        process.exitCode = undefined
+        return { exitCode, report: await readFile(reportPath(projectDir), 'utf8') }
+    }
+
+    /** v1 ships `a.ts` and `gone.ts`, v2 only `a.ts`, and the project edited `gone.ts`. */
+    async function retiredEditedFile(): Promise<{ projectDir: string, registriesV2: BattlestackRegistries }> {
+        const projectDir = await tmp('battlestack-pull-unmanaged-')
+        const tplV1 = await tmp('battlestack-pull-unmanaged-v1-')
+        const tplV2 = await tmp('battlestack-pull-unmanaged-v2-')
+        await writeTemplateFile(tplV1, 'a.ts', 'a\n')
+        await writeTemplateFile(tplV1, 'gone.ts', 'gone\n')
+        await writeTemplateFile(tplV2, 'a.ts', 'a\n')
+        const registriesFor = (tplDir: string, version: string): BattlestackRegistries => {
+            const registries = makeRegistries({ requiredFeatures: [fqid('test:feat')] })
+            registries.features.register(makeFileFeature('test:feat', version, tplDir), origin)
+            return registries
+        }
+        const registriesV1 = registriesFor(tplV1, '1.0.0')
+        const ctx = scaffoldCtx(projectDir, registriesV1, [fqid('test:feat')])
+        await registriesV1.features.get(fqid('test:feat')).execute(ctx)
+        await writeManifest(ctx)
+        await writeFile(path.join(projectDir, 'gone.ts'), 'gone, edited\n')
+        return { projectDir, registriesV2: registriesFor(tplV2, '1.1.0') }
+    }
+
+    it('keeps a file no longer managed listed until its line is deleted from the report', async () => {
+        const { projectDir, registriesV2 } = await retiredEditedFile()
+        const first = await pull(projectDir, registriesV2)
+        expect(first.report).toMatch(/## No longer managed[\s\S]*`gone\.ts`/)
+        expect(first.exitCode).toBe(2)
+
+        const again = await pull(projectDir, registriesV2)
+        expect(again.report).toMatch(/## No longer managed[\s\S]*`gone\.ts`/)
+        expect(again.exitCode).toBe(2)
+
+        await writeFile(reportPath(projectDir), again.report.split('\n').filter((l) => l !== '- `gone.ts`').join('\n'))
+        const kept = await pull(projectDir, registriesV2)
+        expect(kept.report).not.toContain('gone.ts')
+        expect(kept.exitCode).toBeUndefined()
+    })
+
+    it('stops listing a file no longer managed once it is deleted', async () => {
+        const { projectDir, registriesV2 } = await retiredEditedFile()
+        await pull(projectDir, registriesV2)
+        await rm(path.join(projectDir, 'gone.ts'))
+
+        const done = await pull(projectDir, registriesV2)
+        expect(done.report).not.toContain('gone.ts')
+        expect(done.exitCode).toBeUndefined()
+    })
+
+    it('keeps a backup listed while it is there', async () => {
+        const { projectDir, registriesV2 } = await retiredEditedFile()
+        await rm(path.join(projectDir, 'gone.ts'))
+        await pull(projectDir, registriesV2)
+        await writeTemplateFile(projectDir, path.join('.battlestack', 'pull', 'CLAUDE.md.bak'), 'my notes\n')
+
+        const again = await pull(projectDir, registriesV2)
+        expect(again.report).toMatch(/## Backups of regenerated files[\s\S]*CLAUDE\.md\.bak/)
+        expect(again.exitCode).toBe(2)
+    })
+})
+
 describe('battlestack pull: misc plumbing', () => {
     it('keeps the record of a feature whose plugin did not load, and flags the pull', async () => {
         const projectDir = await tmp('battlestack-pull-orphan-')

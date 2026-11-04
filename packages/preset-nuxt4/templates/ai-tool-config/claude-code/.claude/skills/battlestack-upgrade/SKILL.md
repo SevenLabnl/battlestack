@@ -86,7 +86,7 @@ Some features write a file in a way pull cannot check beforehand. When one repla
 
 Backups under `.battlestack/pull/*.bak` are the project's versions of files that were replaced. Most are local edits to files regenerated on every pull, such as `AGENTS.md`: move whatever is still useful into `CLAUDE.project.md`, which pull never touches, then delete the backup. A `.bak` from a `--force` run holds edits the user chose to replace; mention it to them before deleting it.
 
-Files listed as no longer managed were dropped by their feature but kept because the project edited them. Find out whether anything still uses each one. Delete it if not, and leave it as the project's own file if so.
+Files listed as no longer managed were dropped by their feature but kept because the project edited them. Find out whether anything still uses each one. Delete it if not. If so, leave it as the project's own file and delete its line from the report, or every later pull lists it again and exits with code 2.
 
 Steps outside the repository, such as GitHub variables or secrets, cannot be done from here. Copy them into your summary for the user word for word, and do not invent values for secrets.
 
@@ -105,7 +105,7 @@ pnpm test
 
 Fix what fails, then commit, including `.battlestack/` and any new migration. A good commit message names the feature upgrades, lists every conflict you resolved by keeping the project's version over upstream, and names each migration.
 
-Then run `battlestack pull` once more. It should report every feature as up to date and exit with code 0 once no `.new` or `.bak` is left in `.battlestack/pull/` and no step is left in the report. Exit code 2 with only the steps you handed to the user left in the report is expected. Anything else means something is still unfinished.
+Then run `battlestack pull` once more. It should report every feature as up to date and exit with code 0 once no `.new` or `.bak` is left in `.battlestack/pull/` and no step or file no longer managed is left in the report. Exit code 2 with only the steps you handed to the user left in the report is expected. Anything else means something is still unfinished.
 
 ## Never
 

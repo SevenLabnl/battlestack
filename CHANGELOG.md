@@ -41,8 +41,9 @@
   writes
   `.battlestack/pull/REPORT.md` with what is left to do and how, and exits with
   code 2 when that list is not empty. A later pull keeps listing a staged
-  `.new` or a backup until you delete it, and a step until you delete its line
-  from the report. Console output is one line per feature.
+  `.new` or a backup until you delete it, a step until you delete its line
+  from the report, and a file no longer managed until you delete the file or
+  its line. Console output is one line per feature.
 - Generated projects ship a `battlestack-upgrade` skill for AI agents, and the
   generated AGENTS.md and README describe the merge instead of the old staging.
 - With `nuxt4:storage` on, every `nuxt4:database` update staged

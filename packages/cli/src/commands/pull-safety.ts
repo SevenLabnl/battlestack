@@ -232,18 +232,34 @@ export function needsAttention(s: PullSummary): boolean {
 }
 
 const STEPS_TITLE = 'Steps outside this repository'
+const UNMANAGED_TITLE = 'No longer managed'
+
+/** The items of every `## title` section in an earlier report that the user has not deleted yet. */
+async function reportItems(projectDir: string, title: string): Promise<string[]> {
+    const dest = path.join(projectDir, REPORT_PATH)
+    if (!(await exists(dest))) return []
+    const items: string[] = []
+    let inSection = false
+    for (const line of (await readFile(dest, 'utf8')).split(/\r?\n/)) {
+        if (line.startsWith('## ')) inSection = line === `## ${title}`
+        else if (inSection && line.startsWith('- ')) items.push(line.slice(2))
+    }
+    return items
+}
 
 /** The steps an earlier report lists that the user has not deleted from it yet. */
 export async function unfinishedSteps(projectDir: string): Promise<string[]> {
-    const dest = path.join(projectDir, REPORT_PATH)
-    if (!(await exists(dest))) return []
-    const steps: string[] = []
-    let inSteps = false
-    for (const line of (await readFile(dest, 'utf8')).split(/\r?\n/)) {
-        if (line.startsWith('## ')) inSteps = line === `## ${STEPS_TITLE}`
-        else if (inSteps && line.startsWith('- ')) steps.push(line.slice(2))
+    return reportItems(projectDir, STEPS_TITLE)
+}
+
+/** Files an earlier report lists as no longer managed that are still on disk and still listed. */
+export async function unmanagedLeft(projectDir: string): Promise<string[]> {
+    const left: string[] = []
+    for (const item of await reportItems(projectDir, UNMANAGED_TITLE)) {
+        const rel = toPosixRel(item.replace(/^`|`$/g, ''))
+        if (await exists(path.join(projectDir, rel))) left.push(rel)
     }
-    return steps
+    return left
 }
 
 /** Staged `.new` files (as the rel they belong to) and `.bak` backups still in `.battlestack/pull/`. */
@@ -319,8 +335,8 @@ export function renderReport(s: PullSummary): string {
             s.merged.map((r) => `\`${r}\``),
         ),
         ...section(
-            'No longer managed',
-            'Pull stopped tracking these and left them in place because they have local edits. Delete each one that is unused, or keep it as your own.',
+            UNMANAGED_TITLE,
+            'Pull stopped tracking these and left them in place because they have local edits. Delete each one that is unused, or keep it as your own and delete its line here: a later pull lists again every file still here.',
             s.unmanaged.map((r) => `\`${r}\``),
         ),
     ].join('\n')
