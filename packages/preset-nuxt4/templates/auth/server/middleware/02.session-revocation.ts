@@ -9,7 +9,9 @@ import { sessions } from '#server/database/schema/sessions'
  */
 export default defineEventHandler(async (event) => {
     const { name } = useRuntimeConfig(event).session as { name?: string }
-    if (!getCookie(event, name ?? 'nuxt-auth-session')) return
+    // nuxt-auth-utils renames an empty or 'nuxt-session' name to its own cookie; checking any other name would skip the gate.
+    const cookieName = !name || name === 'nuxt-session' ? 'nuxt-auth-session' : name
+    if (!getCookie(event, cookieName)) return
 
     const session = await getUserSession(event)
     const userId = session.user?.id

@@ -94,6 +94,20 @@ describe('pull from nuxt-auth-utils 0.5', () => {
         expect(report.actions).toContain(APP_SECRET_ACTION)
     })
 
+    it('drops the nuxt-session cookie name that 0.6 replaces with nuxt-auth-session', async () => {
+        await write('nuxt.config.ts', 'export default defineNuxtConfig({\n    runtimeConfig: { session: { name: \'nuxt-session\', maxAge: 3600 } },\n})\n')
+        await pull(context())
+        const config = await read('nuxt.config.ts')
+        expect(config).not.toContain('nuxt-session')
+        expect(config).toMatch(/session:\s*\{\s*maxAge: 3600,?\s*\}/)
+    })
+
+    it('keeps a cookie name of the project\'s own', async () => {
+        await write('nuxt.config.ts', 'export default defineNuxtConfig({\n    runtimeConfig: { session: { name: \'acme-session\' } },\n})\n')
+        await pull(context())
+        expect(await read('nuxt.config.ts')).toContain('acme-session')
+    })
+
     it('drops a session config left empty', async () => {
         await write('nuxt.config.ts', 'export default defineNuxtConfig({\n    runtimeConfig: { session: { password: \'\', sessionHeader: false } },\n})\n')
         await pull(context())

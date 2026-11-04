@@ -257,6 +257,11 @@ export async function migrateToAppSecret(projectDir: string): Promise<boolean> {
                 migrated = true
             }
         }
+        // 0.6 renames this name to nuxt-auth-session anyway and warns on every boot.
+        if (session.name === 'nuxt-session') {
+            delete session.name
+            migrated = true
+        }
         if (Object.keys(session).length === 0) delete config.runtimeConfig.session
     }))
     return migrated
