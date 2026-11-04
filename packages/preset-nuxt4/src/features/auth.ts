@@ -18,7 +18,7 @@ import {
 } from '@battlestack/core'
 import { readDotEnv } from '@battlestack/core/utils/dotenv.js'
 import { ui } from '@battlestack/tui'
-import type { EnvVar, Feature, ProjectCommand, RunContext } from '@battlestack/core'
+import type { EnvVar, Feature, InstalledFeatureRecord, ProjectCommand, RunContext, UpdateReport } from '@battlestack/core'
 
 function titleCase(slug: string): string {
     return slug
@@ -186,6 +186,8 @@ export const authFeature: Feature = {
     async update(ctx, prev) {
         const result = await emitTemplateUpdate(ctx, 'nuxt4:auth', import.meta.url, 'auth', prev)
         result.notes.push(...(await retainedPasswordPolicyNotes(ctx.projectDir)))
+        const guardActions = await retainedSessionPasswordGuardActions(ctx.projectDir, prev, result)
+        if (guardActions.length > 0) result.actions = [...(result.actions ?? []), ...guardActions]
         await postPatches(ctx.projectDir)
         const migrated = await migrateToAppSecret(ctx.projectDir)
         // Deployed environments need the new secret even when the local files were moved already.
@@ -225,6 +227,33 @@ async function retainedPasswordPolicyNotes(projectDir: string): Promise<string[]
         )
     }
     return notes
+}
+
+const OLD_GUARD_PLUGIN = 'server/plugins/00-session-password-guard.ts'
+const OLD_GUARD_UTIL = 'server/utils/session-password.ts'
+
+/** The 0.5 boot guard reads `session.password`, which 0.6 drops, so a kept copy fails every production boot. */
+async function retainedSessionPasswordGuardActions(
+    projectDir: string,
+    prev: InstalledFeatureRecord | null,
+    result: UpdateReport,
+): Promise<string[]> {
+    const kept: string[] = []
+    for (const rel of [OLD_GUARD_PLUGIN, OLD_GUARD_UTIL]) {
+        if (!(await exists(path.join(projectDir, rel)))) continue
+        // A pristine tracked copy is queued for deletion at the end of the pull.
+        const removedLater = prev !== null && rel in prev.files
+            && !(prev.ownedByUser ?? []).includes(rel) && !(result.unmanaged ?? []).includes(rel)
+        if (!removedLater) kept.push(rel)
+    }
+    if (kept.length === 0) return []
+    const crash = kept.includes(OLD_GUARD_PLUGIN)
+        ? ` The plugin checks \`session.password\`, which nuxt-auth-utils 0.6 no longer sets, so a production build fails to boot.`
+        : ''
+    return [
+        `Delete ${kept.map((rel) => `\`${rel}\``).join(' and ')}, kept from the nuxt-auth-utils 0.5 setup.${crash} `
+        + '`server/plugins/00-app-secret-guard.ts` checks `NUXT_APP_SECRET` instead.',
+    ]
 }
 
 const APP_SECRET_KEY = 'NUXT_APP_SECRET'
