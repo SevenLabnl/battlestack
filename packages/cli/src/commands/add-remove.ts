@@ -2,6 +2,7 @@ import path from 'node:path'
 import { readFile, rm, writeFile } from 'node:fs/promises'
 import type { Ora } from 'ora'
 import {
+    acquireProjectLock,
     classifyFileState,
     CLIError,
     ErrorCode,
@@ -45,6 +46,9 @@ export const removeReservedMeta: Omit<ReservedCommand, 'run'> = {
     usage: 'battlestack remove <feature>',
     label: 'disable a feature',
     group: 'Lifecycle',
+    helpExtra: [
+        ['battlestack remove <feature> --force', 'remove a feature whose plugin is not loaded, even when it is required'],
+    ],
 }
 
 export async function addCommand(args: ParsedArgs, loader: Ora, registries: BattlestackRegistries): Promise<void> {
@@ -200,6 +204,25 @@ export async function removeCommand(args: ParsedArgs, _loader: Ora, registries: 
     }
 
     const projectRoot = await requireProjectRoot()
+    const releaseLock = await acquireProjectLock(projectRoot, 'battlestack remove', { dryRun: args.dryRun })
+    try {
+        await removeLocked(args, registries, requested, projectRoot)
+    } finally {
+        await releaseLock()
+    }
+}
+
+/** The ids of installed, loaded features whose `requires` names `featureId`. */
+function dependentsOf(manifest: ProjectManifest, featureId: string, registries: BattlestackRegistries): string[] {
+    // `requires` holds bare ids: an fqid without its namespace segment.
+    const bare = featureId.split(':').slice(-2).join(':')
+    return manifest.features
+        .filter((f) => f.id !== featureId && registries.features.has(f.id))
+        .filter((f) => (registries.features.get(f.id).requires ?? []).some((r) => r === bare || r === featureId))
+        .map((f) => f.id)
+}
+
+async function removeLocked(args: ParsedArgs, registries: BattlestackRegistries, requested: string, projectRoot: string): Promise<void> {
     const manifest = await readManifest(projectRoot, registries)
     if (!manifest) {
         throw new CLIError(
@@ -223,6 +246,18 @@ export async function removeCommand(args: ParsedArgs, _loader: Ora, registries: 
 
     // No plugin to ask which files are safe to delete, so only the record goes.
     if (!registries.features.has(featureId)) {
+        const required = registries.templates.has(manifest.template)
+            && registries.templates.get(manifest.template).requiredFeatures.includes(featureId)
+        const dependents = dependentsOf(manifest, featureId, registries)
+        if ((required || dependents.length > 0) && !args.force) {
+            const why = required
+                ? `it is a required feature of template "${manifest.template}"`
+                : `${dependents.join(', ')} require${dependents.length === 1 ? 's' : ''} it`
+            throw new CLIError(
+                ErrorCode.UNSUPPORTED_FEATURE,
+                `Not removing ${featureId}: ${why}. Pass --force to drop its record anyway.`,
+            )
+        }
         if (args.dryRun) {
             ui.info(`dry-run: would drop the record of ${featureId} and leave its files on disk`)
             return
