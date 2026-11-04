@@ -64,6 +64,34 @@ describe('renameEnvKey', () => {
         expect(next).not.toContain('Used by nuxt-auth-utils to seal')
     })
 
+    it('renames an exported legacy key and keeps the export', () => {
+        const next = renameEnvKey(LEGACY_ENV.replace('NUXT_SESSION_PASSWORD', 'export NUXT_SESSION_PASSWORD'))
+        expect(next).toContain(`\nexport NUXT_APP_SECRET=${'a'.repeat(64)}\n`)
+        expect(next).not.toContain('NUXT_SESSION_PASSWORD')
+    })
+
+    it('rewrites the description of a CRLF file and keeps its line endings', () => {
+        const next = renameEnvKey(LEGACY_ENV.replaceAll('\n', '\r\n'))
+        expect(next).toContain(`\r\nNUXT_APP_SECRET=${'a'.repeat(64)}\r\n`)
+        expect(next).toContain('# Nuxt\'s app secret.')
+        expect(next).not.toContain('Used by nuxt-auth-utils to seal')
+        expect(next.replaceAll('\r\n', '')).not.toContain('\n')
+    })
+
+    it('leaves no legacy key behind when it appears twice, and keeps the last value as dotenv does', () => {
+        const next = renameEnvKey(`${LEGACY_ENV}NUXT_SESSION_PASSWORD=${'c'.repeat(64)}\n`)
+        expect(next).not.toContain('NUXT_SESSION_PASSWORD')
+        expect(next.match(/^NUXT_APP_SECRET=/gm)).toHaveLength(1)
+        expect(next).toContain(`NUXT_APP_SECRET=${'c'.repeat(64)}`)
+    })
+
+    it.each(['', 'change-me', '""'])('moves the legacy value into a NUXT_APP_SECRET set to %j', (placeholder) => {
+        const next = renameEnvKey(`NUXT_APP_SECRET=${placeholder}\n${LEGACY_ENV}`)
+        expect(next).toContain(`NUXT_APP_SECRET=${'a'.repeat(64)}\n`)
+        expect(next.match(/^NUXT_APP_SECRET=/gm)).toHaveLength(1)
+        expect(next).not.toContain('NUXT_SESSION_PASSWORD')
+    })
+
     it('leaves a commented-out legacy key and unrelated comments alone', () => {
         const raw = '# keep me\n# NUXT_SESSION_PASSWORD=old\nNUXT_ALLOWED_ORIGINS=\n'
         expect(renameEnvKey(raw)).toBe(raw)
