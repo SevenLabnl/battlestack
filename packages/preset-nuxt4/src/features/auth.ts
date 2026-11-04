@@ -30,7 +30,7 @@ function titleCase(slug: string): string {
 /** Session auth on `nuxt-auth-utils`. The sealed cookie carries an opaque sessionId. */
 export const authFeature: Feature = {
     id: 'nuxt4:auth',
-    version: '1.10.8',
+    version: '1.10.9',
     label: 'Session-based auth (argon2id)',
     frameworks: ['nuxt4'],
     stage: STAGE.AUTH,
@@ -42,7 +42,8 @@ export const authFeature: Feature = {
 
     collectDeps() {
         return {
-            prod: ['zod@^4', '@node-rs/argon2', 'nodemailer'],
+            // 0.6 moves sessions to NUXT_APP_SECRET and drops sessionHeader; held until that migration lands.
+            prod: ['zod@^4', '@node-rs/argon2', 'nodemailer', 'nuxt-auth-utils@^0.5.34'],
             dev: ['@types/nodemailer'],
         }
     },

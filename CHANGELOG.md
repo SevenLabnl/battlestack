@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- A generated project's auth feature pins `nuxt-auth-utils` to `^0.5.34`.
+  0.6.0 drops `sessionHeader` and `NUXT_SESSION_PASSWORD`, which broke new
+  projects' type-check; support for it follows in its own release.
 - A generated project's `nuxt.config.ts` sets `runtimeConfig.session.password`
   to `''`, nuxt-auth-utils' own default, so it type-checks on Nuxt releases
   that require the key. `NUXT_SESSION_PASSWORD` still sets it.
@@ -11,7 +14,8 @@
   secret goes under `runtimeConfig.public` and that user content is never rendered
   with `v-html`. Existing projects get this via `battlestack pull`.
 - The generated Dockerfile pins the latest `node:24-alpine` image
-  (`sha256:06d7adf`).
+  (`sha256:8a32c8c`).
+- `@battlestack/theme` requires `@nuxt/kit` `^4.6.4`, in step with Nuxt 4.6.4.
 - The project name recorded in `.battlestack/manifest.json` now always wins over
   the directory name. Before, any project command in a clone, CI checkout or
   renamed directory silently renamed the project to the directory name, and
