@@ -322,7 +322,7 @@ describe('repairOverwrites', () => {
         const ctx = ctxRecording({ 'logo.png': sha256(upstream) })
 
         expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([{ rel: 'logo.png', featureId: 'test:feat', outcome: 'staged' }])
-        expect(await read('logo.png')).toBe(base.replace('a', 'A'))
+        expect(lf(await read('logo.png'))).toBe(base.replace('a', 'A'))
         expect(await read('.battlestack/pull/logo.png.new')).toBe(upstream)
         expect(updateLedger(ctx).merged).toEqual([])
     })
