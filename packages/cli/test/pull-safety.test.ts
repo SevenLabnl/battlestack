@@ -264,6 +264,34 @@ describe('repairOverwrites', () => {
         expect(ctx.state['files:x:feat']).toEqual({ Dockerfile: sha256('FROM node\n') })
         expect(ctx.state['files:x:other']).toEqual({ Dockerfile: sha256('FROM other\n') })
     })
+
+    it('puts back the record of every feature tracking a staged file', async () => {
+        git('init', '-q')
+        await write('Dockerfile', 'FROM node\nCOPY patches/ ./patches/\n')
+        await commitAll()
+        const manifest = manifestWith({})
+        manifest.features = [
+            { id: 'test:x:other', version: '1.0.0', files: { Dockerfile: sha256('FROM other\n') } },
+            { id: 'test:x:feat', version: '1.0.0', files: { Dockerfile: sha256('FROM node\n') } },
+        ]
+        const start = recordedAtStart(manifest)
+        await write('Dockerfile', 'FROM node:24\n')
+        // Both re-baselined on the write, and a third feature started tracking the file during the pull.
+        const ctx = ctxRecording({}, projectDir)
+        ctx.state = {
+            'files:x:other': { Dockerfile: sha256('FROM node:24\n') },
+            'files:x:feat': { Dockerfile: sha256('FROM node:24\n') },
+            'files:x:new': { Dockerfile: sha256('FROM node:24\n') },
+        }
+        for (const id of ['x:other', 'x:feat', 'x:new']) {
+            ctx.registries.features.register({ id, label: id, version: '1.0.0', stage: 0, async execute() {} } as never, { plugin: 'p', namespace: 'test' })
+        }
+
+        expect((await repairOverwrites(ctx, start, ctx.registries)).map((r) => r.outcome)).toEqual(['staged'])
+        expect(ctx.state['files:x:feat']).toEqual({ Dockerfile: sha256('FROM node\n') })
+        expect(ctx.state['files:x:other']).toEqual({ Dockerfile: sha256('FROM other\n') })
+        expect(ctx.state['files:x:new']).toEqual({})
+    })
 })
 
 describe('report', () => {
