@@ -68,7 +68,9 @@
   the clean-tree check, the repair of local edits and the merge base from git
   history only look at the project folder.
 - Line-ending and other checkout filters (`.gitattributes`, `core.autocrlf`)
-  no longer make untouched files look edited during `pull`.
+  no longer make untouched files look edited during `pull`, `remove` and
+  `doctor`. An untouched file a feature no longer ships is removed instead of
+  listed as no longer managed.
 - `pull --force` and `pull --overwrite` start even when an earlier pull left
   conflict markers. A local edit that a feature wrote over is kept as
   `.battlestack/pull/<path>.bak` under `--force`, and replaced under

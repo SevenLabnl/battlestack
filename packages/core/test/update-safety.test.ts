@@ -5,7 +5,16 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { BASE_DIR, findBase, hasConflictMarkers, storeBase, threeWayMerge } from '../src/utils/merge.js'
-import { copyTemplateDirRecorded, updateLedger, UPDATING_STATE_KEY, writeRecorded } from '../src/utils/templates.js'
+import {
+    classifyFileState,
+    copyTemplateDirRecorded,
+    queueObsoleteDeletions,
+    removeQueuedObsoleteFiles,
+    updateFromTemplateDirs,
+    updateLedger,
+    UPDATING_STATE_KEY,
+    writeRecorded,
+} from '../src/utils/templates.js'
 import { defaultPort, freezePort, resetFrozenPorts } from '../src/utils/port-alloc.js'
 import { exists } from '../src/utils/fs.js'
 import { BattlestackRegistries } from '../src/registry.js'
@@ -207,7 +216,35 @@ describe('writes during an update', () => {
             await writeRecorded(ctx, 'test:f', 'f.txt', BASE.replace('line five', 'line five, new'))
 
             expect(await read('f.txt')).toBe(BASE.replace('line five', 'line five, new'))
-            expect(updateLedger(ctx)).toMatchObject({ conflicts: [], staged: [] })
+            expect(updateLedger(ctx)).toMatchObject({ conflicts: [], staged: [], merged: [] })
+        })
+
+        it('removes an untouched file the feature no longer ships', async () => {
+            await checkedOut(BASE)
+            await writeFile(path.join(templateDir, 'other.txt'), 'x\n')
+            const ctx = updatingCtx({ 'test:f': { 'f.txt': sha256(BASE) } })
+
+            const report = await updateFromTemplateDirs(ctx, 'test:f', [templateDir], { id: 'test:f', version: '1.0.0', files: { 'f.txt': sha256(BASE) } })
+
+            expect(await exists(path.join(projectDir, 'f.txt'))).toBe(false)
+            expect(report.unmanaged ?? []).toEqual([])
+        })
+
+        it('removes an untouched file whose deletion was queued until the end of the run', async () => {
+            await checkedOut(BASE)
+            await writeFile(path.join(templateDir, 'other.txt'), 'x\n')
+            const ctx = updatingCtx({ 'test:f': { 'f.txt': sha256(BASE) } })
+            queueObsoleteDeletions(ctx)
+
+            await updateFromTemplateDirs(ctx, 'test:f', [templateDir], { id: 'test:f', version: '1.0.0', files: { 'f.txt': sha256(BASE) } })
+
+            expect(await removeQueuedObsoleteFiles(ctx)).toEqual(['f.txt'])
+            expect(await exists(path.join(projectDir, 'f.txt'))).toBe(false)
+        })
+
+        it('counts an untouched file as pristine for remove and doctor', async () => {
+            await checkedOut(BASE)
+            expect(await classifyFileState(path.join(projectDir, 'f.txt'), sha256(BASE), false)).toBe('pristine')
         })
 
         it('merges against a stored base that a checkout turned into CRLF', async () => {
