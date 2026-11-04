@@ -123,6 +123,14 @@ describe('a migration that dropped users.avatar_key on a storage project', () =>
         expect(await avatarIn('0001_snapshot.json')).toBeUndefined()
     })
 
+    it.each(['_journal.json', '0001_snapshot.json'])('leaves a step and edits nothing when meta/%s does not parse', async (file) => {
+        await writeFile(migrations('meta', file), '<<<<<<< ours\n{}\n')
+        const { actions } = await pull()
+
+        expect(actions.join('\n')).toContain(`server/database/migrations/meta/${file}\` is not valid JSON`)
+        expect(await exists(migrations('0002_restore_avatar_key.sql'))).toBe(false)
+    })
+
     it('only warns when the schema no longer declares the column, as the project may mean it', async () => {
         await writeFile(path.join(projectDir, 'server', 'database', 'schema', 'users.ts'), "// avatar_key moved to profiles\nexport const users = pgTable('users', {\n})\n")
         const { warnings, actions } = await pull()

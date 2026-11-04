@@ -813,7 +813,7 @@ describe('battlestack pull: a schema change ships with its migration', () => {
     async function setup(
         v2: { schema: string, other: string },
         dbGenerate = writesSql,
-        { featureId = 'nuxt4:database', schema = schemaRel } = {},
+        { featureId = 'nuxt4:database', schema = schemaRel, storage = false } = {},
     ): Promise<{ projectDir: string, registriesV2: BattlestackRegistries }> {
         const projectDir = await tmp('battlestack-pull-schema-')
         const tplV1 = await tmp('battlestack-pull-schema-v1-')
@@ -827,16 +827,21 @@ describe('battlestack pull: a schema change ships with its migration', () => {
             JSON.stringify({ scripts: { 'db:generate': dbGenerate } }),
         )
 
+        const tplStorage = await tmp('battlestack-pull-schema-storage-')
+        const ids = storage ? [featureId, 'nuxt4:storage'] : [featureId]
         const registriesFor = (tplDir: string, version: string): BattlestackRegistries => buildRegistries({
             namespace: 'nuxt4',
-            frameworks: [{ id: FW, label: FW, supportedFeatures: [featureId] }],
-            features: [makeFileFeature(featureId, version, tplDir, { stage: STAGE.DATABASE })],
-            templates: [{ id: TPL, label: TPL, framework: FW, requiredFeatures: [featureId], optionalFeatures: [] }],
+            frameworks: [{ id: FW, label: FW, supportedFeatures: ids }],
+            features: [
+                makeFileFeature(featureId, version, tplDir, { stage: STAGE.DATABASE }),
+                ...(storage ? [makeFileFeature('nuxt4:storage', '1.0.0', tplStorage)] : []),
+            ],
+            templates: [{ id: TPL, label: TPL, framework: FW, requiredFeatures: ids, optionalFeatures: [] }],
         }).registries
         const registriesV1 = registriesFor(tplV1, '1.0.0')
-        const database = registriesV1.features.get(featureId)
-        const ctx = scaffoldCtx(projectDir, registriesV1, [database.fqid])
-        await database.execute(ctx)
+        const features = ids.map((id) => registriesV1.features.get(id))
+        const ctx = scaffoldCtx(projectDir, registriesV1, features.map((f) => f.fqid))
+        for (const f of features) await f.execute(ctx)
         await writeManifest(ctx)
         return { projectDir, registriesV2: registriesFor(tplV2, '1.1.0') }
     }
@@ -903,6 +908,31 @@ describe('battlestack pull: a schema change ships with its migration', () => {
 
         await rm(path.join(projectDir, '.battlestack', 'pull'), { recursive: true })
         expect((await pull(projectDir, registriesV2)).exitCode).toBeUndefined()
+    })
+
+    it('lists the avatar repair it could not do when the migration journal does not parse', async () => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v1 schema\n', other: 'v2\n' }, writesSql, { storage: true })
+        const migrationsDir = path.join(projectDir, 'server', 'database', 'migrations')
+        await mkdir(path.join(migrationsDir, 'meta'), { recursive: true })
+        await writeFile(path.join(migrationsDir, '0001_oops.sql'), 'ALTER TABLE "users" DROP COLUMN "avatar_key";')
+        await writeFile(path.join(migrationsDir, 'meta', '_journal.json'), '<<<<<<< ours\n{}\n')
+        await writeTemplateFile(projectDir, path.join('server', 'database', 'schema', 'users.ts'), "export const users = pgTable('users', { avatarKey: text('avatar_key') })\n")
+        const { exitCode, report } = await pull(projectDir, registriesV2)
+
+        expect(report).toContain('meta/_journal.json` is not valid JSON')
+        expect(exitCode).toBe(2)
+    })
+
+    it('lists the migration step when checking for one fails after the manifest is written', async () => {
+        const { projectDir, registriesV2 } = await setup({ schema: 'v2 schema\n', other: 'v1\n' })
+        // A file where the migrations folder belongs makes the folder scan throw.
+        await writeFile(path.join(projectDir, 'server', 'database', 'migrations'), '')
+        const { exitCode, report } = await pull(projectDir, registriesV2)
+
+        expect(report).toContain('Pull could not check whether the schema needs a migration')
+        expect(report).toContain('pnpm run db:generate')
+        expect(exitCode).toBe(2)
+        expect((await readManifestRaw(projectDir)).features[0].version).toBe('1.1.0')
     })
 
     it('passes on what drizzle-kit said, with a hint, when it stopped at a prompt', async () => {

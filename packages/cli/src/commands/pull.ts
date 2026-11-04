@@ -482,7 +482,14 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             await writeManifest(ctx, { rendered: renderedAll })
             const written = await readManifest(projectDir, registries)
             if (written) await pruneStoredBases(projectDir, written)
-            await generatePulledMigration(ctx, schemaBefore)
+            // The manifest is already written, so a throw here would leave no report and no reminder.
+            try {
+                await generatePulledMigration(ctx, schemaBefore)
+            } catch (error) {
+                const msg = error instanceof Error ? error.message : String(error)
+                updateLedger(ctx).actions.push(`Pull could not check whether the schema needs a migration (${msg}). Fix the cause, then run \`${String(ctx.state.packageManager ?? 'pnpm')} run db:generate\` and commit any new SQL before you deploy.`)
+                ui.warn('Checking for a schema migration failed. See .battlestack/pull/REPORT.md')
+            }
         }
 
         if (renamedFrom && !ctx.dryRun) {
