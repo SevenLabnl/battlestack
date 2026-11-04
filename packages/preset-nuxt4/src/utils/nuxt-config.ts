@@ -203,10 +203,11 @@ export class NuxtConfig {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const prop = security.$ast.properties.find((p: any) => (p.key?.name ?? p.key?.value) === 'rateLimiter')
         const value = prop?.value
-        if (!value || value.type === 'BooleanLiteral' || value.type === 'ConditionalExpression') return 'unchanged'
-        // `{ … } as X` and `{ … } satisfies X` are still an object literal.
-        const literal = value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression' ? value.expression : value
-        if (literal?.type !== 'ObjectExpression') return 'not-literal'
+        // `{ … } as X`, `{ … } satisfies X as Y` and a cast conditional keep their meaning under the casts.
+        let literal = value
+        while (literal?.type === 'TSAsExpression' || literal?.type === 'TSSatisfiesExpression') literal = literal.expression
+        if (!literal || literal.type === 'BooleanLiteral' || literal.type === 'ConditionalExpression') return 'unchanged'
+        if (literal.type !== 'ObjectExpression') return 'not-literal'
         const wrapped = parseModule(`const gated = ${gate}${generateCode({ $ast: value }).code}`)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         prop.value = (wrapped.$ast as any).body[0].declarations[0].init
