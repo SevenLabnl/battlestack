@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -151,5 +151,35 @@ describe('a migration that dropped users.avatar_key on a storage project', () =>
         expect(warnings.filter((w) => w.includes('avatar_key'))).toHaveLength(0)
         expect(actions).toHaveLength(0)
         expect(await exists(migrations('0002_restore_avatar_key.sql'))).toBe(false)
+    })
+})
+
+describe('a project whose drizzle.config.ts sets its own out folder', () => {
+    const custom = (...p: string[]): string => path.join(projectDir, 'db', 'migrations', ...p)
+
+    beforeEach(async () => {
+        await mkdir(path.join(projectDir, 'db'))
+        await rename(migrations(), custom())
+        await writeFile(path.join(projectDir, 'drizzle.config.ts'), "export default defineConfig({\n    schema: './server/database/schema/*.ts',\n    out: './db/migrations',\n})\n")
+    })
+
+    it('repairs the dropped column there', async () => {
+        await writeFile(path.join(projectDir, 'generate.cjs'), CUSTOM_SCRIPT.replace("'server/database/migrations'", "'db/migrations'"))
+        const { actions } = await pull()
+
+        expect(await readFile(custom('0002_restore_avatar_key.sql'), 'utf8')).toBe('ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "avatar_key" text;\n')
+        expect(actions.join('\n')).toContain('db/migrations/0001_oops.sql')
+    })
+
+    it('finds the migration db:generate wrote there', async () => {
+        await writeFile(path.join(projectDir, 'generate.cjs'), "require('fs').writeFileSync('db/migrations/0002_new_index.sql', 'CREATE INDEX x ON y (z);')\n")
+        vi.spyOn(ui, 'warn').mockImplementation(() => {})
+        const ok = vi.spyOn(ui, 'ok').mockImplementation(() => {})
+        const ctx = mockRunContext({ projectDir, enabledFeatures: new Set(['nuxt4:database']), state: { packageManager: 'pnpm' } })
+        // An empty "before" makes every schema file count as changed.
+        await generatePulledMigration(ctx, new Map())
+
+        expect(updateLedger(ctx).actions).toHaveLength(0)
+        expect(ok.mock.calls.map(([m]) => String(m)).join('\n')).toContain('generated 0002_new_index.sql')
     })
 })
