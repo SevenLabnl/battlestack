@@ -122,8 +122,8 @@ function isIconRel(rel: unknown): boolean {
     return rel.toLowerCase().split(/\s+/).some((token) => ICON_RELS.has(token))
 }
 
-/** Matches `rel: 'icon'` (a `useHead` link), `rel="icon"`, `rel=icon` and `:rel="'icon'"` (a `<link>` in a template). */
-const REL_IN_SOURCE = /\brel\s*[:=]\s*(?:(['"`])(.*?)\1|([^\s>'"`]+))/g
+/** Matches `rel: 'icon'` and `'rel': 'icon'` (a `useHead` link), `rel="icon"`, `REL=icon` and `:rel="'icon'"` (a `<link>` in a template). */
+const REL_IN_SOURCE = /\brel['"]?\s*[:=]\s*(?:(['"`])(.*?)\1|([^\s>'"`]+))/gi
 
 function relValue(match: RegExpMatchArray): string {
     return (match[2] ?? match[3] ?? '').replace(/['"`]/g, '')
