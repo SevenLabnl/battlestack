@@ -1,8 +1,8 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyPlugin, BattlestackRegistries, finalizeRegistries } from '@battlestack/core'
+import { applyPlugin, BattlestackRegistries, finalizeRegistries, hashContent, queueObsoleteDeletions } from '@battlestack/core'
 import type { RunContext } from '@battlestack/core'
 import { ui } from '@battlestack/tui'
 import preset from '../src/index.js'
@@ -174,6 +174,36 @@ it('warns about the public keys it cannot add under a non-literal runtimeConfig.
     const warn = vi.spyOn(ui, 'warn').mockImplementation(() => {})
     await authFeature.execute(context())
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('nuxt.config.ts#runtimeConfig.public.allowRegistration'))
+})
+
+describe('the 0.5 session password guard', () => {
+    const GUARD = 'server/plugins/00-session-password-guard.ts'
+    const GUARD_SRC = 'export default defineNitroPlugin(() => {})\n'
+    const guardAction = (actions: string[] = []) => actions.filter((a) => a.includes(GUARD))
+
+    async function pullWithGuard(prev: { files: Record<string, string>, ownedByUser?: string[] }) {
+        await write('nuxt.config.ts', 'export default defineNuxtConfig({})\n')
+        await mkdir(path.join(projectDir, 'server/plugins'), { recursive: true })
+        await write(GUARD, GUARD_SRC)
+        const ctx = context()
+        queueObsoleteDeletions(ctx)
+        return authFeature.update!(ctx, { id: 'nuxt4:nuxt4:auth', version: '1.10.9', ...prev })
+    }
+
+    it('reports an edited copy that pull leaves in place', async () => {
+        const report = await pullWithGuard({ files: { [GUARD]: 'hash-of-the-shipped-version' } })
+        expect(guardAction(report.actions)).toHaveLength(1)
+    })
+
+    it('reports an owned copy', async () => {
+        const report = await pullWithGuard({ files: { [GUARD]: hashContent(GUARD_SRC) }, ownedByUser: [GUARD] })
+        expect(guardAction(report.actions)).toHaveLength(1)
+    })
+
+    it('says nothing about a pristine copy that pull removes at the end', async () => {
+        const report = await pullWithGuard({ files: { [GUARD]: hashContent(GUARD_SRC) } })
+        expect(guardAction(report.actions)).toEqual([])
+    })
 })
 
 it('keeps the Nuxt 4.6 floor in package.json when auth is removed', () => {
