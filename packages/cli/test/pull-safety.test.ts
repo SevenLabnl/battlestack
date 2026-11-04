@@ -292,6 +292,24 @@ describe('repairOverwrites', () => {
         expect(ctx.state['files:x:other']).toEqual({ Dockerfile: sha256('FROM other\n') })
         expect(ctx.state['files:x:new']).toEqual({})
     })
+
+    it('stages a binary file instead of merging it as text', async () => {
+        const base = 'a\nb\nc\nd\ne\n'
+        git('init', '-q')
+        await write('logo.png', base)
+        await commitAll()
+        await write('logo.png', base.replace('a', 'A'))
+        await commitAll()
+        const start = recordedAtStart(manifestWith({ 'logo.png': sha256(base) }))
+        const upstream = base.replace('e', 'E')
+        await write('logo.png', upstream)
+        const ctx = ctxRecording({ 'logo.png': sha256(upstream) })
+
+        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([{ rel: 'logo.png', featureId: 'test:feat', outcome: 'staged' }])
+        expect(await read('logo.png')).toBe(base.replace('a', 'A'))
+        expect(await read('.battlestack/pull/logo.png.new')).toBe(upstream)
+        expect(updateLedger(ctx).merged).toEqual([])
+    })
 })
 
 describe('report', () => {

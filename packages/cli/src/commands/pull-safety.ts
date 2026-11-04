@@ -150,7 +150,8 @@ export async function repairOverwrites(
         const upstream = await readFile(abs)
         const tracker = trackers.find((t) => t.hash === hashContent(upstream)) ?? trackers[0]!
         const featureId = tracker.featureId
-        const base = before.size > 0 ? await findBase(ctx.projectDir, rel, before) : null
+        const binary = isBinaryPath(rel)
+        const base = !binary && before.size > 0 ? await findBase(ctx.projectDir, rel, before) : null
         const merged = base
             ? await threeWayMerge(head.out, base, upstream, {
                 current: `${rel} (yours)`,
@@ -173,7 +174,7 @@ export async function repairOverwrites(
             if (previous) t.files[t.rel] = previous
             else delete t.files[t.rel]
         }
-        await stageUpstream(ctx.projectDir, rel, head.out, upstream, { binary: isBinaryPath(rel) })
+        await stageUpstream(ctx.projectDir, rel, head.out, upstream, { binary })
         ledger.staged.push(rel)
         repairs.push({ rel, featureId, outcome: 'staged' })
     }
