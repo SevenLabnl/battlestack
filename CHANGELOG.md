@@ -6,17 +6,18 @@
   key derived from `NUXT_APP_SECRET`, which replaces `NUXT_SESSION_PASSWORD`,
   and the session cookie is now `nuxt-auth-session`, so every user is logged
   out once. `battlestack pull` renames the key in `.env` and `.env.example`,
-  keeping its value, and removes `session.password` and `sessionHeader` from
-  `nuxt.config.ts`. **Set `NUXT_APP_SECRET` in every deployed environment before
-  deploying**: pull cannot reach those, and a production build without it
-  refuses to boot. `pull` lists this step in `.battlestack/pull/REPORT.md`.
+  keeping its value, and removes `session.password`, `sessionHeader` and a
+  `name: 'nuxt-session'` from `nuxt.config.ts`. **Set `NUXT_APP_SECRET` in every
+  deployed environment before deploying**: pull cannot reach those, and a
+  production build without it refuses to boot. `pull` lists this step in
+  `.battlestack/pull/REPORT.md`, along with deleting an edited or owned copy of
+  the old `server/plugins/00-session-password-guard.ts`, which would stop every
+  production boot. Every generated project now requires Nuxt 4.6, with or
+  without auth.
   Passkeys need `@simplewebauthn/server` 13.3.2 or later, which `pull` installs.
   nuxt-auth-utils 0.6 no longer reads a session from an `x-<name>-session`
   request header, so a logged-out or revoked session cannot be replayed that
   way.
-- A generated project's `nuxt.config.ts` sets `runtimeConfig.session.password`
-  to `''`, nuxt-auth-utils' own default, so it type-checks on Nuxt releases
-  that require the key. `NUXT_SESSION_PASSWORD` still sets it.
 - The Claude Code rules now ask for `pnpm run typecheck` next to lint and tests,
   and rule out getting checks green by suppressing them (`@ts-ignore`, `as any`,
   `eslint-disable`, skipped tests, `--no-verify`). `security.md` adds that nothing
@@ -138,7 +139,7 @@
 - `pull` now stops with a clear error when `runtimeConfig` in `nuxt.config.ts`
   is a variable or shorthand instead of an inline object, where it used to
   crash with a proxy error. A default that cannot be added because its parent
-  is not an inline object (for example `session: baseSession`) is reported as a
+  is not an inline object (for example `public: pub`) is reported as a
   warning instead of being skipped silently, and an explicit `null` is kept as
   your value.
   For preset authors, `mergeDefaults` now returns the paths it could not add,
