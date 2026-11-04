@@ -33,7 +33,8 @@ export const essentialsFeature: Feature = {
             prod: ['@vuepic/vue-datepicker', '@iconify/vue', 'h3@^1', 'nuxt@^4.6.0'],
             // `@iconify-json/lucide` is a local icon bundle. eslint/typescript/vue-tsc are explicit.
             // TypeScript stays on 6 until vue-tsc and typescript-eslint support the TS 7 API.
-            dev: ['@iconify-json/lucide', 'eslint', 'typescript@^6', 'vue-tsc'],
+            // `@nuxt/cli` 4.0.1 crashes `nuxt dev` on Nuxt 4.6.4; install's dedupe moves nuxt's own copy up.
+            dev: ['@iconify-json/lucide', 'eslint', 'typescript@^6', 'vue-tsc', '@nuxt/cli@^4.0.3'],
         }
     },
 
