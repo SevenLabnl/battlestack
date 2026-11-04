@@ -619,3 +619,24 @@ describe('battlestack add with only steps left', () => {
         process.exitCode = undefined
     })
 })
+
+describe('battlestack add twice into the same report', () => {
+    it('replaces its own earlier section instead of stacking another', async () => {
+        const p = await project()
+        await writeReport(p.dir, {
+            merged: [], conflicts: [], staged: [], backups: [], unmanaged: [], restored: [],
+            added: [], orphans: [], actions: ['Run the new database migration'], repairs: [],
+        })
+        await writeFile(path.join(p.dir, 'add-opt.txt'), 'the project\'s own file\n')
+
+        await withCwd(p.dir, () => add('add:opt')(p))
+        await withCwd(p.dir, () => removeCommand(defaultArgs({ projectName: 'add:opt' }), undefined as never, p.registries))
+        await withCwd(p.dir, () => add('add:opt')(p))
+        process.exitCode = undefined
+
+        const report = await readFile(path.join(p.dir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        expect(report.match(new RegExp(`^# battlestack add ${NS}:add:opt$`, 'gm'))).toHaveLength(1)
+        expect(report.match(/`add-opt\.txt`/g)).toHaveLength(1)
+        expect(report).toContain('Run the new database migration')
+    })
+})
