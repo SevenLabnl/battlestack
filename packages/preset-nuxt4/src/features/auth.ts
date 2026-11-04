@@ -187,7 +187,9 @@ export const authFeature: Feature = {
         const result = await emitTemplateUpdate(ctx, 'nuxt4:auth', import.meta.url, 'auth', prev)
         result.notes.push(...(await retainedPasswordPolicyNotes(ctx.projectDir)))
         await postPatches(ctx.projectDir)
-        if (await migrateToAppSecret(ctx.projectDir)) {
+        const migrated = await migrateToAppSecret(ctx.projectDir)
+        // Deployed environments need the new secret even when the local files were moved already.
+        if (migrated || (prev && versionBelow(prev.version, '1.11.0'))) {
             result.actions = [...(result.actions ?? []), APP_SECRET_ACTION]
         }
         await emitRecoveryHookStub(ctx)
@@ -234,6 +236,15 @@ export const APP_SECRET_ACTION = 'nuxt-auth-utils 0.6 seals sessions with a key 
     + '`NUXT_SESSION_PASSWORD`. Before deploying, set `NUXT_APP_SECRET` (at least 32 characters; the old '
     + '`NUXT_SESSION_PASSWORD` value works) in every deployed environment and CI secret, and remove '
     + '`NUXT_SESSION_PASSWORD`. Production refuses to boot without it. Every user is logged out once.'
+
+function versionBelow(version: string, floor: string): boolean {
+    const parts = (v: string) => v.split('-')[0]!.split('.').map(Number)
+    const [a, b] = [parts(version), parts(floor)]
+    for (let i = 0; i < 3; i++) {
+        if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0)
+    }
+    return false
+}
 
 /** Moves a nuxt-auth-utils 0.5 project to `NUXT_APP_SECRET`; true when it found anything to move. */
 export async function migrateToAppSecret(projectDir: string): Promise<boolean> {
