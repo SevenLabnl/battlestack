@@ -13,7 +13,10 @@
   `.battlestack/pull/REPORT.md`, along with deleting an edited or owned copy of
   the old `server/plugins/00-session-password-guard.ts`, which would stop every
   production boot. Every generated project now requires Nuxt 4.6, with or
-  without auth.
+  without auth, and `@nuxt/cli` 4.0.3: 4.0.1 crashes `nuxt dev` on Nuxt 4.6.4.
+  To move the copy Nuxt itself uses, the install that `pull` and a new project
+  run is followed by `pnpm dedupe` or `npm dedupe`. A bun project gets a note to
+  run `bun update @nuxt/cli` instead.
   Passkeys need `@simplewebauthn/server` 13.3.2 or later, which `pull` installs.
   nuxt-auth-utils 0.6 no longer reads a session from an `x-<name>-session`
   request header, so a logged-out or revoked session cannot be replayed that

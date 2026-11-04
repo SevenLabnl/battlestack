@@ -20,15 +20,34 @@ export const installFeature: Feature = {
     },
 
     async update(ctx, _prev) {
-        const changed = await applyInstall(ctx, { skipInstallIfUnchanged: true })
-        if (changed) return { written: ['package.json'], skipped: [], notes: [] }
-        return { written: [], skipped: [], notes: ['package.json unchanged, install skipped'] }
+        const notes: string[] = []
+        const changed = await applyInstall(ctx, { skipInstallIfUnchanged: true }, notes)
+        if (changed) return { written: ['package.json'], skipped: [], notes }
+        return { written: [], skipped: [], notes: ['package.json unchanged, install skipped', ...notes] }
     },
+}
+
+/**
+ * A dependency floor only reaches a transitive copy through dedupe: `nuxt dev` runs the
+ * `@nuxt/cli` nested under `nuxt`, which an existing lockfile keeps on its old version.
+ */
+async function dedupe(pm: PackageManager, ctx: RunContext, notes: string[]): Promise<void> {
+    if (pm === 'bun') {
+        notes.push('bun has no dedupe: if `nuxt dev` fails, run `bun update @nuxt/cli`.')
+        return
+    }
+    try {
+        await run(pm, ['dedupe'], { cwd: ctx.projectDir, inherit: ctx.debug })
+    } catch (err) {
+        ui.warn(`${pm} dedupe failed (${(err as Error).message}); run \`${pm} dedupe\` yourself.`)
+        notes.push(`${pm} dedupe failed; run \`${pm} dedupe\` yourself.`)
+    }
 }
 
 async function applyInstall(
     ctx: RunContext,
     opts: { skipInstallIfUnchanged: boolean },
+    notes: string[] = [],
 ): Promise<boolean> {
     const pm = String(ctx.state.packageManager ?? 'pnpm') as PackageManager
     const { prod, dev } = collectDeclaredDeps(ctx)
@@ -54,6 +73,7 @@ async function applyInstall(
         const pinnedAny = await pinResolvedVersions(ctx.projectDir)
         // Pinning leaves the lockfile on `latest`, so it is re-synced here.
         if (pinnedAny) await run(pm, lockfileSyncArgs(pm), { cwd: ctx.projectDir, inherit: ctx.debug })
+        await dedupe(pm, ctx, notes)
     }
     // Feature-declared skills, refreshed on scaffold and every pull regardless of dep changes.
     await installSkills(ctx, collectSkillSources(ctx, ctx.registries))
