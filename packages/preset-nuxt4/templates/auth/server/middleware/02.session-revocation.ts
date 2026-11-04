@@ -9,7 +9,7 @@ import { sessions } from '#server/database/schema/sessions'
  */
 export default defineEventHandler(async (event) => {
     const { name } = useRuntimeConfig(event).session as { name?: string }
-    // nuxt-auth-utils renames an empty or 'nuxt-session' name to its own cookie; checking any other name would skip the gate.
+    // nuxt-auth-utils 0.6 swaps a 'nuxt-session' name for its own cookie, so checking the configured name would skip revocation.
     const cookieName = !name || name === 'nuxt-session' ? 'nuxt-auth-session' : name
     if (!getCookie(event, cookieName)) return
 
