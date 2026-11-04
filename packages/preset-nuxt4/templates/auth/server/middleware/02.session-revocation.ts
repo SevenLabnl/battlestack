@@ -19,6 +19,7 @@ export default defineEventHandler(async (event) => {
 
     // Replaces the request's cached session too, so later reads in this request see it empty.
     await clearUserSession(event)
+    if ((await getUserSession(event)).user) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
 })
 
 async function isLive(sessionId: string, userId: string): Promise<boolean> {
