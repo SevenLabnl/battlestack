@@ -162,8 +162,22 @@ export async function threeWayMerge(
     }
 }
 
-const MARKER = /^(<{7}|>{7}) /m
+const YOURS = 'yours'
+const UPSTREAM_BEFORE = 'upstream before'
+const UPSTREAM_NOW = 'upstream now'
 
-export function hasConflictMarkers(content: string): boolean {
-    return MARKER.test(content)
+/** The diff3 labels battlestack's merges write, which `hasMergeMarkers` looks for. */
+export function mergeLabels(rel: string, featureId: string): { current: string, base: string, upstream: string } {
+    return {
+        current: `${rel} (${YOURS})`,
+        base: `${rel} (${UPSTREAM_BEFORE}, ${featureId})`,
+        upstream: `${rel} (${UPSTREAM_NOW}, ${featureId})`,
+    }
+}
+
+const MERGE_MARKER = new RegExp(String.raw`^(<{7} .* \(${YOURS}\)|>{7} .* \(${UPSTREAM_NOW}, .+\))\r?$`, 'm')
+
+/** True when the content has a conflict marker one of battlestack's own merges wrote. */
+export function hasMergeMarkers(content: string): boolean {
+    return MERGE_MARKER.test(content)
 }

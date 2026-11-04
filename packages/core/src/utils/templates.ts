@@ -9,7 +9,7 @@ import type { Feature, InstalledFeatureRecord } from '../types/feature.js'
 import type { RunContext } from '../types/run-context.js'
 import type { UpdateReport } from '../types/update-report.js'
 import { writeFileEnsured, exists } from './fs.js'
-import { findBase, storeBase, threeWayMerge } from './merge.js'
+import { findBase, mergeLabels, storeBase, threeWayMerge } from './merge.js'
 
 function templatesRootFor(callerUrl: string): string {
     return path.dirname(fileURLToPath(callerUrl))
@@ -603,11 +603,7 @@ async function mergeInPlace(
     const base = await findBase(ctx.projectDir, rel, recordedHashes)
     if (!base) return false
     const current = await readFile(dest)
-    const merged = await threeWayMerge(current, base, newContent, {
-        current: `${rel} (yours)`,
-        base: `${rel} (upstream before, ${featureId})`,
-        upstream: `${rel} (upstream now, ${featureId})`,
-    })
+    const merged = await threeWayMerge(current, base, newContent, mergeLabels(rel, featureId))
     if (!merged) return false
 
     await writeFile(dest, merged.content)

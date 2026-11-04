@@ -7,8 +7,9 @@ import {
     exists,
     findBase,
     hashContent,
-    hasConflictMarkers,
+    hasMergeMarkers,
     isBinaryPath,
+    mergeLabels,
     pruneBases,
     recordedFiles,
     stageUpstream,
@@ -63,21 +64,20 @@ export async function missingAtStart(projectDir: string, start: StartRecords): P
 }
 
 /**
- * A pull starts from a commit, so git is its undo. Markers left in a file an earlier pull
- * reported as a conflict block it, unless `--force` or `--overwrite` replaces the file anyway.
+ * A pull starts from a commit, so git is its undo. Markers an earlier pull's merge left in a
+ * tracked file block it, unless `--force` or `--overwrite` replaces the file anyway.
  */
 export async function preflight(
     projectDir: string,
     manifest: ProjectManifest,
     opts: { allowDirty: boolean, replacing?: boolean },
 ): Promise<{ git: boolean, clean: boolean }> {
-    const start = recordedAtStart(manifest)
-    for (const rel of opts.replacing ? [] : await reportedConflicts(projectDir)) {
+    for (const [rel, byFeature] of opts.replacing ? [] : recordedAtStart(manifest)) {
         const abs = path.join(projectDir, rel)
         if (!(await exists(abs))) continue
         const content = await readFile(abs)
-        if ([...(start.get(rel)?.values() ?? [])].includes(hashContent(content))) continue
-        if (hasConflictMarkers(content.toString('utf8'))) {
+        if ([...byFeature.values()].includes(hashContent(content))) continue
+        if (hasMergeMarkers(content.toString('utf8'))) {
             throw new CLIError(
                 ErrorCode.SCAFFOLD_FAILED,
                 `${rel} still has conflict markers from an earlier pull. Resolve them (git diff --check lists them), commit, then pull again.`,
@@ -153,11 +153,7 @@ export async function repairOverwrites(
         const binary = isBinaryPath(rel)
         const base = !binary && before.size > 0 ? await findBase(ctx.projectDir, rel, before) : null
         const merged = base
-            ? await threeWayMerge(head.out, base, upstream, {
-                current: `${rel} (yours)`,
-                base: `${rel} (upstream before, ${featureId})`,
-                upstream: `${rel} (upstream now, ${featureId})`,
-            })
+            ? await threeWayMerge(head.out, base, upstream, mergeLabels(rel, featureId))
             : null
         if (merged) {
             await storeBase(ctx.projectDir, upstream)
@@ -236,29 +232,18 @@ export function needsAttention(s: PullSummary): boolean {
 }
 
 const STEPS_TITLE = 'Steps outside this repository'
-const CONFLICTS_TITLE = 'Conflicts'
-
-/** The list items under every `## <title>` heading of an earlier report. */
-async function reportItems(projectDir: string, title: string): Promise<string[]> {
-    const dest = path.join(projectDir, REPORT_PATH)
-    if (!(await exists(dest))) return []
-    const items: string[] = []
-    let inSection = false
-    for (const line of (await readFile(dest, 'utf8')).split(/\r?\n/)) {
-        if (line.startsWith('## ')) inSection = line === `## ${title}`
-        else if (inSection && line.startsWith('- ')) items.push(line.slice(2))
-    }
-    return items
-}
 
 /** The steps an earlier report lists that the user has not deleted from it yet. */
-export function unfinishedSteps(projectDir: string): Promise<string[]> {
-    return reportItems(projectDir, STEPS_TITLE)
-}
-
-/** The files an earlier report lists as conflicts. */
-async function reportedConflicts(projectDir: string): Promise<string[]> {
-    return (await reportItems(projectDir, CONFLICTS_TITLE)).map((item) => item.replace(/^`(.*)`$/, '$1'))
+export async function unfinishedSteps(projectDir: string): Promise<string[]> {
+    const dest = path.join(projectDir, REPORT_PATH)
+    if (!(await exists(dest))) return []
+    const steps: string[] = []
+    let inSteps = false
+    for (const line of (await readFile(dest, 'utf8')).split(/\r?\n/)) {
+        if (line.startsWith('## ')) inSteps = line === `## ${STEPS_TITLE}`
+        else if (inSteps && line.startsWith('- ')) steps.push(line.slice(2))
+    }
+    return steps
 }
 
 /** Staged `.new` files (as the rel they belong to) and `.bak` backups still in `.battlestack/pull/`. */
@@ -291,7 +276,7 @@ export function renderReport(s: PullSummary): string {
             : 'Nothing needs attention. Review the diff, run lint, typecheck and the tests, and commit.',
         '',
         ...section(
-            CONFLICTS_TITLE,
+            'Conflicts',
             'Both your project and upstream changed the same lines. Each file has diff3 markers: `<<<<<<<` your version, `|||||||` upstream before, `=======` upstream now, `>>>>>>>`. Keep your intent and take the upstream change where it does not contradict it. `git diff --check` lists any marker left behind, and pull refuses to run until none are left, except with `--force` or `--overwrite`.',
             s.conflicts.map((r) => `\`${r}\``),
         ),
