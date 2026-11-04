@@ -140,3 +140,14 @@ it('warns about the public keys it cannot add under a non-literal runtimeConfig.
     await authFeature.execute(context())
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('nuxt.config.ts#runtimeConfig.public.allowRegistration'))
 })
+
+it('keeps the Nuxt 4.6 floor in package.json when auth is removed', () => {
+    const ctx = context()
+    const auth = ctx.registries.features.get('nuxt4:auth').fqid
+    for (const template of ctx.registries.templates.all()) {
+        const remaining = template.requiredFeatures
+            .filter((id) => id !== auth && ctx.registries.features.has(id))
+            .flatMap((id) => ctx.registries.features.get(id).collectDeps?.(ctx)?.prod ?? [])
+        expect(remaining, template.id).toContain('nuxt@^4.6.0')
+    }
+})

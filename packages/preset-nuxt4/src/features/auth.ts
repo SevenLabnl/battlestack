@@ -43,7 +43,7 @@ export const authFeature: Feature = {
 
     collectDeps() {
         return {
-            prod: ['zod@^4', '@node-rs/argon2', 'nodemailer', 'nuxt-auth-utils@^0.6.0', 'nuxt@^4.6.0'],
+            prod: ['zod@^4', '@node-rs/argon2', 'nodemailer', 'nuxt-auth-utils@^0.6.0'],
             dev: ['@types/nodemailer'],
         }
     },
