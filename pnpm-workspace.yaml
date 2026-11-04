@@ -3,5 +3,8 @@ packages:
 # Hold new releases back 3 days; fall back to a younger one only when nothing older satisfies a range.
 minimumReleaseAge: 4320
 minimumReleaseAgeStrict: false
+# Exact-version exceptions; drop each once it is older than the window.
+minimumReleaseAgeExclude:
+  - '@nuxt/kit@4.6.4'
 allowBuilds:
   esbuild: true

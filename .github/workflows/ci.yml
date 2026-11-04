@@ -13,6 +13,11 @@ on:
   # Every job still runs on a label event: a skipped required check would count as passing.
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
+  # The scaffold jobs install upstream modules unpinned, so their breakage surfaces on main
+  # before it lands in unrelated Dependabot PRs.
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read

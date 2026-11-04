@@ -42,7 +42,8 @@ export const authFeature: Feature = {
 
     collectDeps() {
         return {
-            prod: ['zod@^4', '@node-rs/argon2', 'nodemailer'],
+            // 0.6 moves sessions to NUXT_APP_SECRET and drops sessionHeader; held until that migration lands.
+            prod: ['zod@^4', '@node-rs/argon2', 'nodemailer', 'nuxt-auth-utils@^0.5.34'],
             dev: ['@types/nodemailer'],
         }
     },
