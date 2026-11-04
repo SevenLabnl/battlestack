@@ -47,7 +47,7 @@ export const removeReservedMeta: Omit<ReservedCommand, 'run'> = {
     label: 'disable a feature',
     group: 'Lifecycle',
     helpExtra: [
-        ['battlestack remove <feature> --force', 'remove a feature whose plugin is not loaded, even when it is required'],
+        ['battlestack remove <feature> --force', 'remove a feature whose plugin is not loaded, even when another installed feature requires it'],
     ],
 }
 
