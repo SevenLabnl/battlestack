@@ -135,7 +135,7 @@ Things to get right:
 
 | Key | Why |
 | --- | --- |
-| `NUXT_SESSION_PASSWORD` | Must be a real secret, at least 32 characters, and different from development. Rotating it invalidates every session. |
+| `NUXT_APP_SECRET` | Must be a real secret, at least 32 characters, and different from development. Nuxt only generates one in development, so a production build without it refuses to boot. Rotating it invalidates every session. |
 | `NUXT_DATABASE_URL` | Your production database, not a container. |
 | `NUXT_PUBLIC_APP_URL` | Your real public URL. Wrong here breaks OAuth callbacks and passkeys. |
 | `NUXT_WEBAUTHN_RP_ID` | Must match your production domain, or passkeys silently fail. |

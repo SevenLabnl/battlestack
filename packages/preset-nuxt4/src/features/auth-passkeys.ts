@@ -7,7 +7,7 @@ import { STAGE } from '@battlestack/core'
 /** Passkeys (WebAuthn) on `nuxt-auth-utils`. Requires `auth.webAuthn = true` in nuxt.config. */
 export const authPasskeysFeature: Feature = {
     id: 'nuxt4:auth-passkeys',
-    version: '1.1.3',
+    version: '1.2.0',
     label: 'Passkeys (WebAuthn)',
     description: 'Passwordless login and registration via platform passkeys.',
     frameworks: ['nuxt4'],
@@ -17,7 +17,7 @@ export const authPasskeysFeature: Feature = {
 
     collectDeps() {
         return {
-            prod: ['@simplewebauthn/server@^11', '@simplewebauthn/browser@^11'],
+            prod: ['@simplewebauthn/server@^13.3.2', '@simplewebauthn/browser@^13.3.0'],
         }
     },
 
