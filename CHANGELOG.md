@@ -70,7 +70,8 @@
   `staging.yml` or `development.yml` as no longer managed when it never wrote
   that file.
 - `battlestack add` no longer erases an earlier pull's unfinished items from
-  `.battlestack/pull/REPORT.md`; it puts its own section first.
+  `.battlestack/pull/REPORT.md`; it puts its own section first. Adding the
+  same feature again replaces that section instead of adding a second one.
 - `battlestack pull` works on a project in a subfolder of a git repository:
   the clean-tree check, the repair of local edits and the merge base from git
   history only look at the project folder.

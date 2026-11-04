@@ -185,15 +185,18 @@ export async function addCommand(args: ParsedArgs, loader: Ora, registries: Batt
     ui.blank()
 }
 
-/** Puts add's leftovers above an earlier report rather than replacing it, so a pull's unfinished items stay listed. */
+/** Puts add's leftovers above an earlier report, so a pull's unfinished items stay listed, replacing this feature's own earlier block. */
 async function writeAddReport(projectRoot: string, fqid: string, leftover: PullSummary): Promise<string> {
     const dest = path.join(projectRoot, REPORT_PATH)
     if (!(await exists(dest))) return writeReport(projectRoot, leftover)
     const rendered = renderReport(leftover)
     const sections = rendered.slice(rendered.indexOf('\n## ') + 1)
     const intro = `Adding ${fqid} left work to finish. The report of an earlier run follows it.`
-    const prior = await readFile(dest, 'utf8')
-    await writeFile(dest, [`# battlestack add ${fqid}`, '', intro, '', sections, prior].join('\n'))
+    const header = `# battlestack add ${fqid}`
+    // Sections are `## `, so each `# ` line starts the block of one run.
+    const blocks = (await readFile(dest, 'utf8')).split(/^(?=# )/m)
+    const prior = blocks.filter((b) => b.split(/\r?\n/, 1)[0] !== header).join('')
+    await writeFile(dest, [header, '', intro, '', sections, prior].join('\n'))
     return REPORT_PATH
 }
 
