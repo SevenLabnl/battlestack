@@ -14,8 +14,8 @@
  *   . clean     no change
  *
  * Two rules are enforced. A feature that changed what it emits must be bumped.
- * A feature that changed `collectDocs` or `collectEnv` must also bump the
- * feature that writes the aggregated file, listed in WRITERS.
+ * A feature that changed `collectDocs`, `collectEnv` or `collectDeps` must also
+ * bump the feature that writes the aggregated file, listed in WRITERS.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
@@ -48,6 +48,7 @@ const TPL_NAME_RE = /(?:templatesDir\(\s*import\.meta\.url\s*(?:,\s*'\.\.'\s*)*,
 const WRITERS: Record<string, string> = {
     collectDocs: 'nuxt4:docs',
     collectEnv: 'shared:env',
+    collectDeps: 'shared:install',
 }
 
 async function main(): Promise<void> {
