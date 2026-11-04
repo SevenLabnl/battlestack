@@ -187,9 +187,22 @@ describe('essentialsFeature: default favicon and app icons', () => {
     it.each([
         ['a bound rel', '<link :rel="\'icon\'" href="/brand.svg">'],
         ['an unquoted rel', '<link rel=icon href="/brand.svg">'],
+        ['an upper-case REL', '<LINK REL="icon" HREF="/brand.svg">'],
     ])('adds no icon links when the app sets them with %s', async (_, link) => {
         await mkdir(path.join(projectDir, 'app'), { recursive: true })
         await writeFile(path.join(projectDir, 'app', 'app.vue'), `<template>\n    ${link}\n</template>\n`, 'utf8')
+        await essentialsFeature.execute(ctx())
+
+        expect(await readNuxtConfig()).not.toContain('/favicon.svg')
+    })
+
+    it('adds no icon links when a layout sets them through useHead with a quoted key', async () => {
+        await mkdir(path.join(projectDir, 'app', 'layouts'), { recursive: true })
+        await writeFile(
+            path.join(projectDir, 'app', 'layouts', 'default.vue'),
+            "<script setup lang=\"ts\">\nuseHead({ link: [{ 'rel': 'icon', 'href': '/brand.svg' }] })\n</script>\n",
+            'utf8',
+        )
         await essentialsFeature.execute(ctx())
 
         expect(await readNuxtConfig()).not.toContain('/favicon.svg')

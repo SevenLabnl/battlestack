@@ -156,7 +156,8 @@
 - `pull` no longer appends the template's favicon and apple-touch-icon links to
   a project that declares its own icons: browsers take the last matching icon,
   so those links overrode the project's branding. Any `icon`, `shortcut icon` or
-  `apple-touch-icon` link counts, in any casing, when it is in
+  `apple-touch-icon` link counts, in any casing, with a quoted `'rel'` key or an
+  upper-case `REL` attribute too, when it is in
   `nuxt.config.ts#app.head.link`, `app/app.vue` or a layout under
   `app/layouts/`. Icon links set in a page, a plugin or `app/error.vue` are not
   detected. `pull` notes when it skips the links, and removes the three
