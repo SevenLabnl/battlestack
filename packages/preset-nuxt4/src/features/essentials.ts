@@ -29,7 +29,8 @@ export const essentialsFeature: Feature = {
 
     collectDeps() {
         return {
-            prod: ['@vuepic/vue-datepicker', '@iconify/vue', 'h3@^1'],
+            // The Nuxt floor lives here, not in auth: `remove` strips a dep that only the removed feature declares.
+            prod: ['@vuepic/vue-datepicker', '@iconify/vue', 'h3@^1', 'nuxt@^4.6.0'],
             // `@iconify-json/lucide` is a local icon bundle. eslint/typescript/vue-tsc are explicit.
             // TypeScript stays on 6 until vue-tsc and typescript-eslint support the TS 7 API.
             dev: ['@iconify-json/lucide', 'eslint', 'typescript@^6', 'vue-tsc'],
