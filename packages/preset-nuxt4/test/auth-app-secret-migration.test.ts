@@ -33,7 +33,7 @@ function context(): RunContext {
     })
 }
 
-const pull = (ctx: RunContext) => authFeature.update!(ctx, { id: 'nuxt4:nuxt4:auth', version: '1.10.9', files: {} })
+const pull = (ctx: RunContext, version = '1.10.9') => authFeature.update!(ctx, { id: 'nuxt4:nuxt4:auth', version, files: {} })
 const read = (file: string) => readFile(path.join(projectDir, file), 'utf8')
 const write = (file: string, content: string) => writeFile(path.join(projectDir, file), content)
 
@@ -114,10 +114,17 @@ describe('pull from nuxt-auth-utils 0.5', () => {
         expect(await read('nuxt.config.ts')).not.toMatch(/session:/)
     })
 
-    it('reports nothing on a project that is already migrated', async () => {
+    it('reports the production step even when the local files were already moved', async () => {
         await write('nuxt.config.ts', 'export default defineNuxtConfig({\n    runtimeConfig: { session: { maxAge: 3600 } },\n})\n')
         await write('.env', `NUXT_APP_SECRET=${'a'.repeat(64)}\n`)
         const report = await pull(context())
+        expect(report.actions).toContain(APP_SECRET_ACTION)
+    })
+
+    it.each(['1.11.0', '1.12.3', '2.0.0'])('reports nothing when the project was on auth %s already', async (version) => {
+        await write('nuxt.config.ts', 'export default defineNuxtConfig({\n    runtimeConfig: { session: { maxAge: 3600 } },\n})\n')
+        await write('.env', `NUXT_APP_SECRET=${'a'.repeat(64)}\n`)
+        const report = await pull(context(), version)
         expect(report.actions ?? []).not.toContain(APP_SECRET_ACTION)
     })
 })
