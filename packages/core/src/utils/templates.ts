@@ -158,8 +158,14 @@ export async function classifyFileState(
 ): Promise<FileState> {
     if (isOwned) return 'owned'
     if (!(await exists(absPath))) return 'missing'
-    const currentHash = await hashFile(absPath)
-    return currentHash === recordedHash ? 'pristine' : 'drifted'
+    return (await diskHashes(absPath)).includes(recordedHash) ? 'pristine' : 'drifted'
+}
+
+/** The file's hash, then its LF hash when it has CRLF endings: core.autocrlf checks out as CRLF what battlestack recorded as LF. */
+async function diskHashes(abs: string): Promise<string[]> {
+    const content = await readFile(abs)
+    const lf = isBinaryPath(abs) ? null : withoutCrlf(content)
+    return lf ? [sha256(content), sha256(lf)] : [sha256(content)]
 }
 
 // Mirrors the `binary` rules in `.gitattributes`. These never round-trip through a
@@ -383,16 +389,10 @@ async function classifyForUpdate(
     if (ownedSet.has(rel)) return { state: 'owned', newHash }
     if (!(await exists(dest))) return { state: 'missing', newHash }
 
-    const currentHash = await hashFile(dest)
-    if (currentHash === newHash) return { state: 'converged', newHash }
-    // Matching any feature's last write means nobody edited it since.
-    if (recordedHashes.has(currentHash)) return { state: 'pristine', newHash }
-    // core.autocrlf checks out CRLF what battlestack wrote, and recorded, as LF.
-    const lf = isBinaryPath(rel) ? null : withoutCrlf(await readFile(dest))
-    if (lf) {
-        const lfHash = sha256(lf)
-        if (lfHash === newHash) return { state: 'converged', newHash }
-        if (recordedHashes.has(lfHash)) return { state: 'pristine', newHash }
+    for (const hash of await diskHashes(dest)) {
+        if (hash === newHash) return { state: 'converged', newHash }
+        // Matching any feature's last write means nobody edited it since.
+        if (recordedHashes.has(hash)) return { state: 'pristine', newHash }
     }
     return { state: 'drifted', newHash }
 }
@@ -652,9 +652,8 @@ export function queueObsoleteDeletions(ctx: RunContext): void {
 }
 
 /**
- * Writes the deferred rels whose later owner dropped them, so a file moving to an earlier feature
- * is kept. Then deletes the queued files that no feature tracks now and that are still pristine.
- * Returns the deleted rels.
+ * Writes deferred files whose later owner dropped them, then deletes the queued ones no feature
+ * tracks now and that are still pristine. Returns the deleted rels.
  */
 export async function removeQueuedObsoleteFiles(ctx: RunContext): Promise<string[]> {
     const deferred = (ctx.state[DEFERRED_QUEUE_KEY] as DeferredWrite[] | undefined) ?? []
@@ -671,7 +670,7 @@ export async function removeQueuedObsoleteFiles(ctx: RunContext): Promise<string
     for (const { rel, recordedHash } of queue) {
         if (tracked.has(toPosix(rel))) continue
         const dest = path.join(ctx.projectDir, rel)
-        if (!(await exists(dest)) || await hashFile(dest) !== recordedHash) continue
+        if (!(await exists(dest)) || !(await diskHashes(dest)).includes(recordedHash)) continue
         await rm(dest, { force: true })
         await clearArtifacts(ctx, dest, rel)
         removed.push(rel)
@@ -708,11 +707,11 @@ export async function deleteObsoleteFiles(
             )
             continue
         }
-        const currentHash = await hashFile(dest)
+        const pristine = (await diskHashes(dest)).includes(recordedHash)
         const queue = ctx.state[OBSOLETE_QUEUE_KEY] as QueuedObsolete[] | undefined
-        if (currentHash === recordedHash && queue) {
+        if (pristine && queue) {
             queue.push({ rel, recordedHash })
-        } else if (currentHash === recordedHash) {
+        } else if (pristine) {
             await rm(dest, { force: true })
             await clearArtifacts(ctx, dest, rel)
             report.notes.push(`removed obsolete file: ${rel}`)
