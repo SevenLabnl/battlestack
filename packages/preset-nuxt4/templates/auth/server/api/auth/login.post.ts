@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
     }
 
     if (await isTotpEnabled(user.id)) {
-        return { requiresMfa: true, mfaToken: createMfaChallenge(user.id) }
+        return { requiresMfa: true, mfaToken: await createMfaChallenge(user.id) }
     }
 
     const sessionId = await createDbSession(user.id, event)

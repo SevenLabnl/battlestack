@@ -2,9 +2,18 @@
 
 ## Unreleased
 
-- A generated project's auth feature pins `nuxt-auth-utils` to `^0.5.34`.
-  0.6.0 drops `sessionHeader` and `NUXT_SESSION_PASSWORD`, which broke new
-  projects' type-check; support for it follows in its own release.
+- Auth moves to nuxt-auth-utils 0.6 and Nuxt 4.6. Sessions are sealed with a
+  key derived from `NUXT_APP_SECRET`, which replaces `NUXT_SESSION_PASSWORD`,
+  and the session cookie is now `nuxt-auth-session`, so every user is logged
+  out once. `battlestack pull` renames the key in `.env` and `.env.example`,
+  keeping its value, and removes `session.password` and `sessionHeader` from
+  `nuxt.config.ts`. **Set `NUXT_APP_SECRET` in every deployed environment before
+  deploying**: pull cannot reach those, and a production build without it
+  refuses to boot. `pull` lists this step in `.battlestack/pull/REPORT.md`.
+  Passkeys need `@simplewebauthn/server` 13.3.2 or later, which `pull` installs.
+  nuxt-auth-utils 0.6 no longer reads a session from an `x-<name>-session`
+  request header, so a logged-out or revoked session cannot be replayed that
+  way.
 - A generated project's `nuxt.config.ts` sets `runtimeConfig.session.password`
   to `''`, nuxt-auth-utils' own default, so it type-checks on Nuxt releases
   that require the key. `NUXT_SESSION_PASSWORD` still sets it.
@@ -118,18 +127,12 @@
   `pull` reset.
   For preset authors, `mergeShallow` in `@battlestack/core/utils/ts-file.js` is
   now `mergeDefaults`.
-- A logged-out or revoked session was still accepted when its sealed cookie
-  value was sent as an `x-nuxt-session-session` header, which the revocation
-  check never sees. The auth feature now sets
-  `runtimeConfig.session.sessionHeader: false`; run `battlestack pull`.
 - `pull` now stops with a clear error when `runtimeConfig` in `nuxt.config.ts`
   is a variable or shorthand instead of an inline object, where it used to
   crash with a proxy error. A default that cannot be added because its parent
   is not an inline object (for example `session: baseSession`) is reported as a
   warning instead of being skipped silently, and an explicit `null` is kept as
-  your value. If you set `runtimeConfig.session.sessionHeader` to anything but
-  `false`, `pull` keeps it and warns that a revoked session is still accepted
-  through the session header.
+  your value.
   For preset authors, `mergeDefaults` now returns the paths it could not add,
   and `objectLiteralAt` is exported from `@battlestack/core/utils/ts-file.js`.
 - `pull` no longer appends the template's favicon and apple-touch-icon links to

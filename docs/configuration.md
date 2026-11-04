@@ -21,7 +21,7 @@ why you never get a placeholder for something you did not turn on.
 
 Three kinds of value end up there:
 
-- **Generated secrets.** Things battlestack owns, like the session password, are
+- **Generated secrets.** Things battlestack owns, like the app secret, are
   generated with real entropy per project. You never invent them, and a
   leftover `change-me` placeholder in an existing `.env` is upgraded to a real
   value on the next run.
@@ -143,7 +143,7 @@ Only the variables for features you enabled appear in your `.env`.
 
 | Key | Notes |
 | --- | --- |
-| `NUXT_SESSION_PASSWORD` | Generated. Seals session cookies. Must be at least 32 characters, and the CLI refuses a shorter one. |
+| `NUXT_APP_SECRET` | Generated. Nuxt's app secret; nuxt-auth-utils seals session cookies with a key derived from it. Must be at least 32 characters, and the CLI refuses a shorter one. |
 | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | The seeded admin that `battlestack login` signs you in as. |
 | `NUXT_SMTP_HOST`, `NUXT_SMTP_PORT`, `NUXT_SMTP_USERNAME`, `NUXT_SMTP_PASSWORD`, `NUXT_SMTP_FROM` | Outgoing mail. Locally these point at the mail catcher. |
 | `NUXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION` | Whether signup requires verification. |
