@@ -278,22 +278,48 @@ export async function migrateToAppSecret(projectDir: string): Promise<boolean> {
     return migrated
 }
 
-/** Renames the legacy key in place, or drops it when the new key is already set. */
+/** Groups: prefix (`export `), key, `=`, value, line-ending `\r`. */
+const ENV_LINE = /^(\s*(?:export\s+)?)([A-Za-z_]\w*)(\s*=\s*)(.*?)(\r?)$/
+const PLACEHOLDER_VALUES = new Set(['', 'change-me', 'changeme', 'replace-me', 'replaceme'])
+
+function isPlaceholder(value: string): boolean {
+    return PLACEHOLDER_VALUES.has(value.trim().replace(/^(['"])(.*)\1$/, '$2').trim().toLowerCase())
+}
+
+/**
+ * Renames the legacy key in place, or drops it when the new key is already set. A placeholder new key
+ * takes the legacy value instead, so the secret that sealed existing sessions is never lost.
+ */
 export function renameEnvKey(raw: string): string {
     const lines = raw.split('\n')
-    const keyOf = (line: string) => line.trimStart().startsWith('#') ? undefined : line.split('=')[0]!.trim()
-    const legacy = lines.findIndex((l) => keyOf(l) === LEGACY_SECRET_KEY)
-    if (legacy < 0) return raw
-    const desc = lines.lastIndexOf(LEGACY_SECRET_DESCRIPTION, legacy)
-    const ownDesc = desc >= 0 && legacy - desc <= 2
-    if (lines.some((l) => keyOf(l) === APP_SECRET_KEY)) {
-        lines.splice(legacy, 1)
-        if (ownDesc) lines.splice(desc, 1)
-    } else {
-        lines[legacy] = APP_SECRET_KEY + lines[legacy]!.slice(lines[legacy]!.indexOf('='))
-        if (ownDesc) lines[desc] = `# ${APP_SECRET_DESCRIPTION}`
+    const parsed = lines.map((l) => ENV_LINE.exec(l))
+    const legacy = parsed.flatMap((m, i) => m?.[2] === LEGACY_SECRET_KEY ? [i] : [])
+    if (legacy.length === 0) return raw
+    // dotenv lets the last occurrence win.
+    const value = parsed[legacy.at(-1)!]![4]!
+    const descOf = (i: number) => [i - 1, i - 2]
+        .find((d) => d >= 0 && lines[d]!.replace(/\r$/, '') === LEGACY_SECRET_DESCRIPTION)
+
+    const current = parsed.findLastIndex((m) => m?.[2] === APP_SECRET_KEY)
+    const keep = current < 0 ? legacy[0] : undefined
+    if (current >= 0 && isPlaceholder(parsed[current]![4]!)) {
+        const m = parsed[current]!
+        lines[current] = m[1]! + m[2]! + m[3]! + value + m[5]!
     }
-    return lines.join('\n')
+    const keptDesc = keep === undefined ? undefined : descOf(keep)
+    if (keep !== undefined) {
+        const m = parsed[keep]!
+        lines[keep] = m[1]! + APP_SECRET_KEY + m[3]! + value + m[5]!
+        if (keptDesc !== undefined) lines[keptDesc] = `# ${APP_SECRET_DESCRIPTION}${lines[keptDesc]!.endsWith('\r') ? '\r' : ''}`
+    }
+    const drop = new Set<number>()
+    for (const i of legacy) {
+        if (i === keep) continue
+        drop.add(i)
+        const d = descOf(i)
+        if (d !== undefined && d !== keptDesc) drop.add(d)
+    }
+    return lines.filter((_, i) => !drop.has(i)).join('\n')
 }
 
 /** No-op stub at `server/utils/auth-recovery-signup-hook.ts` when `nuxt4:auth-recovery` is off. */
