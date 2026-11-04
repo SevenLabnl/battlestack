@@ -35,7 +35,8 @@
   like any other file, and a check after the update restores and merges any
   edited file a feature (including a plugin's) wrote over.
 - `pull` requires a clean working tree (`--allow-dirty` to override), refuses to
-  start while conflict markers from a previous pull remain, writes
+  start while a file the previous pull reported as a conflict still has
+  conflict markers, writes
   `.battlestack/pull/REPORT.md` with what is left to do and how, and exits with
   code 2 when that list is not empty. A later pull keeps listing a staged
   `.new` or a backup until you delete it, and a step until you delete its line

@@ -11,6 +11,7 @@ import {
     recordedAtStart,
     renderReport,
     repairOverwrites,
+    writeReport,
     type PullSummary,
 } from '../src/commands/pull-safety.js'
 
@@ -90,8 +91,18 @@ describe('preflight', () => {
 
     it('refuses to start while a merged file still has conflict markers', async () => {
         await write('a.ts', '<<<<<<< a.ts (yours)\nx\n=======\ny\n>>>>>>> a.ts (upstream now)\n')
+        await writeReport(projectDir, { ...EMPTY, conflicts: ['a.ts'] })
         await expect(preflight(projectDir, manifestWith({ 'a.ts': sha256('y\n') }), { allowDirty: true }))
-            .rejects.toThrow(/conflict markers/)
+            .rejects.toThrow(/a\.ts still has conflict markers/)
+    })
+
+    it('starts over a marker line in a file no earlier pull reported as a conflict', async () => {
+        await write('a.ts', '<<<<<<< a.ts (yours)\nx\n=======\ny\n>>>>>>> a.ts (upstream now)\n')
+        await write('notes.md', '<<<<<<< a deliberate marker line\n')
+        await writeReport(projectDir, { ...EMPTY, conflicts: ['a.ts'] })
+        await write('a.ts', 'x\n')
+        const manifest = manifestWith({ 'a.ts': sha256('y\n'), 'notes.md': sha256('notes\n') })
+        await expect(preflight(projectDir, manifest, { allowDirty: true })).resolves.toEqual({ git: false, clean: false })
     })
 
     it('runs outside git, reporting that it could not check', async () => {
@@ -100,6 +111,7 @@ describe('preflight', () => {
 
     it('lets --force and --overwrite start over conflict markers, since they replace the file', async () => {
         await write('a.ts', '<<<<<<< a.ts (yours)\nx\n=======\ny\n>>>>>>> a.ts (upstream now)\n')
+        await writeReport(projectDir, { ...EMPTY, conflicts: ['a.ts'] })
         await expect(preflight(projectDir, manifestWith({ 'a.ts': sha256('y\n') }), { allowDirty: true, replacing: true }))
             .resolves.toEqual({ git: false, clean: false })
     })
