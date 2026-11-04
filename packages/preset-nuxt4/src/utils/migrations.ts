@@ -174,6 +174,12 @@ async function repairDroppedAvatarColumn(ctx: RunContext): Promise<void> {
     }
 
     const pm = packageManagerOf(ctx)
+    const unreadable = await unreadableMeta(dir)
+    if (unreadable) {
+        updateLedger(ctx).actions.push(`${where} drops users.avatar_key, which deletes every avatar on deploy. Pull did not add the migration that puts the column back, because \`${migrations}/meta/${unreadable}\` is not valid JSON (an unresolved merge?). Fix it, then run \`battlestack pull\` again before you deploy.`)
+        ui.warn(`${where} drops users.avatar_key. See .battlestack/pull/REPORT.md`)
+        return
+    }
     const created = ctx.state[LOCKFILE_BLOCKED_STATE_KEY] || ctx.state.skipInstall
         ? []
         : (await generateMigration(ctx, ['--custom', `--name=${RESTORE_NAME}`])).created
@@ -193,6 +199,20 @@ async function repairDroppedAvatarColumn(ctx: RunContext): Promise<void> {
         : `Pull could not add the migration that puts the column back. Run \`${pm} run db:generate ${pm === 'npm' ? '-- ' : ''}--custom --name=${RESTORE_NAME}\`, write \`${RESTORE_SQL.trim()}\` into the new file, and add \`avatar_key\` back to users in its snapshot`
     updateLedger(ctx).actions.push(`${where} drops users.avatar_key, which deletes every avatar on deploy. ${restore}. Where that migration has not run in any database yet, delete its \`DROP COLUMN "avatar_key"\` statement before you deploy to keep the avatars; where it has run, only a database backup brings them back. Do not edit it where it has run, as the migrator would run it again. Review and commit before you deploy.`)
     ui.warn(`${where} drops users.avatar_key. See .battlestack/pull/REPORT.md`)
+}
+
+/** The first of drizzle's journal and snapshots that does not parse, checked before the repair edits any of them. */
+async function unreadableMeta(dir: string): Promise<string | undefined> {
+    const meta = path.join(dir, 'meta')
+    if (!(await exists(meta))) return undefined
+    for (const file of (await readdir(meta)).filter((f) => f === '_journal.json' || /^\d+_snapshot\.json$/.test(f)).sort()) {
+        try {
+            JSON.parse(await readFile(path.join(meta, file), 'utf8'))
+        } catch {
+            return file
+        }
+    }
+    return undefined
 }
 
 /** drizzle's index of a migration file, from the journal, so a `timestamp` prefix works too. */

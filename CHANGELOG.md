@@ -54,6 +54,9 @@
   and lists the dropping migration in `REPORT.md`, so you can take the drop
   out wherever it has not run yet. It does not edit that migration itself,
   since the migrator would run an edited migration again.
+- A drizzle journal or snapshot that does not parse no longer stops `pull`
+  after it has written the manifest. The avatar repair and any other failure
+  while checking for a schema migration become a step in `REPORT.md`.
 - `pull` removes a file a feature no longer ships only after every feature has
   updated. A file moving to another feature, whichever of the two updates
   first, is no longer deleted or written back in the same run, and a pull that
