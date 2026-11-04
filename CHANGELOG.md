@@ -172,8 +172,9 @@
 - `pull` now gates a hardcoded `security.rateLimiter` in `nuxt.config.ts` on
   `NUXT_RATE_LIMIT_DISABLED`, keeping its values, nested options included.
   Projects scaffolded before the gate existed could not switch the
-  nuxt-security limiter off for e2e runs. A limiter that is `false`, already
-  gated or set from a variable is left alone.
+  nuxt-security limiter off for e2e runs. An inline object behind `as` or
+  `satisfies` is gated too. A limiter that is `false`, already gated (casts
+  included) or set from a variable is left alone.
 
 ## v1.4.0 (2026-10-15)
 
