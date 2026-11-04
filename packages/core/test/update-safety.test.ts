@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { BASE_DIR, findBase, hasConflictMarkers, storeBase, threeWayMerge } from '../src/utils/merge.js'
+import { BASE_DIR, findBase, hasMergeMarkers, mergeLabels, storeBase, threeWayMerge } from '../src/utils/merge.js'
 import {
     classifyFileState,
     copyTemplateDirRecorded,
@@ -96,7 +96,19 @@ describe('threeWayMerge', () => {
         expect(merged?.conflicts).toBe(true)
         expect(text).toContain('<<<<<<< x (yours)')
         expect(text).toContain('||||||| x (upstream before)\nline three')
-        expect(hasConflictMarkers(text)).toBe(true)
+    })
+
+    it('labels its markers so the preflight recognises them, and only them', async () => {
+        const merged = await threeWayMerge(
+            Buffer.from(BASE.replace('line three', 'ours')),
+            Buffer.from(BASE),
+            Buffer.from(BASE.replace('line three', 'theirs')),
+            mergeLabels('src/x.ts', 'test:feat'),
+        )
+        const text = merged!.content.toString()
+        expect(hasMergeMarkers(text)).toBe(true)
+        expect(hasMergeMarkers(text.replaceAll('\n', '\r\n'))).toBe(true)
+        expect(hasMergeMarkers('<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> main\n')).toBe(false)
     })
 })
 

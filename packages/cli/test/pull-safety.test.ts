@@ -11,7 +11,6 @@ import {
     recordedAtStart,
     renderReport,
     repairOverwrites,
-    writeReport,
     type PullSummary,
 } from '../src/commands/pull-safety.js'
 
@@ -77,6 +76,9 @@ afterEach(async () => {
     await rm(projectDir, { recursive: true, force: true })
 })
 
+// Labelled as pull's own merges label them.
+const MERGED = '<<<<<<< a.ts (yours)\nx\n||||||| a.ts (upstream before, test:feat)\nw\n=======\ny\n>>>>>>> a.ts (upstream now, test:feat)\n'
+
 describe('preflight', () => {
     it('refuses a working tree with uncommitted changes, unless allowed', async () => {
         git('init', '-q')
@@ -89,19 +91,22 @@ describe('preflight', () => {
         await expect(preflight(projectDir, manifest, { allowDirty: true })).resolves.toEqual({ git: true, clean: false })
     })
 
-    it('refuses to start while a merged file still has conflict markers', async () => {
-        await write('a.ts', '<<<<<<< a.ts (yours)\nx\n=======\ny\n>>>>>>> a.ts (upstream now)\n')
-        await writeReport(projectDir, { ...EMPTY, conflicts: ['a.ts'] })
+    it('refuses to start while a file still has markers from a battlestack merge, with no report on this clone', async () => {
+        await write('a.ts', MERGED)
         await expect(preflight(projectDir, manifestWith({ 'a.ts': sha256('y\n') }), { allowDirty: true }))
             .rejects.toThrow(/a\.ts still has conflict markers/)
     })
 
-    it('starts over a marker line in a file no earlier pull reported as a conflict', async () => {
-        await write('a.ts', '<<<<<<< a.ts (yours)\nx\n=======\ny\n>>>>>>> a.ts (upstream now)\n')
-        await write('notes.md', '<<<<<<< a deliberate marker line\n')
-        await writeReport(projectDir, { ...EMPTY, conflicts: ['a.ts'] })
-        await write('a.ts', 'x\n')
-        const manifest = manifestWith({ 'a.ts': sha256('y\n'), 'notes.md': sha256('notes\n') })
+    it('refuses on the markers of a CRLF checkout of the merged file', async () => {
+        await write('a.ts', MERGED.replaceAll('\n', '\r\n'))
+        await expect(preflight(projectDir, manifestWith({ 'a.ts': sha256('y\n') }), { allowDirty: true }))
+            .rejects.toThrow(/a\.ts still has conflict markers/)
+    })
+
+    it('starts over conflict markers battlestack did not write', async () => {
+        await write('a.ts', '<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> feature/login\n')
+        await write('docs/git.md', 'Git marks a conflict like this:\n\n<<<<<<< yours\nx\n>>>>>>> theirs\n')
+        const manifest = manifestWith({ 'a.ts': sha256('y\n'), 'docs/git.md': sha256('docs\n') })
         await expect(preflight(projectDir, manifest, { allowDirty: true })).resolves.toEqual({ git: false, clean: false })
     })
 
@@ -110,8 +115,7 @@ describe('preflight', () => {
     })
 
     it('lets --force and --overwrite start over conflict markers, since they replace the file', async () => {
-        await write('a.ts', '<<<<<<< a.ts (yours)\nx\n=======\ny\n>>>>>>> a.ts (upstream now)\n')
-        await writeReport(projectDir, { ...EMPTY, conflicts: ['a.ts'] })
+        await write('a.ts', MERGED)
         await expect(preflight(projectDir, manifestWith({ 'a.ts': sha256('y\n') }), { allowDirty: true, replacing: true }))
             .resolves.toEqual({ git: false, clean: false })
     })
