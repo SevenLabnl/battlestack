@@ -44,7 +44,7 @@ export interface TemplateExtension {
     /**
      * Appended to `optionalFeatures` AND `defaultEnabledOptional`: checked by default on a
      * new scaffold, a plain checkbox to everyone else. `battlestack pull` rehydrates only
-     * required features, so an existing project never receives one of these unasked — the
+     * required features, so an existing project never receives one of these unasked. This is the
      * channel for a feature that every new project should have and no old project is owed.
      */
     addDefaultEnabledOptional?: string[]

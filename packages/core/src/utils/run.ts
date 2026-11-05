@@ -74,7 +74,7 @@ function runInner(command: string, args: string[], options: RunOptions): Promise
         let stderr = ''
 
         // A timeout kill must reject, but `close` treats any signal as a clean
-        // stop (Ctrl-C on an inherited child) — so the flag decides which.
+        // stop (Ctrl-C on an inherited child), so the flag decides which.
         let timedOut = false
         let timer: NodeJS.Timeout | undefined
         if (options.timeoutMs) {

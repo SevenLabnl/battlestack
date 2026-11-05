@@ -2,12 +2,25 @@
 
 ## Unreleased
 
-- A generated project's auth feature pins `nuxt-auth-utils` to `^0.5.34`.
-  0.6.0 drops `sessionHeader` and `NUXT_SESSION_PASSWORD`, which broke new
-  projects' type-check; support for it follows in its own release.
-- A generated project's `nuxt.config.ts` sets `runtimeConfig.session.password`
-  to `''`, nuxt-auth-utils' own default, so it type-checks on Nuxt releases
-  that require the key. `NUXT_SESSION_PASSWORD` still sets it.
+- Auth moves to nuxt-auth-utils 0.6 and Nuxt 4.6. Sessions are sealed with a
+  key derived from `NUXT_APP_SECRET`, which replaces `NUXT_SESSION_PASSWORD`,
+  and the session cookie is now `nuxt-auth-session`, so every user is logged
+  out once. `battlestack pull` renames the key in `.env` and `.env.example`,
+  keeping its value, and removes `session.password`, `sessionHeader` and a
+  `name: 'nuxt-session'` from `nuxt.config.ts`. **Set `NUXT_APP_SECRET` in every
+  deployed environment before deploying**: pull cannot reach those, and a
+  production build without it refuses to boot. `pull` lists this step in
+  `.battlestack/pull/REPORT.md`, along with deleting an edited or owned copy of
+  the old `server/plugins/00-session-password-guard.ts`, which would stop every
+  production boot. Every generated project now requires Nuxt 4.6, with or
+  without auth, and `@nuxt/cli` 4.0.3: 4.0.1 crashes `nuxt dev` on Nuxt 4.6.4.
+  To move the copy Nuxt itself uses, the install that `pull` and a new project
+  run is followed by `pnpm dedupe` or `npm dedupe`. A bun project gets a note to
+  run `bun update @nuxt/cli` instead.
+  Passkeys need `@simplewebauthn/server` 13.3.2 or later, which `pull` installs.
+  nuxt-auth-utils 0.6 no longer reads a session from an `x-<name>-session`
+  request header, so a logged-out or revoked session cannot be replayed that
+  way.
 - The Claude Code rules now ask for `pnpm run typecheck` next to lint and tests,
   and rule out getting checks green by suppressing them (`@ts-ignore`, `as any`,
   `eslint-disable`, skipped tests, `--no-verify`). `security.md` adds that nothing
@@ -16,6 +29,99 @@
 - The generated Dockerfile pins the latest `node:24-alpine` image
   (`sha256:8a32c8c`).
 - `@battlestack/theme` requires `@nuxt/kit` `^4.6.4`, in step with Nuxt 4.6.4.
+- `pull` merges upstream changes into files you edited instead of only staging
+  them. Edited files get a three-way merge against the version battlestack last
+  wrote, with diff3 conflict markers where both sides changed the same lines.
+  Those versions are kept in `.battlestack/base/`, which should be committed;
+  a project's first merge finds them in git history.
+- `pull` no longer overwrites local work. A feature new to the project stages
+  its file when you already have one at that path, the Dockerfile is merged
+  like any other file, and a check after the update restores and merges any
+  edited file a feature (including a plugin's) wrote over.
+- `pull` requires a clean working tree (`--allow-dirty` to override), refuses to
+  start while a file still has the conflict markers of an earlier pull's
+  merge (other markers, such as a `<<<<<<< HEAD` left by git, do not block it),
+  writes
+  `.battlestack/pull/REPORT.md` with what is left to do and how, and exits with
+  code 2 when that list is not empty. A later pull keeps listing a staged
+  `.new` or a backup until you delete it, a step until you delete its line
+  from the report, and a file no longer managed until you delete the file or
+  its line. Console output is one line per feature.
+- Generated projects ship a `battlestack-upgrade` skill for AI agents, and the
+  generated AGENTS.md and README describe the merge instead of the old staging.
+- With `nuxt4:storage` on, every `nuxt4:database` update staged
+  `server/database/schema/users.ts` for a manual merge, and taking the staged
+  file dropped the `avatar_key` column. The database feature now ships
+  `users.ts` with `avatarKey` when storage is on, and an edited `users.ts` is
+  merged instead of staged. If an earlier pull already led to a migration that
+  drops `users.avatar_key`, `pull` adds a migration that puts the column back
+  and lists the dropping migration in `REPORT.md`, so you can take the drop
+  out wherever it has not run yet. It does not edit that migration itself,
+  since the migrator would run an edited migration again.
+- A drizzle journal or snapshot that does not parse no longer stops `pull`
+  after it has written the manifest. The avatar repair and any other failure
+  while checking for a schema migration become a step in `REPORT.md`.
+- `pull` removes a file a feature no longer ships only after every feature has
+  updated. A file moving to another feature, whichever of the two updates
+  first, is no longer deleted or written back in the same run, and a pull that
+  stops halfway leaves it in place.
+- `pull` leaves files claimed with `battlestack own` untouched when their
+  feature writes them outside its template folder, such as the Dockerfile, and
+  no longer drops a feature's `own` entries when that feature declares
+  structural files.
+- `shared:github` no longer reports a project's own `production.yml`,
+  `staging.yml` or `development.yml` as no longer managed when it never wrote
+  that file.
+- `battlestack add` no longer erases an earlier pull's unfinished items from
+  `.battlestack/pull/REPORT.md`; it puts its own section first. Adding the
+  same feature again replaces that section instead of adding a second one.
+- `battlestack pull` works on a project in a subfolder of a git repository:
+  the clean-tree check, the repair of local edits and the merge base from git
+  history only look at the project folder.
+- Line-ending and other checkout filters (`.gitattributes`, `core.autocrlf`)
+  no longer make untouched files look edited during `pull`, `remove` and
+  `doctor`. An untouched file a feature no longer ships is removed instead of
+  listed as no longer managed.
+- `pull --force` and `pull --overwrite` start even when an earlier pull left
+  conflict markers. A local edit that a feature wrote over is kept as
+  `.battlestack/pull/<path>.bak` under `--force`, and replaced under
+  `--overwrite`.
+- When `pull` puts back your edits and stages a feature's file, every feature
+  tracking that file keeps its earlier record, so the next pull merges against
+  the version you actually have. A binary file is staged, never merged as
+  text.
+- A file `pull` stages after putting back your edits now gets a `.patch` next
+  to the `.new`, as the report says. The report lists a restored file once, and
+  each feature's line counts merges, conflicts and staged files from all of its
+  writes.
+- The `battlestack-upgrade` skill for AI agents now covers schema changes:
+  finish schema merges first, run `db:generate` in a terminal for renames,
+  read every generated migration for dropped columns, and never copy a staged
+  schema `.new` over the project's file. It also covers `--force` backups,
+  monorepo projects, deleting each finished step from `REPORT.md`, and checking
+  that a second pull exits with code 0 once nothing is left.
+- A project scaffolded before the 3-day release-age policy can have a
+  `pnpm-lock.yaml` with packages younger than the policy allows, and pnpm then
+  refuses every script once `pull` adds the policy. `pull` now detects that,
+  skips lint and `db:generate`, and lists the fix in `REPORT.md`:
+  `pnpm clean --lockfile && pnpm install`, then lint, the tests and
+  `db:generate` if the schema changed.
+- A feature whose plugin did not load keeps its manifest record on `pull`
+  instead of being dropped, so its files stay managed.
+- `battlestack remove` of a feature whose plugin did not load refuses when
+  another installed feature requires it, unless you pass `--force`. `remove`
+  also takes the project lock, so it refuses to run while another battlestack
+  command such as `pull` is running.
+- `shared:github` drops its records of the deploy workflows it no longer ships.
+- `pull` keeps a project's dependency range when it already has a higher floor
+  in the same major than the feature asks for. Below 1.0 that has to be the
+  same minor, as a caret range means there.
+- Ports written into committed files (`docker-compose.yml` defaults, the
+  `mastra:studio` script) depend only on the project name, so they no longer
+  change between machines. `.env` still overrides them locally.
+- A project-mode command run outside a project, such as `battlestack pull`,
+  explains that there is no project here instead of starting a new one with
+  that name.
 - The project name recorded in `.battlestack/manifest.json` now always wins over
   the directory name. Before, any project command in a clone, CI checkout or
   renamed directory silently renamed the project to the directory name, and
@@ -27,7 +133,8 @@
   `battlestack rename <old-name>` (the old name is in the manifest's
   `previousNames`). The first `pull` after a rename re-renders every feature,
   also at unchanged versions, without touching owned or edited files, and lists
-  the tracked files that still contain the old name.
+  the tracked files that still contain the old name. When a feature fails or its
+  plugin does not load, the rename stays pending for the next pull.
 
 - A skill whose `skills add` fails no longer ends the run on a plain "Scaffold
   complete" or "Update complete": the closing line names the skills that were
@@ -41,14 +148,37 @@
   `pull` reset.
   For preset authors, `mergeShallow` in `@battlestack/core/utils/ts-file.js` is
   now `mergeDefaults`.
-- A logged-out or revoked session could still sign in when its sealed cookie
-  value was sent as an `x-nuxt-session-session` header, which the revocation
-  check never sees. The auth feature now sets
-  `runtimeConfig.session.sessionHeader: false`; run `battlestack pull`.
+- `pull` now stops with a clear error when `runtimeConfig` in `nuxt.config.ts`
+  is a variable or shorthand instead of an inline object, where it used to
+  crash with a proxy error. A default that cannot be added because its parent
+  is not an inline object (for example `public: pub`) is reported as a
+  warning instead of being skipped silently, and an explicit `null` is kept as
+  your value.
+  For preset authors, `mergeDefaults` now returns the paths it could not add,
+  and `objectLiteralAt` is exported from `@battlestack/core/utils/ts-file.js`.
 - `pull` no longer appends the template's favicon and apple-touch-icon links to
-  a project that declares its own icons in `app.head.link`: browsers take the
-  last matching icon, so those links overrode the project's branding. Remove any
-  `/favicon.ico` or `/apple-touch-icon.png` links a previous pull added.
+  a project that declares its own icons: browsers take the last matching icon,
+  so those links overrode the project's branding. Any `icon`, `shortcut icon` or
+  `apple-touch-icon` link counts, in any casing, with a quoted `'rel'` key or an
+  upper-case `REL` attribute too, when it is in
+  `nuxt.config.ts#app.head.link`, `app/app.vue` or a layout under
+  `app/layouts/`. Icon links set in a page, a plugin or `app/error.vue` are not
+  detected. `pull` notes when it skips the links, and removes the three
+  template links when an earlier pull added them.
+- `battlestack pull` runs `db:generate` when it changes a file under
+  `server/database/schema/`. Before, the schema change came without a
+  migration and never reached production, which applies only committed SQL.
+  Pull names the new SQL file to commit. When no file appears (with
+  `--skip-install`, a rename drizzle-kit has to ask about, or a schema file
+  still waiting for your merge), the step goes into
+  `.battlestack/pull/REPORT.md` and pull exits with code 2. Scaffold also
+  checks for the SQL file instead of trusting drizzle-kit's exit code.
+- `pull` now gates a hardcoded `security.rateLimiter` in `nuxt.config.ts` on
+  `NUXT_RATE_LIMIT_DISABLED`, keeping its values, nested options included.
+  Projects scaffolded before the gate existed could not switch the
+  nuxt-security limiter off for e2e runs. An inline object behind `as` or
+  `satisfies` is gated too. A limiter that is `false`, already gated (casts
+  included) or set from a variable is left alone.
 
 ## v1.4.0 (2026-10-15)
 

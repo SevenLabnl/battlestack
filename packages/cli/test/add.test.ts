@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -8,6 +8,7 @@ import {
     MANIFEST_PATH,
     silentLoader,
     STAGE,
+    updateLedger,
     writeManifest,
     writeRecorded,
     type BattlestackRegistries,
@@ -17,6 +18,7 @@ import {
 } from '@battlestack/core'
 import { addCommand, removeCommand } from '../src/commands/add-remove.js'
 import { pullCommand } from '../src/commands/pull.js'
+import { writeReport } from '../src/commands/pull-safety.js'
 import { buildRegistries, defaultArgs, withCwd, withCwdCapture } from './test-utils.js'
 
 const NS = 'addtest'
@@ -50,7 +52,7 @@ function feature(id: string, extra: Partial<Feature> = {}): Feature {
  * Ids are authored BARE; `buildRegistries` finalizes them into namespaced fqids. That
  * divergence is what `add` must get right, and what a hand-written fixture cannot fake.
  */
-function fixtures(): { registries: BattlestackRegistries, warnings: string[] } {
+function fixtures(base: Partial<Feature> = {}, extra: Feature[] = []): { registries: BattlestackRegistries, warnings: string[] } {
     return buildRegistries({
         namespace: NS,
         frameworks: [{
@@ -65,10 +67,11 @@ function fixtures(): { registries: BattlestackRegistries, warnings: string[] } {
                 // Advertised but never registered. `supportedFeatures` is a catalog of
                 // ids a project MAY carry, so this is a supported state, not a warning.
                 'add:unregistered',
+                ...extra.map((f) => f.id),
             ],
         }],
         features: [
-            feature('add:base'),
+            feature('add:base', base),
             feature('add:opt'),
             feature('add:owning', {
                 structuralFiles: () => ['add-owning.txt'],
@@ -80,13 +83,14 @@ function fixtures(): { registries: BattlestackRegistries, warnings: string[] } {
             feature('add:not-advertised'),
             // Registered and advertised, but the template does not offer it.
             feature('add:not-in-template'),
+            ...extra,
         ],
         templates: [{
             id: TPL,
             label: TPL,
             framework: FW,
             requiredFeatures: ['add:base'],
-            optionalFeatures: ['add:opt', 'add:owning', 'add:other-fw', 'add:not-advertised'],
+            optionalFeatures: ['add:opt', 'add:owning', 'add:other-fw', 'add:not-advertised', ...extra.map((f) => f.id)],
         }],
     })
 }
@@ -496,5 +500,143 @@ describe('battlestack add --dry-run', () => {
 
         expect(lines.join('\n')).toMatch(/dry-run/)
         expect(await p.manifest()).toEqual(before)
+    })
+})
+
+describe('battlestack add into an existing file', () => {
+    it('keeps the project\'s file, stages the feature\'s version and flags the run', async () => {
+        const p = await project()
+        await writeFile(path.join(p.dir, 'add-opt.txt'), 'the project\'s own file\n')
+
+        await withCwd(p.dir, () => add('add:opt')(p))
+
+        expect(await readFile(path.join(p.dir, 'add-opt.txt'), 'utf8')).toBe('the project\'s own file\n')
+        expect(await readFile(path.join(p.dir, '.battlestack', 'pull', 'add-opt.txt.new'), 'utf8')).toBe('add:opt\n')
+        expect(await fileExists(p.dir, '.battlestack/pull/REPORT.md')).toBe(true)
+        expect(process.exitCode).toBe(2)
+        process.exitCode = undefined
+    })
+})
+
+describe('battlestack add after a pull that left work', () => {
+    it('keeps the pull\'s items in REPORT.md next to its own', async () => {
+        const p = await project()
+        await writeReport(p.dir, {
+            merged: [], conflicts: ['app/conflicted.ts'], staged: [], backups: [], unmanaged: [], restored: [],
+            added: [], orphans: [], actions: ['Run the new database migration'], repairs: [],
+        })
+        await writeFile(path.join(p.dir, 'add-opt.txt'), 'the project\'s own file\n')
+
+        await withCwd(p.dir, () => add('add:opt')(p))
+
+        const report = await readFile(path.join(p.dir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        expect(report).toContain('`add-opt.txt`')
+        expect(report).toContain('`app/conflicted.ts`')
+        expect(report).toContain('Run the new database migration')
+        expect(report.indexOf('`add-opt.txt`')).toBeLessThan(report.indexOf('# battlestack pull report'))
+        process.exitCode = undefined
+    })
+})
+
+describe('battlestack remove of a feature whose plugin is not loaded', () => {
+    it('drops only the record and leaves the files', async () => {
+        const p = await project()
+        const manifestPath = path.join(p.dir, MANIFEST_PATH)
+        const m = await p.manifest()
+        m.features.push({ id: 'gone:feature', version: '1.0.0', files: { 'gone.txt': 'abc' } })
+        await writeFile(manifestPath, JSON.stringify(m))
+        await writeFile(path.join(p.dir, 'gone.txt'), 'still here\n')
+
+        await withCwd(p.dir, () => removeCommand(defaultArgs({ projectName: 'gone:feature' }), undefined as never, p.registries))
+
+        const after = await p.manifest()
+        expect(after.features.map((f) => f.id)).not.toContain('gone:feature')
+        expect(after.optedOut).toContain('gone:feature')
+        expect(await readFile(path.join(p.dir, 'gone.txt'), 'utf8')).toBe('still here\n')
+    })
+
+    const GONE = 'goneplugin:gone:feature'
+
+    async function withGone(p: Project): Promise<void> {
+        const m = await p.manifest()
+        m.features.push({ id: GONE, version: '1.0.0', files: { 'gone.txt': 'abc' } })
+        await writeFile(path.join(p.dir, MANIFEST_PATH), JSON.stringify(m))
+    }
+
+    const remove = (p: Project, force = false): Promise<void> =>
+        withCwd(p.dir, () => removeCommand(defaultArgs({ projectName: GONE, force }), undefined as never, p.registries))
+
+    it('refuses when an installed feature requires it, unless --force', async () => {
+        const p = await project(fixtures({ requires: ['gone:feature'] }))
+        await withGone(p)
+
+        await expect(remove(p)).rejects.toThrow(`${NS}:add:base requires it`)
+        expect((await p.manifest()).features.map((f) => f.id)).toContain(GONE)
+
+        await remove(p, true)
+        expect((await p.manifest()).features.map((f) => f.id)).not.toContain(GONE)
+    })
+
+    it('refuses a required feature, unless --force', async () => {
+        const p = await project()
+        // Loading drops an unresolvable id from requiredFeatures; a template listing it anyway still reaches the check.
+        p.registries.templates.get(TPL).requiredFeatures.push(GONE)
+        await withGone(p)
+
+        await expect(remove(p)).rejects.toThrow('required feature')
+        expect((await p.manifest()).features.map((f) => f.id)).toContain(GONE)
+
+        await remove(p, true)
+        expect((await p.manifest()).features.map((f) => f.id)).not.toContain(GONE)
+    })
+})
+
+describe('battlestack remove takes the project lock', () => {
+    it('refuses while another battlestack process holds it', async () => {
+        const p = await project()
+        const lock = { pid: process.pid, hostname: os.hostname(), startedAt: new Date().toISOString(), command: 'battlestack pull' }
+        await writeFile(path.join(p.dir, '.battlestack', 'lock'), JSON.stringify(lock))
+
+        await expect(withCwd(p.dir, () => removeCommand(defaultArgs({ projectName: 'add:base' }), undefined as never, p.registries)))
+            .rejects.toThrow('Another battlestack process')
+        expect((await p.manifest()).features.map((f) => f.id)).toContain(`${NS}:add:base`)
+    })
+})
+
+describe('battlestack add with only steps left', () => {
+    it('says so instead of counting files to merge', async () => {
+        const steps = feature('add:steps', {
+            async execute(ctx) {
+                updateLedger(ctx).actions.push('Set a secret in production')
+            },
+        })
+        const p = await project(fixtures({}, [steps]))
+
+        const lines = await withCwdCapture(p.dir, () => add('add:steps')(p))
+
+        expect(lines.join('\n')).toContain(`Added ${NS}:add:steps, with steps left`)
+        expect(process.exitCode).toBe(2)
+        process.exitCode = undefined
+    })
+})
+
+describe('battlestack add twice into the same report', () => {
+    it('replaces its own earlier section instead of stacking another', async () => {
+        const p = await project()
+        await writeReport(p.dir, {
+            merged: [], conflicts: [], staged: [], backups: [], unmanaged: [], restored: [],
+            added: [], orphans: [], actions: ['Run the new database migration'], repairs: [],
+        })
+        await writeFile(path.join(p.dir, 'add-opt.txt'), 'the project\'s own file\n')
+
+        await withCwd(p.dir, () => add('add:opt')(p))
+        await withCwd(p.dir, () => removeCommand(defaultArgs({ projectName: 'add:opt' }), undefined as never, p.registries))
+        await withCwd(p.dir, () => add('add:opt')(p))
+        process.exitCode = undefined
+
+        const report = await readFile(path.join(p.dir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        expect(report.match(new RegExp(`^# battlestack add ${NS}:add:opt$`, 'gm'))).toHaveLength(1)
+        expect(report.match(/`add-opt\.txt`/g)).toHaveLength(1)
+        expect(report).toContain('Run the new database migration')
     })
 })

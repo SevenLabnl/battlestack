@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { readFile, writeFile } from 'node:fs/promises'
 import { createHmac } from 'node:crypto'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
@@ -17,7 +18,7 @@ import {
 } from '@battlestack/core'
 import { readDotEnv } from '@battlestack/core/utils/dotenv.js'
 import { ui } from '@battlestack/tui'
-import type { EnvVar, Feature, ProjectCommand, RunContext } from '@battlestack/core'
+import type { EnvVar, Feature, InstalledFeatureRecord, ProjectCommand, RunContext, UpdateReport } from '@battlestack/core'
 
 function titleCase(slug: string): string {
     return slug
@@ -30,7 +31,7 @@ function titleCase(slug: string): string {
 /** Session auth on `nuxt-auth-utils`. The sealed cookie carries an opaque sessionId. */
 export const authFeature: Feature = {
     id: 'nuxt4:auth',
-    version: '1.10.9',
+    version: '1.11.0',
     label: 'Session-based auth (argon2id)',
     frameworks: ['nuxt4'],
     stage: STAGE.AUTH,
@@ -42,8 +43,7 @@ export const authFeature: Feature = {
 
     collectDeps() {
         return {
-            // 0.6 moves sessions to NUXT_APP_SECRET and drops sessionHeader; held until that migration lands.
-            prod: ['zod@^4', '@node-rs/argon2', 'nodemailer', 'nuxt-auth-utils@^0.5.34'],
+            prod: ['zod@^4', '@node-rs/argon2', 'nodemailer', 'nuxt-auth-utils@^0.6.0'],
             dev: ['@types/nodemailer'],
         }
     },
@@ -71,7 +71,7 @@ export const authFeature: Feature = {
                     '- `battlestack login other@example.com` does the same for any user that already exists in the DB.',
                     '- `battlestack uli` is a short alias (Drush muscle memory).',
                     '',
-                    'Mechanism: CLI builds an HMAC-signed token with the same `NUXT_SESSION_PASSWORD` that seals session cookies and opens `/auth/magic-login?token=…&sig=…` on the running dev server. The Nuxt page (`app/pages/auth/magic-login.vue`) POSTs the token to `/api/auth/magic-login`, which verifies the HMAC, calls `createDbSession`, and sets the session cookie; the page then client-side navigates to `/dashboard`. The endpoint stacks two guards (`NODE_ENV !== \'production\'` AND the request `host` header must resolve to a local hostname: `localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, `*.local`, or `*.battlestack.test`), so even a dev-tagged server tunnelled through ngrok or exposed publicly returns 404. Tokens expire after 60 seconds.',
+                    'Mechanism: CLI builds an HMAC-signed token with `NUXT_APP_SECRET`, the secret session cookies are sealed from, and opens `/auth/magic-login?token=…&sig=…` on the running dev server. The Nuxt page (`app/pages/auth/magic-login.vue`) POSTs the token to `/api/auth/magic-login`, which verifies the HMAC, calls `createDbSession`, and sets the session cookie; the page then client-side navigates to `/dashboard`. The endpoint stacks two guards (`NODE_ENV !== \'production\'` AND the request `host` header must resolve to a local hostname: `localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, `*.local`, or `*.battlestack.test`), so even a dev-tagged server tunnelled through ngrok or exposed publicly returns 404. Tokens expire after 60 seconds.',
                     '',
                     '### Self-service registration',
                     '',
@@ -95,10 +95,10 @@ export const authFeature: Feature = {
     collectEnv(ctx): EnvVar[] {
         return [
             {
-                key: 'NUXT_SESSION_PASSWORD',
+                key: APP_SECRET_KEY,
                 generate: { bytes: 32, encoding: 'hex' },
                 group: 'Session',
-                description: 'Used by nuxt-auth-utils to seal session cookies. Must be ≥ 32 chars.',
+                description: APP_SECRET_DESCRIPTION,
                 secret: true,
             },
             {
@@ -186,7 +186,14 @@ export const authFeature: Feature = {
     async update(ctx, prev) {
         const result = await emitTemplateUpdate(ctx, 'nuxt4:auth', import.meta.url, 'auth', prev)
         result.notes.push(...(await retainedPasswordPolicyNotes(ctx.projectDir)))
+        const guardActions = await retainedSessionPasswordGuardActions(ctx.projectDir, prev, result)
+        if (guardActions.length > 0) result.actions = [...(result.actions ?? []), ...guardActions]
         await postPatches(ctx.projectDir)
+        const migrated = await migrateToAppSecret(ctx.projectDir)
+        // Deployed environments need the new secret even when the local files were moved already.
+        if (migrated || (prev && versionBelow(prev.version, '1.11.0'))) {
+            result.actions = [...(result.actions ?? []), APP_SECRET_ACTION]
+        }
         await emitRecoveryHookStub(ctx)
         await emitAuditStub(ctx)
         return result
@@ -220,6 +227,128 @@ async function retainedPasswordPolicyNotes(projectDir: string): Promise<string[]
         )
     }
     return notes
+}
+
+const OLD_GUARD_PLUGIN = 'server/plugins/00-session-password-guard.ts'
+const OLD_GUARD_UTIL = 'server/utils/session-password.ts'
+
+/** The 0.5 boot guard reads `session.password`, which 0.6 drops, so a kept copy fails every production boot. */
+async function retainedSessionPasswordGuardActions(
+    projectDir: string,
+    prev: InstalledFeatureRecord | null,
+    result: UpdateReport,
+): Promise<string[]> {
+    const kept: string[] = []
+    for (const rel of [OLD_GUARD_PLUGIN, OLD_GUARD_UTIL]) {
+        if (!(await exists(path.join(projectDir, rel)))) continue
+        // A pristine tracked copy is queued for deletion at the end of the pull.
+        const removedLater = prev !== null && rel in prev.files
+            && !(prev.ownedByUser ?? []).includes(rel) && !(result.unmanaged ?? []).includes(rel)
+        if (!removedLater) kept.push(rel)
+    }
+    if (kept.length === 0) return []
+    const crash = kept.includes(OLD_GUARD_PLUGIN)
+        ? ` The plugin checks \`session.password\`, which nuxt-auth-utils 0.6 no longer sets, so a production build fails to boot.`
+        : ''
+    return [
+        `Delete ${kept.map((rel) => `\`${rel}\``).join(' and ')}, kept from the nuxt-auth-utils 0.5 setup.${crash} `
+        + '`server/plugins/00-app-secret-guard.ts` checks `NUXT_APP_SECRET` instead.',
+    ]
+}
+
+const APP_SECRET_KEY = 'NUXT_APP_SECRET'
+const LEGACY_SECRET_KEY = 'NUXT_SESSION_PASSWORD'
+const APP_SECRET_DESCRIPTION = 'Nuxt\'s app secret. nuxt-auth-utils seals session cookies with a key derived from it. Must be ≥ 32 chars.'
+const LEGACY_SECRET_DESCRIPTION = '# Used by nuxt-auth-utils to seal session cookies. Must be ≥ 32 chars.'
+
+export const APP_SECRET_ACTION = 'nuxt-auth-utils 0.6 seals sessions with a key derived from `NUXT_APP_SECRET` and ignores '
+    + '`NUXT_SESSION_PASSWORD`. Before deploying, set `NUXT_APP_SECRET` (at least 32 characters; the old '
+    + '`NUXT_SESSION_PASSWORD` value works) in every deployed environment and CI secret, and remove '
+    + '`NUXT_SESSION_PASSWORD`. Production refuses to boot without it. Every user is logged out once.'
+
+function versionBelow(version: string, floor: string): boolean {
+    const parts = (v: string) => v.split('-')[0]!.split('.').map(Number)
+    const [a, b] = [parts(version), parts(floor)]
+    for (let i = 0; i < 3; i++) {
+        if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0)
+    }
+    return false
+}
+
+/** Moves a nuxt-auth-utils 0.5 project to `NUXT_APP_SECRET`; true when it found anything to move. */
+export async function migrateToAppSecret(projectDir: string): Promise<boolean> {
+    let migrated = false
+    for (const file of ['.env', '.env.example']) {
+        const p = path.join(projectDir, file)
+        const raw = await readFile(p, 'utf8').catch(() => null)
+        if (raw === null) continue
+        const next = renameEnvKey(raw)
+        if (next !== raw) {
+            await writeFile(p, next, 'utf8')
+            migrated = true
+        }
+    }
+    await patchNuxtConfig(projectDir, (c) => c.mutate((config) => {
+        const session = config.runtimeConfig?.session
+        if (session?.$type !== 'object') return
+        for (const key of ['password', 'sessionHeader']) {
+            if (key in session) {
+                delete session[key]
+                migrated = true
+            }
+        }
+        // 0.6 renames this name to nuxt-auth-session anyway and warns on every boot.
+        if (session.name === 'nuxt-session') {
+            delete session.name
+            migrated = true
+        }
+        if (Object.keys(session).length === 0) delete config.runtimeConfig.session
+    }))
+    return migrated
+}
+
+/** Groups: prefix (`export `), key, `=`, value, line-ending `\r`. */
+const ENV_LINE = /^(\s*(?:export\s+)?)([A-Za-z_]\w*)(\s*=\s*)(.*?)(\r?)$/
+const PLACEHOLDER_VALUES = new Set(['', 'change-me', 'changeme', 'replace-me', 'replaceme'])
+
+function isPlaceholder(value: string): boolean {
+    return PLACEHOLDER_VALUES.has(value.trim().replace(/^(['"])(.*)\1$/, '$2').trim().toLowerCase())
+}
+
+/**
+ * Renames the legacy key in place, or drops it when the new key is already set. A placeholder new key
+ * takes the legacy value instead, so the secret that sealed existing sessions is never lost.
+ */
+export function renameEnvKey(raw: string): string {
+    const lines = raw.split('\n')
+    const parsed = lines.map((l) => ENV_LINE.exec(l))
+    const legacy = parsed.flatMap((m, i) => m?.[2] === LEGACY_SECRET_KEY ? [i] : [])
+    if (legacy.length === 0) return raw
+    // dotenv lets the last occurrence win.
+    const value = parsed[legacy.at(-1)!]![4]!
+    const descOf = (i: number) => [i - 1, i - 2]
+        .find((d) => d >= 0 && lines[d]!.replace(/\r$/, '') === LEGACY_SECRET_DESCRIPTION)
+
+    const current = parsed.findLastIndex((m) => m?.[2] === APP_SECRET_KEY)
+    const keep = current < 0 ? legacy[0] : undefined
+    if (current >= 0 && isPlaceholder(parsed[current]![4]!)) {
+        const m = parsed[current]!
+        lines[current] = m[1]! + m[2]! + m[3]! + value + m[5]!
+    }
+    const keptDesc = keep === undefined ? undefined : descOf(keep)
+    if (keep !== undefined) {
+        const m = parsed[keep]!
+        lines[keep] = m[1]! + APP_SECRET_KEY + m[3]! + value + m[5]!
+        if (keptDesc !== undefined) lines[keptDesc] = `# ${APP_SECRET_DESCRIPTION}${lines[keptDesc]!.endsWith('\r') ? '\r' : ''}`
+    }
+    const drop = new Set<number>()
+    for (const i of legacy) {
+        if (i === keep) continue
+        drop.add(i)
+        const d = descOf(i)
+        if (d !== undefined && d !== keptDesc) drop.add(d)
+    }
+    return lines.filter((_, i) => !drop.has(i)).join('\n')
 }
 
 /** No-op stub at `server/utils/auth-recovery-signup-hook.ts` when `nuxt4:auth-recovery` is off. */
@@ -286,11 +415,11 @@ async function runLogin(ctx: RunContext): Promise<void> {
         )
     }
 
-    const secret = env.get('NUXT_SESSION_PASSWORD') ?? ''
+    const secret = env.get('NUXT_APP_SECRET') ?? ''
     if (secret.length < 32) {
         throw new CLIError(
             ErrorCode.SCAFFOLD_FAILED,
-            'NUXT_SESSION_PASSWORD is missing or shorter than 32 chars in `.env`. Bump it and re-run.',
+            'NUXT_APP_SECRET is missing or shorter than 32 chars in `.env`. Bump it and re-run.',
         )
     }
 
@@ -359,10 +488,6 @@ async function postPatches(projectDir: string): Promise<void> {
             allowedOrigins: '',
             // Must be registered: `NUXT_RATE_LIMIT_DISABLED` only binds onto an existing key.
             rateLimitDisabled: false,
-            // h3 also accepts the sealed session from an `x-<name>-session` header, which
-            // `02.session-revocation.ts` never sees (it checks the cookie): refuse that path.
-            // `password` is nuxt-auth-utils' own default; Nuxt's runtimeConfig type requires it.
-            session: { password: '', sessionHeader: false },
         })
         c.mergeRuntimePublic({
             appUrl: '',

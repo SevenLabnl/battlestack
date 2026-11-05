@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import type { AuthenticatorTransportFuture } from '@simplewebauthn/server'
 import { db } from '#server/database/client'
 import { users, type Role } from '#server/database/schema/users'
 import { webauthnCredentials, webauthnChallenges } from '#server/database/schema/auth-passkeys'
@@ -41,7 +42,7 @@ export default defineWebAuthnAuthenticateEventHandler({
         return creds.map((c) => ({
             id: c.id,
             transports: c.transports
-                ? (JSON.parse(c.transports) as AuthenticatorTransport[])
+                ? (JSON.parse(c.transports) as AuthenticatorTransportFuture[])
                 : undefined,
         }))
     },
@@ -67,7 +68,7 @@ export default defineWebAuthnAuthenticateEventHandler({
             counter: cred.counter,
             backedUp: cred.backedUp === 'true',
             transports: cred.transports
-                ? (JSON.parse(cred.transports) as AuthenticatorTransport[])
+                ? (JSON.parse(cred.transports) as AuthenticatorTransportFuture[])
                 : undefined,
         }
     },

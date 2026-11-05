@@ -46,6 +46,8 @@ export interface ParsedArgs {
     format: boolean
     /** `battlestack pull`: refresh ONLY the AI-agent skills; skip feature updates, deps, and formatting. */
     skillsOnly: boolean
+    /** `pull` into a working tree with uncommitted changes. */
+    allowDirty?: boolean
     /** Argv after `--`, forwarded verbatim to a subcommand's underlying tool. */
     passthrough: string[]
 }

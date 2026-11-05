@@ -11,7 +11,7 @@ import { ui } from '@battlestack/tui'
 /** Aggregates `collectDeps()` into `package.json`, then installs. Runs on `pull` too. */
 export const installFeature: Feature = {
     id: 'shared:install',
-    version: '1.2.1',
+    version: '1.2.2',
     label: 'package.json + install',
     stage: STAGE.FINALIZE,
 
@@ -20,15 +20,34 @@ export const installFeature: Feature = {
     },
 
     async update(ctx, _prev) {
-        const changed = await applyInstall(ctx, { skipInstallIfUnchanged: true })
-        if (changed) return { written: ['package.json'], skipped: [], notes: [] }
-        return { written: [], skipped: [], notes: ['package.json unchanged, install skipped'] }
+        const notes: string[] = []
+        const changed = await applyInstall(ctx, { skipInstallIfUnchanged: true }, notes)
+        if (changed) return { written: ['package.json'], skipped: [], notes }
+        return { written: [], skipped: [], notes: ['package.json unchanged, install skipped', ...notes] }
     },
+}
+
+/**
+ * A dependency floor only reaches a transitive copy through dedupe: `nuxt dev` runs the
+ * `@nuxt/cli` nested under `nuxt`, which an existing lockfile keeps on its old version.
+ */
+async function dedupe(pm: PackageManager, ctx: RunContext, notes: string[]): Promise<void> {
+    if (pm === 'bun') {
+        notes.push('bun has no dedupe: if `nuxt dev` fails, run `bun update @nuxt/cli`.')
+        return
+    }
+    try {
+        await run(pm, ['dedupe'], { cwd: ctx.projectDir, inherit: ctx.debug })
+    } catch (err) {
+        ui.warn(`${pm} dedupe failed (${(err as Error).message}); run \`${pm} dedupe\` yourself.`)
+        notes.push(`${pm} dedupe failed; run \`${pm} dedupe\` yourself.`)
+    }
 }
 
 async function applyInstall(
     ctx: RunContext,
     opts: { skipInstallIfUnchanged: boolean },
+    notes: string[] = [],
 ): Promise<boolean> {
     const pm = String(ctx.state.packageManager ?? 'pnpm') as PackageManager
     const { prod, dev } = collectDeclaredDeps(ctx)
@@ -54,6 +73,7 @@ async function applyInstall(
         const pinnedAny = await pinResolvedVersions(ctx.projectDir)
         // Pinning leaves the lockfile on `latest`, so it is re-synced here.
         if (pinnedAny) await run(pm, lockfileSyncArgs(pm), { cwd: ctx.projectDir, inherit: ctx.debug })
+        await dedupe(pm, ctx, notes)
     }
     // Feature-declared skills, refreshed on scaffold and every pull regardless of dep changes.
     await installSkills(ctx, collectSkillSources(ctx, ctx.registries))
@@ -237,6 +257,7 @@ export async function formatProject(ctx: RunContext): Promise<void> {
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         ui.warn(`eslint --fix failed (non-fatal): ${msg}`)
+        ctx.state['format:error'] = msg
     }
 }
 
@@ -267,9 +288,38 @@ function mergeDeps(
     const out: Record<string, string> = { ...existing }
     for (const [name, version] of Object.entries(incoming)) {
         const prior = out[name]
+        if (prior && keepsHigherFloor(prior, version)) continue
         if (!prior || prior === 'latest' || version !== 'latest') {
             out[name] = version
         }
     }
     return out
+}
+
+const CARET = /^\^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/
+
+/** `npm:<pkg>@<range>` → [`npm:<pkg>@`, range]; a plain range → ['', range]. */
+function splitAlias(spec: string): [string, string] {
+    if (!spec.startsWith('npm:')) return ['', spec]
+    const at = spec.lastIndexOf('@')
+    return at > 4 ? [spec.slice(0, at + 1), spec.slice(at + 1)] : ['', spec]
+}
+
+/** A project's `^4.4.3` already satisfies a feature's `^4`; lowering the floor would allow older releases back in. */
+export function keepsHigherFloor(prior: string, incoming: string): boolean {
+    const [priorTarget, priorRange] = splitAlias(prior)
+    const [incomingTarget, incomingRange] = splitAlias(incoming)
+    if (priorTarget !== incomingTarget) return false
+    const p = CARET.exec(priorRange)
+    const i = CARET.exec(incomingRange)
+    if (!p || !i || p[1] !== i[1]) return false
+    const floor = (m: RegExpExecArray): [number, number] => [Number(m[2] ?? 0), Number(m[3] ?? 0)]
+    const [pMinor, pPatch] = floor(p)
+    const [iMinor, iPatch] = floor(i)
+    // Below 1.0 a caret pins the minor (`^0.0.x` the patch), so a higher one is another compatibility line.
+    if (i[1] === '0' && i[2] !== undefined) {
+        if (pMinor !== iMinor) return false
+        if (iMinor === 0 && i[3] !== undefined) return pPatch === iPatch
+    }
+    return pMinor > iMinor || (pMinor === iMinor && pPatch >= iPatch)
 }

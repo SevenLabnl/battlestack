@@ -1,13 +1,15 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { patchNuxtConfig } from '../utils/nuxt-config.js'
+import { patchNuxtConfig, type NuxtConfig } from '../utils/nuxt-config.js'
 import { isFeatureEnabled, type Feature } from '@battlestack/core'
 import { STAGE } from '@battlestack/core/constants/stages.js'
+
+const RATE_LIMIT_GATE = 'process.env.NUXT_RATE_LIMIT_DISABLED === \'true\' ? false : '
 
 /** `nuxt-security` wrapper: response headers and a module-level rate-limit floor. */
 export const securityFeature: Feature = {
     id: 'shared:security',
-    version: '1.0.4',
+    version: '1.0.5',
     label: 'Security headers (nuxt-security)',
     stage: STAGE.BASE_CONFIG,
     failureIsNonFatal: true,
@@ -93,8 +95,7 @@ export const securityFeature: Feature = {
         // `NUXT_RATE_LIMIT_DISABLED=true` disables the per-IP limiter. Dev and e2e only.
         const cfgPath = path.join(ctx.projectDir, 'nuxt.config.ts')
         const raw = await readFile(cfgPath, 'utf8')
-        const gated
-            = 'process.env.NUXT_RATE_LIMIT_DISABLED === \'true\' ? false : { tokensPerInterval: 100, interval: 60_000 }'
+        const gated = `${RATE_LIMIT_GATE}{ tokensPerInterval: 100, interval: 60_000 }`
         await writeFile(
             cfgPath,
             raw.replace(new RegExp(String.raw`(['"])${RATE_LIMITER_SENTINEL}\1`), gated),
@@ -103,13 +104,21 @@ export const securityFeature: Feature = {
     },
 
     async update(ctx, _prev) {
-        await patchNuxtConfig(ctx.projectDir, (c) =>
+        let gate: ReturnType<NuxtConfig['gateRateLimiter']> = 'unchanged'
+        await patchNuxtConfig(ctx.projectDir, (c) => {
             c.mutate((cfg) => {
                 if (!cfg.security) {
                     cfg.security = {}
                 }
-            }),
-        )
-        return { written: ['nuxt.config.ts'], skipped: [], notes: [] }
+            })
+            // Projects scaffolded before the gate carry a bare object that e2e runs cannot switch off.
+            gate = c.gateRateLimiter(RATE_LIMIT_GATE)
+        })
+        const notes = {
+            'gated': ['security: rateLimiter now turns off with NUXT_RATE_LIMIT_DISABLED=true (dev and e2e only)'],
+            'not-literal': [`security: nuxt.config.ts#security.rateLimiter is not an object literal, so it was not gated. To let dev and e2e runs turn it off with NUXT_RATE_LIMIT_DISABLED=true, write it as \`${RATE_LIMIT_GATE}<your options>\``],
+            'unchanged': [],
+        }[gate]
+        return { written: ['nuxt.config.ts'], skipped: [], notes }
     },
 }

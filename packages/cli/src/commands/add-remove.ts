@@ -1,7 +1,8 @@
 import path from 'node:path'
-import { rm } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import type { Ora } from 'ora'
 import {
+    acquireProjectLock,
     classifyFileState,
     CLIError,
     ErrorCode,
@@ -12,6 +13,7 @@ import {
     readManifest,
     recordOwned,
     run,
+    MANIFEST_PATH,
     writeJson,
     writeManifest,
     type BattlestackRegistries,
@@ -22,11 +24,14 @@ import {
     type ReservedCommand,
     type RunContext,
     resolveProjectName,
+    UPDATING_STATE_KEY,
+    updateLedger,
     type ProjectManifest,
 } from '@battlestack/core'
 import { applyEnv, collectEnvForFeature } from '@battlestack/preset-nuxt4'
 import { ui } from '@battlestack/tui'
 import { formatAndReconcile } from './format-project.js'
+import { needsAttention, NEEDS_ATTENTION_EXIT_CODE, renderReport, REPORT_PATH, writeReport, type PullSummary } from './pull-safety.js'
 
 /** Static metadata only. `run` is built per-dispatch in `project.ts`. */
 export const addReservedMeta: Omit<ReservedCommand, 'run'> = {
@@ -41,6 +46,9 @@ export const removeReservedMeta: Omit<ReservedCommand, 'run'> = {
     usage: 'battlestack remove <feature>',
     label: 'disable a feature',
     group: 'Lifecycle',
+    helpExtra: [
+        ['battlestack remove <feature> --force', 'remove a feature whose plugin is not loaded, even when another installed feature requires it'],
+    ],
 }
 
 export async function addCommand(args: ParsedArgs, loader: Ora, registries: BattlestackRegistries): Promise<void> {
@@ -144,7 +152,20 @@ export async function addCommand(args: ParsedArgs, loader: Ora, registries: Batt
     await writeManifest(ctx)
 
     ui.blank()
-    ui.ok(`Added ${fqid}`)
+    const ledger = updateLedger(ctx)
+    const leftover: PullSummary = {
+        merged: ledger.merged, conflicts: ledger.conflicts, staged: ledger.staged,
+        backups: [], unmanaged: [], restored: [], added: [], orphans: [], actions: ledger.actions, repairs: [],
+    }
+    if (needsAttention(leftover)) {
+        const reportPath = await writeAddReport(projectRoot, fqid, leftover)
+        const files = ledger.conflicts.length + ledger.staged.length
+        ui.warn(files > 0 ? `Added ${fqid}, merging into ${files} existing file(s) that need a look` : `Added ${fqid}, with steps left`)
+        ui.dim(`  Next steps: ${reportPath}`)
+        process.exitCode = NEEDS_ATTENTION_EXIT_CODE
+    } else {
+        ui.ok(`Added ${fqid}`)
+    }
 
     if (envDiff.newKeys.length > 0) {
         ui.blank()
@@ -164,6 +185,21 @@ export async function addCommand(args: ParsedArgs, loader: Ora, registries: Batt
     ui.blank()
 }
 
+/** Puts add's leftovers above an earlier report, so a pull's unfinished items stay listed, replacing this feature's own earlier block. */
+async function writeAddReport(projectRoot: string, fqid: string, leftover: PullSummary): Promise<string> {
+    const dest = path.join(projectRoot, REPORT_PATH)
+    if (!(await exists(dest))) return writeReport(projectRoot, leftover)
+    const rendered = renderReport(leftover)
+    const sections = rendered.slice(rendered.indexOf('\n## ') + 1)
+    const intro = `Adding ${fqid} left work to finish. The report of an earlier run follows it.`
+    const header = `# battlestack add ${fqid}`
+    // Sections are `## `, so each `# ` line starts the block of one run.
+    const blocks = (await readFile(dest, 'utf8')).split(/^(?=# )/m)
+    const prior = blocks.filter((b) => b.split(/\r?\n/, 1)[0] !== header).join('')
+    await writeFile(dest, [header, '', intro, '', sections, prior].join('\n'))
+    return REPORT_PATH
+}
+
 export async function removeCommand(args: ParsedArgs, _loader: Ora, registries: BattlestackRegistries): Promise<void> {
     const requested = args.projectName
     if (!requested) {
@@ -171,6 +207,25 @@ export async function removeCommand(args: ParsedArgs, _loader: Ora, registries: 
     }
 
     const projectRoot = await requireProjectRoot()
+    const releaseLock = await acquireProjectLock(projectRoot, 'battlestack remove', { dryRun: args.dryRun })
+    try {
+        await removeLocked(args, registries, requested, projectRoot)
+    } finally {
+        await releaseLock()
+    }
+}
+
+/** The ids of installed, loaded features whose `requires` names `featureId`. */
+function dependentsOf(manifest: ProjectManifest, featureId: string, registries: BattlestackRegistries): string[] {
+    // `requires` holds bare ids: an fqid without its namespace segment.
+    const bare = featureId.split(':').slice(-2).join(':')
+    return manifest.features
+        .filter((f) => f.id !== featureId && registries.features.has(f.id))
+        .filter((f) => (registries.features.get(f.id).requires ?? []).some((r) => r === bare || r === featureId))
+        .map((f) => f.id)
+}
+
+async function removeLocked(args: ParsedArgs, registries: BattlestackRegistries, requested: string, projectRoot: string): Promise<void> {
     const manifest = await readManifest(projectRoot, registries)
     if (!manifest) {
         throw new CLIError(
@@ -190,6 +245,33 @@ export async function removeCommand(args: ParsedArgs, _loader: Ora, registries: 
             ErrorCode.UNSUPPORTED_FEATURE,
             `Feature is not installed: ${featureId}`,
         )
+    }
+
+    // No plugin to ask which files are safe to delete, so only the record goes.
+    if (!registries.features.has(featureId)) {
+        const required = registries.templates.has(manifest.template)
+            && registries.templates.get(manifest.template).requiredFeatures.includes(featureId)
+        const dependents = dependentsOf(manifest, featureId, registries)
+        if ((required || dependents.length > 0) && !args.force) {
+            const why = required
+                ? `it is a required feature of template "${manifest.template}"`
+                : `${dependents.join(', ')} require${dependents.length === 1 ? 's' : ''} it`
+            throw new CLIError(
+                ErrorCode.UNSUPPORTED_FEATURE,
+                `Not removing ${featureId}: ${why}. Pass --force to drop its record anyway.`,
+            )
+        }
+        if (args.dryRun) {
+            ui.info(`dry-run: would drop the record of ${featureId} and leave its files on disk`)
+            return
+        }
+        manifest.features = manifest.features.filter((f) => f.id !== featureId)
+        manifest.optedOut = [...new Set([...(manifest.optedOut ?? []), featureId])]
+        manifest.updatedAt = new Date().toISOString()
+        await writeJson(path.join(projectRoot, MANIFEST_PATH), manifest)
+        ui.ok(`Dropped the record of ${featureId}, whose plugin is not loaded.`)
+        ui.dim(`  Its ${Object.keys(record.files).length} file(s) stay on disk and are no longer managed.`)
+        return
     }
 
     const template = registries.templates.get(manifest.template)
@@ -369,7 +451,7 @@ function buildCtx(
         framework: registries.frameworks.get(manifest.framework),
         template: registries.templates.get(manifest.template),
         enabledFeatures: new Set(enabled),
-        state: { packageManager: pm, skipInstall: args.skipInstall },
+        state: { packageManager: pm, skipInstall: args.skipInstall, [UPDATING_STATE_KEY]: !args.dryRun },
         debug: args.debug,
         dryRun: args.dryRun,
         registries,
