@@ -75,6 +75,24 @@ describe('e2e: prompts management', () => {
         expect((reset.data?.version ?? 0) > (updated.data?.version ?? 0)).toBe(true)
     })
 
+    it.skipIf(!serverUp)('admin can save a prompt as long as a real agent prompt, and gets the reason when one is too long', async () => {
+        const adminCookie = await loginAsAdmin()
+        const list = await apiGet<{ rows: Prompt[], total: number }>('/api/prompts', adminCookie)
+        const target = list.data?.rows?.[0]
+        if (!target) return
+
+        try {
+            const long = await apiPut<Prompt>(`/api/prompts/${target.id}`, { content: 'x'.repeat(20_000) }, adminCookie)
+            expect(long.status).toBe(200)
+
+            const tooLong = await apiPut(`/api/prompts/${target.id}`, { content: 'x'.repeat(100_001) }, adminCookie)
+            expect(tooLong.status).toBe(400)
+            expect(JSON.stringify(tooLong.data)).toContain('100,000 characters')
+        } finally {
+            await apiPost(`/api/prompts/${target.id}/reset`, {}, adminCookie)
+        }
+    })
+
     if (!serverUp) {
         it('e2e suite skipped, no server up at TEST_BASE_URL', () => {
             expect(BASE_URL).toBeTypeOf('string')

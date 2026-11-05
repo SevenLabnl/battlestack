@@ -1,13 +1,13 @@
 import path from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
-import { STAGE, isFeatureEnabled, hashFile, rebaselineRecordedFile, recordFile, type Feature, type RunContext } from '@battlestack/core'
+import { STAGE, exists, isFeatureEnabled, hashFile, ownedAnywhere, rebaselineRecordedFile, recordFile, updateLedger, type Feature, type RunContext } from '@battlestack/core'
 import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
 import { applyColorAliases } from './battlestack-theme.js'
 
 /** Frontend shell: `app.vue`, `app.config.ts`, layouts, landing page. All emitted files are structural. */
 export const landingShellFeature: Feature = {
     id: 'nuxt4:landing-shell',
-    version: '1.4.2',
+    version: '1.4.3',
     label: 'Landing shell (layouts, public landing page)',
     description: 'Public landing page, layouts, and frontend app shell.',
     frameworks: ['nuxt4'],
@@ -28,10 +28,42 @@ export const landingShellFeature: Feature = {
 
     async update(ctx, prev) {
         const report = await emitTemplateUpdate(ctx, this.id, import.meta.url, 'landing-shell', prev)
-        await applyVariants(ctx, this.id)
-        if (isFeatureEnabled(ctx, 'nuxt4:battlestack-theme')) await applyColorAliases(ctx)
+        // The patches below bypass the drift-aware writer, so they honor ownership themselves.
+        const owned = ctx.state.overwrite === true ? new Set<string>() : ownedAnywhere(ctx)
+        if (!owned.has('app/layouts/default.vue')) await applyVariants(ctx, this.id)
+        if (isFeatureEnabled(ctx, 'nuxt4:battlestack-theme') && !owned.has('app/app.config.ts')) await applyColorAliases(ctx)
+        await suggestHeaderActions(ctx, prev?.version)
         return report
     },
+}
+
+const HEADER_ACTIONS_SINCE = '1.4.3'
+
+/**
+ * The layout is structural, so the project owns it and pull never adds the `#header-actions`
+ * target to it. Lists the step once, on the pull that crosses the version that introduced it.
+ */
+async function suggestHeaderActions(ctx: RunContext, fromVersion: string | undefined): Promise<void> {
+    if (!fromVersion || !isOlder(fromVersion, HEADER_ACTIONS_SINCE)) return
+    const layout = path.join(ctx.projectDir, 'app', 'layouts', 'default.vue')
+    if (!(await exists(layout))) return
+    const content = await readFile(layout, 'utf8')
+    if (!content.includes('<UHeader') || content.includes('header-actions')) return
+    updateLedger(ctx).suggestions.push(
+        'To let a page add an action to the app header with `<Teleport to="#header-actions" defer>`, add '
+        + '`<div id="header-actions" class="contents" />` inside `<UHeader>` in `app/layouts/default.vue`, and '
+        + '`:ui="{ center: \'flex\' }"` on `<UHeader>` so it shows on mobile (give the `UNavigationMenu` there `class="hidden lg:flex"`). '
+        + 'Pull leaves the layout alone because it is yours.',
+    )
+}
+
+function isOlder(version: string, than: string): boolean {
+    const a = version.split('.').map(Number)
+    const b = than.split('.').map(Number)
+    for (let i = 0; i < 3; i++) {
+        if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0)
+    }
+    return false
 }
 
 // Session UI sits between `battlestack:auth` markers, dropped when `nuxt4:auth` is off.
