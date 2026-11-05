@@ -22,7 +22,7 @@ export function assertValidAppSecretUnlessDev(isDevBuild: boolean, secret: strin
         + 'cookie key from it: without a valid value, every login and every session check '
         + 'fails. Nuxt only generates one in development. Separately, and just as important: '
         + 'it MUST be the exact same value on every running instance (deliver it via one shared '
-        + 'secret, e.g. a k8s Secret through `envFrom`, and never generated per-pod), '
+        + 'secret from your secret store, never generated per instance), '
         + 'or a session sealed by one instance fails to validate on another. This '
         + 'check can only catch absence/length from where it runs, not cross-instance '
         + 'mismatch; that part is on the deployment, not this guard.',
