@@ -40,7 +40,7 @@
         "access": "public"
     },
     "dependencies": {
-        "ora": "^9.4.1",
+        "ora": "^10.0.0",
         "picocolors": "^1.1.1",
         "prompts": "^2.4.2"
     },
