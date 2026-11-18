@@ -121,7 +121,7 @@ manifest.
 
 `battlestack --help` inside a project shows only the commands of features that
 are installed. `bstack` is an alias for `battlestack` everywhere.
-[docs/commands.md](docs/commands.md) is the full reference.
+[docs/commands.md](commands.md) is the full reference.
 
 ### 5.2 Templates
 
@@ -139,7 +139,7 @@ that gets copied.
 Feature ids are namespaced: `nuxt4:*` features are specific to the Nuxt
 framework, `shared:*` features are not. The catalog groups them as auth, data,
 AI, app surface, ops and quality, and always-present plumbing.
-[docs/features.md](docs/features.md) lists every feature.
+[docs/features.md](features.md) lists every feature.
 
 ### 5.4 Packages
 
@@ -242,7 +242,7 @@ confirms first if any are owned. `bump` updates dependencies, `sync` runs
 `pull`, `bump` and `doctor` in that order, and `install` writes `.env`,
 installs dependencies and applies the schema in a fresh clone. `rename` renames
 a project; renaming its directory does not.
-[docs/keeping-projects-current.md](docs/keeping-projects-current.md) covers the
+[docs/keeping-projects-current.md](keeping-projects-current.md) covers the
 routine.
 
 ### 7.3 Extension
@@ -267,7 +267,7 @@ Plugins load from four sources, first occurrence wins:
 Store plugins can be listed, updated and set to update automatically
 (`off`, `notify` by default, or `apply`); updates respect the release-age
 window, and a version that fails to load is rolled back.
-[docs/plugins.md](docs/plugins.md) is the practical guide.
+[docs/plugins.md](plugins.md) is the practical guide.
 
 ### 7.4 Quality of what it emits
 
@@ -350,7 +350,7 @@ docs sections, Nuxt modules, agent skills, build secrets) aggregated across
 every enabled feature, plus lifecycle methods. Features run in coarse stages and
 are ordered within a stage by `before`/`after` edges.
 
-[docs/architecture.md](docs/architecture.md) is the reference, including its
+[docs/architecture.md](architecture.md) is the reference, including its
 section on known rough edges: no `extendFramework` hook, a `supportedFeatures`
 catalog that can drift from what is registered, ordering edges that are not
 namespace-safe, template extensions that add features but not files, a
@@ -375,17 +375,17 @@ A stable release is: Prepare release (bumps every package, prepends a
 the Release workflow behind an environment approval, whose gate re-runs the
 lockstep check, typecheck, tests, build and the packed-tarball smoke test.
 Prereleases publish under the `next` dist-tag and do not move `production`.
-[docs/releasing.md](docs/releasing.md) has the details.
+[docs/releasing.md](releasing.md) has the details.
 
 `main` is protected by two stacked rulesets: an organisation ruleset (one
 approving review, resolved threads, no force-push) and a repository ruleset that
 requires every CI job to pass. CI also runs daily, so upstream breakage of the
 unpinned scaffold jobs shows up on `main` first. See
-[docs/repository-settings.md](docs/repository-settings.md).
+[docs/repository-settings.md](repository-settings.md).
 
 For generated projects, battlestack emits the production image, a compose stack
 and the health endpoint; where that runs is the user's choice
-([docs/deployment.md](docs/deployment.md)).
+([docs/deployment.md](deployment.md)).
 
 ---
 
@@ -541,19 +541,19 @@ security fix without a rewrite.
 
 ## 18. Reference documents
 
-[docs/architecture.md](docs/architecture.md) for how the plugin system and
-package split work. [docs/features.md](docs/features.md) for the current catalog.
-[docs/plugins.md](docs/plugins.md) for extending it.
-[CONTRIBUTING.md](CONTRIBUTING.md) for the rules these principles become at
+[docs/architecture.md](architecture.md) for how the plugin system and
+package split work. [docs/features.md](features.md) for the current catalog.
+[docs/plugins.md](plugins.md) for extending it.
+[CONTRIBUTING.md](../CONTRIBUTING.md) for the rules these principles become at
 review time.
 
 | Path | What it holds |
 | --- | --- |
-| [docs/README.md](docs/README.md) | Index of the user documentation |
-| [docs/commands.md](docs/commands.md) | Every command and flag |
-| [docs/templates.md](docs/templates.md) | The three templates |
-| [docs/keeping-projects-current.md](docs/keeping-projects-current.md) | `pull`, drift, ownership |
-| [docs/deployment.md](docs/deployment.md) | Image, compose, health checks |
-| [docs/releasing.md](docs/releasing.md) | How a release is cut |
-| [docs/repository-settings.md](docs/repository-settings.md) | Rulesets and required CI checks |
-| [CHANGELOG.md](CHANGELOG.md) | Release history and unreleased changes |
+| [docs/README.md](README.md) | Index of the user documentation |
+| [docs/commands.md](commands.md) | Every command and flag |
+| [docs/templates.md](templates.md) | The three templates |
+| [docs/keeping-projects-current.md](keeping-projects-current.md) | `pull`, drift, ownership |
+| [docs/deployment.md](deployment.md) | Image, compose, health checks |
+| [docs/releasing.md](releasing.md) | How a release is cut |
+| [docs/repository-settings.md](repository-settings.md) | Rulesets and required CI checks |
+| [CHANGELOG.md](../CHANGELOG.md) | Release history and unreleased changes |
