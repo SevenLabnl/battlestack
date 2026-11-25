@@ -6,7 +6,7 @@ import { Role } from '#server/database/schema/users'
 import { requireRole, requireRouterParam } from '#server/utils/auth'
 import { tryLogAudit } from '#server/utils/audit-bridge'
 import { invalidateActiveModel } from '#server/mastra/utils/ai-model'
-import { effectiveReasoningEffort } from '#server/mastra/utils/reasoning'
+import { effectiveReasoningEffort, withReasoningSupport } from '#server/mastra/utils/reasoning'
 
 const schema = z.object({
     model: z.string().min(1, 'Model is required').max(200).optional(),
@@ -67,5 +67,5 @@ export default defineEventHandler(async (event) => {
         reasoningEffort: updated.reasoningEffort,
     })
 
-    return updated
+    return withReasoningSupport(updated)
 })

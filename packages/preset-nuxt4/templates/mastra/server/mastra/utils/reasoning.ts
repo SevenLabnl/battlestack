@@ -52,3 +52,12 @@ export function effectiveReasoningEffort(modelId: string, stored: string | null 
     const support = reasoningSupport(modelId)
     return support?.levels.find((level) => level === stored) ?? null
 }
+
+/** Adds the selector data the admin page needs to a model config row. Embedding rows get none. */
+export function withReasoningSupport<T extends { key: string, model: string }>(row: T): T & {
+    reasoningEfforts: ReasoningEffort[]
+    defaultReasoningEffort: ReasoningEffort | null
+} {
+    const support = row.key === 'embedding' ? null : reasoningSupport(row.model)
+    return { ...row, reasoningEfforts: support?.levels ?? [], defaultReasoningEffort: support?.defaultLevel ?? null }
+}

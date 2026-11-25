@@ -8,6 +8,8 @@ interface ModelConfig {
     description: string
     model: string
     reasoningEffort: string | null
+    reasoningEfforts: string[]
+    defaultReasoningEffort: string | null
 }
 
 const { t } = useI18n()
@@ -25,8 +27,6 @@ interface ProxyModel {
     supportsFunctionCalling?: boolean
     supportsVision?: boolean
     supportsReasoning?: boolean
-    reasoningEfforts?: string[]
-    defaultReasoningEffort?: string | null
 }
 
 const { data: modelsData, pending: modelsPending } = useFetch('/api/ai/models', {
@@ -46,14 +46,13 @@ function optionsFor(configKey: string) {
 }
 
 function reasoningOptionsFor(config: ModelConfig) {
-    const model = availableModels.value.find((m) => m.id === config.model)
-    if (!model?.reasoningEfforts?.length) return []
-    const fallback = model.defaultReasoningEffort
-        ? t(`mastraAdmin.reasoningLevels.${model.defaultReasoningEffort}`)
+    if (!config.reasoningEfforts.length) return []
+    const fallback = config.defaultReasoningEffort
+        ? t(`mastraAdmin.reasoningLevels.${config.defaultReasoningEffort}`)
         : t('mastraAdmin.reasoningProviderDefault')
     return [
         { label: t('mastraAdmin.reasoningDefault', { level: fallback }), value: null as string | null },
-        ...model.reasoningEfforts.map((level) => ({ label: t(`mastraAdmin.reasoningLevels.${level}`), value: level })),
+        ...config.reasoningEfforts.map((level) => ({ label: t(`mastraAdmin.reasoningLevels.${level}`), value: level })),
     ]
 }
 

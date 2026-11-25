@@ -2,11 +2,12 @@ import { db } from '#server/database/client'
 import { aiModelConfigs } from '#server/database/schema/ai'
 import { Role } from '#server/database/schema/users'
 import { requireRole } from '#server/utils/auth'
+import { withReasoningSupport } from '#server/mastra/utils/reasoning'
 
 export default defineEventHandler(async (event) => {
     await requireRole(event, Role.Admin)
 
-    return db
+    const rows = await db
         .select({
             id: aiModelConfigs.id,
             key: aiModelConfigs.key,
@@ -17,4 +18,5 @@ export default defineEventHandler(async (event) => {
         })
         .from(aiModelConfigs)
         .orderBy(aiModelConfigs.key)
+    return rows.map(withReasoningSupport)
 })
