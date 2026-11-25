@@ -49,6 +49,13 @@ describe('gitignoreFeature: fetched AI-agent skill content (.agents/)', () => {
         expect(await readGitignore()).toMatch(/^\.agents\/$/m)
     })
 
+    it('git-ignores the per-person Claude Code settings, not the shared ones', async () => {
+        await gitignoreFeature.execute(ctx())
+        const out = await readGitignore()
+        expect(out).toMatch(/^\.claude\/settings\.local\.json$/m)
+        expect(out).not.toMatch(/^\.claude\/?$/m)
+    })
+
     it('keeps skills-lock.json tracked: it is the record of what was fetched', async () => {
         await gitignoreFeature.execute(ctx())
         expect(await readGitignore()).not.toMatch(/skills-lock/)

@@ -27,6 +27,8 @@ const REQUIRED_PATTERNS = [
     '.mastra',
     // Fetched third-party skill content, recorded by the tracked `skills-lock.json`.
     '.agents/',
+    // Claude Code's per-person settings; the shared ones are `.claude/settings.json`.
+    '.claude/settings.local.json',
     // Legacy in-tree pull artifacts. Never a bare `*.battlestack`.
     '*.battlestack.bak',
     '*.battlestack.new',
