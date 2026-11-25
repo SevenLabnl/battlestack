@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- A generated project's `.gitignore` lists `.claude/settings.local.json`, Claude
+  Code's per-person settings file. Existing projects get the line via
+  `battlestack pull`; one that already committed the file still has to run
+  `git rm --cached .claude/settings.local.json` once.
 - `battlestack --help` lists every plugin command. One whose short name is taken
   by a built-in or feature command (a plugin's `login` next to the auth
   feature's), or provided by two plugins (`deploy`), was hidden or shown in a

@@ -27,6 +27,8 @@ const REQUIRED_PATTERNS = [
     '.mastra',
     // Fetched third-party skill content, recorded by the tracked `skills-lock.json`.
     '.agents/',
+    // Claude Code's per-person settings; the shared ones are `.claude/settings.json`.
+    '.claude/settings.local.json',
     // Legacy in-tree pull artifacts. Never a bare `*.battlestack`.
     '*.battlestack.bak',
     '*.battlestack.new',
@@ -224,7 +226,7 @@ async function applyNuxtIgnore(projectDir: string): Promise<void> {
 /** Ignore patterns for git, Nuxt's and Nitro's auto-import scanners, and the ESLint config. */
 export const gitignoreFeature: Feature = {
     id: 'nuxt4:gitignore',
-    version: '1.5.2',
+    version: '1.5.3',
     label: 'Enforce ignore patterns (git, Nuxt, ESLint)',
     frameworks: ['nuxt4'],
     stage: STAGE.GITIGNORE,
