@@ -1,7 +1,7 @@
 # Product requirements: battlestack
 
-Written retrospectively at v0.1.0. battlestack exists and ships; this describes
-what it is for, what it commits to, and what it deliberately refuses to do, so
+First written retrospectively, after battlestack already shipped, and kept
+current since. It describes what it is for, what it commits to, and what it deliberately refuses to do, so
 there is a reference for deciding what belongs in it next.
 
 Scope is the public CLI and the Nuxt 4 preset. Capabilities distributed as
@@ -10,7 +10,7 @@ separate plugins are specified by whoever owns them, not here.
 | | |
 | --- | --- |
 | **Product** | battlestack, a scaffolding CLI for Nuxt 4, published to npm as `battlestack` and five `@battlestack/*` packages |
-| **Status** | Living document. Describes the product as built; the latest release in `CHANGELOG.md` is v1.4.0 (2026-10-15) |
+| **Status** | Living document. Describes the product as built; the latest release is the top entry of `CHANGELOG.md` |
 | **Owner** | SevenLab, which builds it and uses it to start its own and its clients' projects |
 | **Visibility** | Public repository with a `LICENSE` and `CONTRIBUTING.md`, open to outside contributors |
 
@@ -33,7 +33,7 @@ What it is made of, in short:
   installed feature contributes).
 - **One public preset.** `@battlestack/preset-nuxt4` registers the `nuxt4`
   framework, three templates (`nuxt4-minimal`, `nuxt4-fullstack`, `nuxt4-ai`)
-  and 39 features, through the same plugin API any third party uses.
+  and 41 features, through the same plugin API any third party uses.
 - **A manifest per generated project** (`.battlestack/manifest.json`) that
   records, per feature, its version and a content hash per emitted file. Every
   "staying current" capability is built on it.
@@ -337,6 +337,8 @@ battlestack has no database of its own. Its state is a handful of files.
 The manifest is the source of truth for `pull`. Features removed with
 `battlestack remove` are listed in `optedOut` and never rehydrated.
 
+---
+
 ## 10. Architecture
 
 Projects are built in three layers: **framework → template → feature**.
@@ -424,8 +426,8 @@ The items below are those named gaps; none has a date.
 | The rough edges listed in `docs/architecture.md` §8 | `docs/architecture.md` |
 | bun × `nuxt4-fullstack` verification, and running the pack-smoke matrix in CI | `CONTRIBUTING.md` |
 
-_Assumption — to confirm:_ that these are the next priorities. The repository
-records them as gaps, not as planned work.
+The repository records these as gaps, not as planned work, and their order is
+not decided.
 
 ---
 
@@ -449,9 +451,9 @@ outside the public catalog.
 coexistence, so a future preset can register alongside rather than replace.
 
 **Unpinned upstream modules.** Scaffolds install current upstream releases, so
-an upstream change can break every fresh scaffold once it clears the release-age
-window, as `nuxt-auth-utils` 0.6.0 did. The daily CI run and the 3-day window
-are the mitigations.
+a breaking upstream release can break every fresh scaffold once it clears the
+release-age window. The daily CI run, the 3-day window and pinning a module
+until support lands are the mitigations.
 
 ---
 
