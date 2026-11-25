@@ -90,7 +90,7 @@ function ensureRegistered(): void {
                 pluginContexts.push(ctx)
             },
         }, origin)
-        // Shadows a reserved subcommand: must never reach dispatch, nor be listed.
+        // Shadows a reserved subcommand: the bare name must never reach this command.
         registries.commands.register({
             id: 'doctor',
             description: 'plugin command shadowing a reserved command',
@@ -282,7 +282,7 @@ describe('projectCommand', () => {
         expect(pluginContexts[0]!.parsed.dryRun).toBe(true)
     })
 
-    it('omits plugin commands that lose dispatch from the listing', async () => {
+    it('lists a plugin command whose bare name is taken by its fqid', async () => {
         const lines: string[] = []
         vi.mocked(console.log).mockImplementation((...a: unknown[]) => {
             lines.push(a.join(' '))
@@ -291,9 +291,10 @@ describe('projectCommand', () => {
         const out = lines.join('\n')
         // Reachable, so listed under its plugin.
         expect(out).toContain('plugin-contributed top-level command')
-        // Shadowed by a feature command, a reserved command, and the scaffold router.
-        expect(out).not.toContain('plugin command shadowing a feature command')
-        expect(out).not.toContain('plugin command shadowing a reserved command')
+        // The bare name goes to a feature or reserved command; the fqid still dispatches.
+        expect(out).toMatch(/projecttest:hello\s+plugin command shadowing a feature command/)
+        expect(out).toMatch(/projecttest:doctor\s+plugin command shadowing a reserved command/)
+        // Unreachable under either spelling in project mode.
         expect(out).not.toContain('scaffold-only command')
     })
 

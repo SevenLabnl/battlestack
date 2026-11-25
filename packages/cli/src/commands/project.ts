@@ -19,7 +19,7 @@ import {
     type RunContext,
 } from '@battlestack/core'
 import { stripCommandToken } from '../cli/args.js'
-import { dispatchPluginCommand, isScaffoldOnly, pluginCommandGroups, SCAFFOLD_ONLY } from '../cli/plugin-commands.js'
+import { dispatchPluginCommand, isScaffoldOnly, pluginCommandGroups, pluginCommandUsage, SCAFFOLD_ONLY } from '../cli/plugin-commands.js'
 import { addCommand, addReservedMeta, removeCommand, removeReservedMeta } from './add-remove.js'
 import { describeCommand, describeReservedMeta } from './describe.js'
 import { doctorCommand, doctorReservedMeta } from './doctor.js'
@@ -284,11 +284,12 @@ function printAvailable(
         )
     }
 
-    for (const { plugin, commands: cmds } of pluginCommandGroups(registries, claimedNames(registries, ordered))) {
+    const claimed = claimedNames(registries, ordered)
+    for (const { plugin, commands: cmds } of pluginCommandGroups(registries, claimed)) {
         ui.blank()
         ui.plain('  ' + pc.dim(plugin))
         ui.kv(
-            cmds.map((cmd) => [cmd.usage ?? cmd.id, cmd.description] as [string, string]),
+            cmds.map((cmd) => [pluginCommandUsage(registries, cmd, claimed), cmd.description] as [string, string]),
             '    ',
         )
     }

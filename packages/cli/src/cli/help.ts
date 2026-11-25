@@ -1,7 +1,7 @@
 import pc from 'picocolors'
 import { ui } from '@battlestack/tui'
 import { claimedProjectCommands, collectFeatureCommandHelp, RESERVED_COMMANDS } from '../commands/project.js'
-import { pluginCommandGroups } from './plugin-commands.js'
+import { pluginCommandGroups, pluginCommandUsage } from './plugin-commands.js'
 import type { BattlestackRegistries, HelpMode } from '@battlestack/core'
 
 /** `printScaffoldHelp`'s template ids and examples are preset-nuxt-specific. */
@@ -43,14 +43,14 @@ export function printCommandHelp(name: string | undefined): boolean {
 
 /**
  * Plugin-contributed commands, one block per owning plugin. Scaffold-only ids
- * are excluded, plus anything in `claimed` that would lose dispatch anyway.
+ * are excluded; a command whose bare name is in `claimed` is listed by its fqid.
  */
 function printPluginCommandHelp(registries: BattlestackRegistries, claimed?: ReadonlySet<string>): void {
     for (const { plugin, commands } of pluginCommandGroups(registries, claimed)) {
         ui.blank()
         ui.plain(pc.bold(plugin))
         ui.kv(
-            commands.map((cmd) => [`battlestack ${cmd.usage ?? cmd.id}`, cmd.description] as [string, string]),
+            commands.map((cmd) => [`battlestack ${pluginCommandUsage(registries, cmd, claimed)}`, cmd.description] as [string, string]),
             '  ',
         )
     }
