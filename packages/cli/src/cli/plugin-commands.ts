@@ -86,9 +86,9 @@ export async function dispatchPluginCommand(
 }
 
 /**
- * Plugin commands grouped by owning plugin, minus every name in `claimed`.
- * A built-in or feature command of the same name always wins dispatch, so
- * listing one here would advertise a command the user cannot reach.
+ * Plugin commands grouped by owning plugin, minus the scaffold-only ids and
+ * every fqid in `claimed`. A command whose bare name is claimed stays listed:
+ * its fqid still dispatches, and `pluginCommandUsage` prints that spelling.
  */
 export function pluginCommandGroups(
     registries: BattlestackRegistries,
@@ -96,10 +96,28 @@ export function pluginCommandGroups(
 ): Array<{ plugin: string, commands: Registered<BattlestackCommand>[] }> {
     const grouped = new Map<string, Registered<BattlestackCommand>[]>()
     for (const cmd of registries.commands.all()) {
-        if (claimed.has(cmd.id) || claimed.has(cmd.fqid)) continue
+        if (SCAFFOLD_ONLY.has(cmd.id) || claimed.has(cmd.fqid)) continue
         const list = grouped.get(cmd.origin.plugin) ?? []
         list.push(cmd)
         grouped.set(cmd.origin.plugin, list)
     }
     return [...grouped].map(([plugin, commands]) => ({ plugin, commands }))
+}
+
+/**
+ * The usage line to print in help. When the bare id is claimed by a built-in
+ * or feature command, or provided by several plugins, only the fqid reaches
+ * this command, so the usage is rewritten to lead with it.
+ */
+export function pluginCommandUsage(
+    registries: BattlestackRegistries,
+    cmd: Registered<BattlestackCommand>,
+    claimed: ReadonlySet<string> = SCAFFOLD_ONLY,
+): string {
+    const usage = cmd.usage ?? cmd.id
+    if (usage === cmd.fqid || usage.startsWith(`${cmd.fqid} `)) return usage
+    const bareReaches = !claimed.has(cmd.id) && lookupPluginCommand(registries, cmd.id).kind === 'one'
+    if (bareReaches) return usage
+    if (usage === cmd.id || usage.startsWith(`${cmd.id} `)) return cmd.fqid + usage.slice(cmd.id.length)
+    return cmd.fqid
 }

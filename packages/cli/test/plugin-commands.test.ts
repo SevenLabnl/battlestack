@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BattlestackRegistries, silentLoader, type Provenance } from '@battlestack/core'
-import { dispatchPluginCommand, isScaffoldOnly, lookupPluginCommand, pluginCommandGroups } from '../src/cli/plugin-commands.js'
+import { dispatchPluginCommand, isScaffoldOnly, lookupPluginCommand, pluginCommandGroups, pluginCommandUsage } from '../src/cli/plugin-commands.js'
 
 const alpha: Provenance = { plugin: '@test/alpha', namespace: 'alpha' }
 const beta: Provenance = { plugin: '@test/beta', namespace: 'beta' }
@@ -127,17 +127,54 @@ describe('pluginCommandGroups', () => {
         ])
     })
 
-    it('excludes claimed names by either spelling', () => {
+    it('excludes a claimed fqid but keeps a command whose bare name is claimed', () => {
         const registries = new BattlestackRegistries()
         registries.commands.register({ id: 'deploy', description: 'ship it', run() {} }, alpha)
         registries.commands.register({ id: 'doctor', description: 'shadowed', run() {} }, beta)
         const groups = pluginCommandGroups(registries, new Set(['alpha:deploy', 'doctor']))
-        expect(groups).toEqual([])
+        expect(groups).toEqual([
+            { plugin: '@test/beta', commands: [expect.objectContaining({ fqid: 'beta:doctor' })] },
+        ])
+    })
+
+    it('still excludes scaffold-only ids when a claimed set is passed', () => {
+        const registries = new BattlestackRegistries()
+        registries.commands.register({ id: 'create', description: 'scaffold', run() {} }, alpha)
+        expect(pluginCommandGroups(registries, new Set(['doctor']))).toEqual([])
     })
 
     it('groups by owning plugin', () => {
         const groups = pluginCommandGroups(ambiguousRegistries())
         expect(groups.map((g) => g.plugin)).toEqual(['@test/alpha', '@test/beta'])
         expect(groups.every((g) => g.commands.every((c) => c.id === 'deploy'))).toBe(true)
+    })
+})
+
+describe('pluginCommandUsage', () => {
+    function one(command: { id: string, usage?: string }) {
+        const registries = new BattlestackRegistries()
+        registries.commands.register({ description: 'x', run() {}, ...command }, alpha)
+        return { registries, cmd: registries.commands.all()[0]! }
+    }
+
+    it('keeps the bare usage when the bare name reaches the command', () => {
+        const { registries, cmd } = one({ id: 'status', usage: 'status [service]' })
+        expect(pluginCommandUsage(registries, cmd)).toBe('status [service]')
+    })
+
+    it('leads with the fqid when the bare name is claimed', () => {
+        const { registries, cmd } = one({ id: 'login', usage: 'login [--no-browser]' })
+        expect(pluginCommandUsage(registries, cmd, new Set(['login']))).toBe('alpha:login [--no-browser]')
+    })
+
+    it('leads with the fqid when several plugins provide the bare name', () => {
+        const registries = ambiguousRegistries()
+        expect(registries.commands.all().filter((cmd) => cmd.id === 'deploy').map((cmd) => pluginCommandUsage(registries, cmd)))
+            .toEqual(['alpha:deploy', 'beta:deploy'])
+    })
+
+    it('leaves a usage that already leads with the fqid alone', () => {
+        const { registries, cmd } = one({ id: 'login', usage: 'alpha:login' })
+        expect(pluginCommandUsage(registries, cmd, new Set(['login']))).toBe('alpha:login')
     })
 })
