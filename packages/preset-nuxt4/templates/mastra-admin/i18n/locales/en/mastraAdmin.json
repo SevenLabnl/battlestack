@@ -15,6 +15,17 @@
         "selectPrompt": "Select a prompt",
         "noPrompt": "No prompt",
         "errorTitle": "Error",
-        "errorGeneric": "Something went wrong"
+        "errorGeneric": "Something went wrong",
+        "reasoningLabel": "Reasoning effort",
+        "reasoningDefault": "Default ({level})",
+        "reasoningProviderDefault": "provider default",
+        "reasoningLevels": {
+            "none": "None",
+            "minimal": "Minimal",
+            "low": "Low",
+            "medium": "Medium",
+            "high": "High",
+            "xhigh": "Extra high"
+        }
     }
 }

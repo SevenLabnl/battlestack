@@ -13,6 +13,7 @@ export default defineEventHandler(async (event) => {
             name: aiModelConfigs.name,
             description: aiModelConfigs.description,
             model: aiModelConfigs.model,
+            reasoningEffort: aiModelConfigs.reasoningEffort,
         })
         .from(aiModelConfigs)
         .orderBy(aiModelConfigs.key)

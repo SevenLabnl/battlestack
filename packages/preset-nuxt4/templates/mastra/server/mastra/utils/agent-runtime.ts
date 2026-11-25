@@ -3,7 +3,7 @@ import { eq, sql } from 'drizzle-orm'
 // `#server/*` is a Nuxt/Nitro alias that doesn't exist inside Mastra's bundle.
 import { db } from '../../database/client'
 import { agents } from '../../database/schema/ai'
-import { getActiveModelId } from './ai-model'
+import { getActiveModelId, getActiveReasoningEffort } from './ai-model'
 import { getDefaultPrompts } from '../../utils/prompts/defaults'
 import { getAgentDefinition } from '../agents/registry'
 import { createTtlCache, invalidate } from '../../utils/cache-bus'
@@ -51,6 +51,18 @@ export async function getAgentModelId(agentKey: string): Promise<string> {
     const link = await readAgentLink(agentKey)
     const modelConfigKey = link?.modelConfigKey || getAgentDefinition(agentKey).modelConfigKey
     return getActiveModelId(modelConfigKey)
+}
+
+/**
+ * Call options for an agent: today only the linked model config's reasoning effort, omitted when unset or unsupported.
+ * Pass the result as the agent's `defaultOptions` factory.
+ */
+export async function getAgentDefaultOptions(agentKey: string): Promise<{ providerOptions?: { openaiCompatible: { reasoningEffort: string } } }> {
+    const link = await readAgentLink(agentKey)
+    const modelConfigKey = link?.modelConfigKey || getAgentDefinition(agentKey).modelConfigKey
+    const modelId = await getActiveModelId(modelConfigKey)
+    const reasoningEffort = await getActiveReasoningEffort(modelConfigKey, modelId)
+    return reasoningEffort ? { providerOptions: { openaiCompatible: { reasoningEffort } } } : {}
 }
 
 /**

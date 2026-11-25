@@ -56,15 +56,20 @@ and deselect the model when the key is missing.
 
 ```ts
 import { Agent } from '@mastra/core/agent'
-import { getAgentModelId, getAgentInstructions } from '../utils/agent-runtime'
+import { getAgentModelId, getAgentInstructions, getAgentDefaultOptions } from '../utils/agent-runtime'
 
 export const myAgent = new Agent({
     id: 'my-agent',
     name: 'My Agent',
     instructions: () => getAgentInstructions('my-agent'),
     model: () => getAgentModelId('my-agent'),
+    defaultOptions: () => getAgentDefaultOptions('my-agent'),
 })
 ```
+
+`getAgentDefaultOptions` sends the reasoning effort an admin picked for the
+linked model config. Models that support it are listed in
+`server/mastra/utils/reasoning.ts`; extend that table for new ones.
 
 Add the agent to the Mastra constructor in `server/mastra/index.ts` and give it
 an entry in `server/mastra/agents/registry.ts` (name, default model config +

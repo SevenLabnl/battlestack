@@ -29,7 +29,7 @@ import {
 /** Mastra AI runtime. Talks to an OpenAI-compatible AI gateway (sluis.ai preset, or any compatible URL) via `@ai-sdk/openai-compatible`. */
 export const mastraFeature: Feature = {
     id: 'nuxt4:mastra',
-    version: '2.1.6',
+    version: '2.2.0',
     label: 'Mastra AI runtime',
     frameworks: ['nuxt4'],
     stage: STAGE.AI_CORE,
@@ -249,6 +249,8 @@ export const mastraFeature: Feature = {
                     '- Swap models by editing the agent (no code path change)',
                     '',
                     'Admins also swap models at runtime from `/dashboard/settings/ai`. The `ai_model_configs` table holds `chat` + `embedding` rows; agents resolve a `key` and use the row\'s `model` value. The page calls `/api/ai/models` (gateway passthrough) for the picker and `PUT /api/ai/configs/:id` to commit changes (admin-only, audit-logged).',
+                    '',
+                    'Each chat model config also stores an optional `reasoning_effort`. The picker only offers it for models listed in `server/mastra/utils/reasoning.ts`, with the levels that model accepts; null omits the field so the model runs at its provider default (Mistral Large reasons at `high`). Agents send it through `defaultOptions: () => getAgentDefaultOptions(key)`, and an effort the current model does not accept is never sent. Add a model to that table to give it a selector.',
                     '',
                     'Boot-time registration: `server/plugins/10-sync-ai-on-boot.ts` runs on EVERY boot (dev/staging/prod, advisory-locked) and ensures the `ai_model_configs` rows plus an `agents` row per registered agent exist: insert-if-missing, never update or delete. This replaces relying on the dev-only `db:seed` (which refuses to run in production), so a fresh staging/prod deploy is never left with empty tables.',
                     '',
