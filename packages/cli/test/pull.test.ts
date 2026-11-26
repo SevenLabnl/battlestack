@@ -395,6 +395,35 @@ describe('battlestack pull: ownedByUser is inviolable', () => {
         process.exitCode = undefined
     })
 
+    it('CORE PROPERTY: a path owned only by a feature whose plugin did not load is left alone by a loaded feature that tracks it', async () => {
+        const projectDir = await tmp('battlestack-pull-owned-orphan-')
+        const otherV1 = await tmp('battlestack-pull-owned-orphan-v1-')
+        const otherV2 = await tmp('battlestack-pull-owned-orphan-v2-')
+        await writeTemplateFile(otherV1, 'shared.ts', 'v1\n')
+        await writeTemplateFile(otherV2, 'shared.ts', 'v2\n')
+
+        const ids = [fqid('test:feat-other')]
+        const registriesV1 = makeRegistries({ requiredFeatures: ids })
+        const otherV1Feature = makeFileFeature('test:feat-other', '1.0.0', otherV1)
+        registriesV1.features.register(otherV1Feature, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, ids)
+        await otherV1Feature.execute(ctx)
+        await writeManifest(ctx)
+
+        // Unedited, so only the orphan's ownership keeps the loaded feature from writing it.
+        const manifest = await readManifestRaw(projectDir)
+        manifest.features.push({ id: 'gone:feat-owner', version: '1.0.0', files: {}, ownedByUser: ['shared.ts'] })
+        await writeFile(path.join(projectDir, MANIFEST_PATH), JSON.stringify(manifest, null, 2), 'utf8')
+
+        const registriesV2 = makeRegistries({ requiredFeatures: ids })
+        registriesV2.features.register(makeFileFeature('test:feat-other', '2.0.0', otherV2), origin)
+
+        await runPull(projectDir, registriesV2)
+        process.exitCode = undefined
+
+        expect(await readFile(path.join(projectDir, 'shared.ts'), 'utf8')).toBe('v1\n')
+    })
+
     it('retires a moved template through real ownership and version-gated pulls without data loss', async () => {
         const projectDir = await tmp('battlestack-pull-owned-retirement-')
         const tplV1 = await tmp('battlestack-pull-owned-retirement-v1-')

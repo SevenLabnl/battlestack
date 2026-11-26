@@ -609,6 +609,33 @@ describe('battlestack remove of a feature whose plugin is not loaded', () => {
     })
 })
 
+describe('battlestack remove keeps ownership the removed feature held for others', () => {
+    it('moves an owned path the feature did not track to the features that do', async () => {
+        const p = await project()
+        await withCwd(p.dir, () => add('add:opt')(p))
+        const m = await p.manifest()
+        m.features.find((f) => f.id === `${NS}:add:opt`)!.ownedByUser = ['add-base.txt']
+        await writeFile(path.join(p.dir, MANIFEST_PATH), JSON.stringify(m))
+
+        await withCwd(p.dir, () => removeCommand(defaultArgs({ projectName: 'add:opt', skipInstall: true }), undefined as never, p.registries))
+
+        const base = (await p.manifest()).features.find((f) => f.id === `${NS}:add:base`)!
+        expect(base.ownedByUser).toEqual(['add-base.txt'])
+    })
+
+    it('does the same for a feature whose plugin is not loaded', async () => {
+        const p = await project()
+        const m = await p.manifest()
+        m.features.push({ id: 'gone:feature', version: '1.0.0', files: {}, ownedByUser: ['add-base.txt'] })
+        await writeFile(path.join(p.dir, MANIFEST_PATH), JSON.stringify(m))
+
+        await withCwd(p.dir, () => removeCommand(defaultArgs({ projectName: 'gone:feature' }), undefined as never, p.registries))
+
+        const base = (await p.manifest()).features.find((f) => f.id === `${NS}:add:base`)!
+        expect(base.ownedByUser).toEqual(['add-base.txt'])
+    })
+})
+
 describe('battlestack remove takes the project lock', () => {
     it('refuses while another battlestack process holds it', async () => {
         const p = await project()

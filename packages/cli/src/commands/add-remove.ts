@@ -28,6 +28,7 @@ import {
     resolveProjectName,
     UPDATING_STATE_KEY,
     updateLedger,
+    type InstalledFeatureRecord,
     type ProjectManifest,
 } from '@battlestack/core'
 import { applyEnv, collectEnvForFeature } from '@battlestack/preset-nuxt4'
@@ -229,6 +230,24 @@ function dependentsOf(manifest: ProjectManifest, featureId: string, registries: 
         .map((f) => f.id)
 }
 
+/** Gives the paths `record` owns but does not track to the features that track them, so the ownership outlives it. */
+function handOverOwnership(manifest: ProjectManifest, record: InstalledFeatureRecord): InstalledFeatureRecord[] {
+    const tracked = new Set(Object.keys(record.files).map(toPosixRel))
+    const receivers = new Set<InstalledFeatureRecord>()
+    for (const rel of record.ownedByUser ?? []) {
+        const posix = toPosixRel(rel)
+        if (tracked.has(posix)) continue
+        for (const other of manifest.features) {
+            if (other === record || !Object.keys(other.files).some((k) => toPosixRel(k) === posix)) continue
+            const owned = other.ownedByUser ?? []
+            if (owned.some((o) => toPosixRel(o) === posix)) continue
+            other.ownedByUser = [...owned, rel]
+            receivers.add(other)
+        }
+    }
+    return [...receivers]
+}
+
 async function removeLocked(args: ParsedArgs, registries: BattlestackRegistries, requested: string, projectRoot: string): Promise<void> {
     const manifest = await readManifest(projectRoot, registries)
     if (!manifest) {
@@ -269,6 +288,7 @@ async function removeLocked(args: ParsedArgs, registries: BattlestackRegistries,
             ui.info(`dry-run: would drop the record of ${featureId} and leave its files on disk`)
             return
         }
+        handOverOwnership(manifest, record)
         manifest.features = manifest.features.filter((f) => f.id !== featureId)
         manifest.optedOut = [...new Set([...(manifest.optedOut ?? []), featureId])]
         manifest.updatedAt = new Date().toISOString()
@@ -350,6 +370,7 @@ async function removeLocked(args: ParsedArgs, registries: BattlestackRegistries,
     const removedOnly = computeRemovedOnlyDeps(ctxForDeps, featureId, registries)
     await stripDepsAndInstall(ctxForDeps, removedOnly, pm)
 
+    const receivers = handOverOwnership(manifest, record)
     manifest.features = manifest.features.filter((f) => f.id !== featureId)
     manifest.updatedAt = new Date().toISOString()
     const ctx = buildCtx(
@@ -364,6 +385,9 @@ async function removeLocked(args: ParsedArgs, registries: BattlestackRegistries,
     for (const f of manifest.features) {
         if (!registries.features.has(f.id)) continue
         ctx.state[`files:${registries.features.get(f.id).id}`] = { ...f.files }
+    }
+    for (const f of receivers) {
+        if (registries.features.has(f.id)) ctx.state[`owned:${registries.features.get(f.id).id}`] = [...f.ownedByUser!]
     }
     ctx.state.optedOut = [...new Set([...(manifest.optedOut ?? []), featureId])]
     await writeManifest(ctx)

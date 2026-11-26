@@ -403,6 +403,10 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             ctx.state[`files:${bare}`] = { ...f.files }
             if (f.ownedByUser) ctx.state[`owned:${bare}`] = [...f.ownedByUser]
         }
+        // An orphan's ownership still holds: its plugin may only have failed to load.
+        for (const f of orphans) {
+            if (f.ownedByUser) ctx.state[`owned:${f.id}`] = [...f.ownedByUser]
+        }
 
         // `--skills-only`: skills only, skipping template updates, dep install and formatting.
         if (args.skillsOnly) {

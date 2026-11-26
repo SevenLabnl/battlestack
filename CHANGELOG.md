@@ -156,6 +156,10 @@
 - `pull` no longer adds the theme imports to an owned
   `app/assets/css/main.css`, and the `eslint --fix` pass of `pull` and `add`
   gives every owned file its own bytes back.
+- A path owned only under a feature whose plugin did not load stays owned
+  during `pull`, as `doctor` already reports it. `battlestack remove` hands a
+  path the removed feature owned but did not ship to the features that do
+  track it, so the next pull of one of them leaves it alone.
 - A feature whose plugin did not load keeps its manifest record on `pull`
   instead of being dropped, so its files stay managed.
 - `battlestack remove` of a feature whose plugin did not load refuses when
