@@ -28,7 +28,9 @@ description: Apply the Battlestack design system when building, modifying, revie
 
 State the classification in one line before implementing. For 6–7, read `references/component-selection.md`.
 
-A page that needs an action in the app header, such as "New chat", teleports it into the layout's `#header-actions` target instead of editing the layout: `<Teleport to="#header-actions" defer>`. Render it client-side only (`<ClientOnly>` or a `v-if` on client state), because Nuxt teleports only to `body` during SSR. The layout is the project's shell, and editing it makes every later `battlestack pull` merge into it.
+A page that needs an action in the app header, such as "New chat", teleports it into the layout's `#header-actions` target: `<Teleport to="#header-actions" defer>`. Render it client-side only (`<ClientOnly>` or a `v-if` on client state), because Nuxt teleports only to `body` during SSR.
+
+First check that the target exists in the layout the page uses (its `definePageMeta({ layout })`, else `app/layouts/default.vue`). Projects scaffolded before it shipped, projects without the landing shell, and the `auth` layout do not have it, and a teleport to a missing target renders nothing without an error. If the layout has a `<UHeader>` without the target, add `<div id="header-actions" class="contents" />` inside it, and `:ui="{ center: 'flex' }"` on `<UHeader>` so it shows on mobile (give the `UNavigationMenu` there `class="hidden lg:flex"`). A layout without a header, such as `auth`, has nowhere to put the action, so keep it in the page. The layout belongs to the project, so `battlestack pull` never changes it.
 
 ### 3. Implement with tokens
 

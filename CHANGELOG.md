@@ -135,7 +135,8 @@
   `<Teleport to="#header-actions" defer>` instead of editing the layout. The
   layout belongs to your project, so `pull` does not change it: the pull that
   brings this in lists the edits to make under Optional in `REPORT.md`,
-  without counting them as work left.
+  without counting them as work left. The `battlestack-ui` skill tells AI
+  agents to check that the page's layout has the target and to add it if not.
 - A prompt can be up to 100,000 characters instead of 10,000, and a prompt that
   cannot be saved shows the reason in the toast instead of a bare 400.
 - The AI settings e2e test sets the model from `NUXT_AI_GATEWAY_CHAT_MODEL`
