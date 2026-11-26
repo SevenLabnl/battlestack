@@ -15,6 +15,18 @@
         "selectPrompt": "Kies een prompt",
         "noPrompt": "Geen prompt",
         "errorTitle": "Fout",
-        "errorGeneric": "Er ging iets mis"
+        "errorGeneric": "Er ging iets mis",
+        "reasoningLabel": "Denkniveau",
+        "reasoningDefault": "Standaard ({level})",
+        "reasoningLevels": {
+            "none": "Uit",
+            "minimal": "Minimaal",
+            "low": "Laag",
+            "medium": "Gemiddeld",
+            "high": "Hoog",
+            "xhigh": "Extra hoog",
+            "max": "Maximaal"
+        },
+        "reasoningDefaultUnknown": "Standaard"
     }
 }

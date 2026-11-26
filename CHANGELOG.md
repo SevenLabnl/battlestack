@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- The AI settings page lets an admin pick a reasoning effort per chat model
+  config, for models that support one. The levels come from the AI gateway
+  when it reports them on `/v1/models` (sluis.ai does), else from a built-in
+  table covering GPT-6, GPT-5.x, gpt-oss, Claude, Gemini 2.5 to 4, Mistral
+  Large, Grok 3 mini, GLM-5, Qwen 3.5/3.6 and Gemma 4. "Default" sends nothing,
+  so the model keeps its provider default, which the picker names (`high` for
+  Mistral Large). Existing projects get a
+  new nullable `ai_model_configs.reasoning_effort` column via
+  `battlestack pull`; run `battlestack db:generate` afterwards and commit the
+  migration. Until it is applied the AI settings page errors, while agents
+  keep running at their provider default.
 - A generated project's `.gitignore` lists `.claude/settings.local.json`, Claude
   Code's per-person settings file. Existing projects get the line via
   `battlestack pull`; one that already committed the file still has to run

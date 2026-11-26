@@ -73,7 +73,7 @@ describe('model resolution routes through the generic gateway', () => {
 
     it('the admin model picker reuses the gateway module\'s models fetch', async () => {
         const src = await read('mastra', 'server', 'api', 'ai', 'models.get.ts')
-        expect(src).toContain("import { fetchGatewayModelIds } from '#server/mastra/gateways/openai-compat'")
+        expect(src).toContain("import { fetchGatewayModels } from '#server/mastra/gateways/openai-compat'")
         // Control: no second hand-rolled models request in this route (prose may
         // still name the endpoint; an actual call would need a fetch invocation).
         expect(src).not.toMatch(/\$fetch|await fetch\(/)

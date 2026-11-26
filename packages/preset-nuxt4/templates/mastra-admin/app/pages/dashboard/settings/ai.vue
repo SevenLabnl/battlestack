@@ -7,6 +7,9 @@ interface ModelConfig {
     name: string
     description: string
     model: string
+    reasoningEffort: string | null
+    reasoningEfforts: string[]
+    defaultReasoningEffort: string | null
 }
 
 const { t } = useI18n()
@@ -42,11 +45,22 @@ function optionsFor(configKey: string) {
         .map((m) => ({ label: m.id, value: m.id }))
 }
 
-async function updateModelConfig(id: string, model: string) {
+function reasoningOptionsFor(config: ModelConfig) {
+    if (!config.reasoningEfforts.length) return []
+    const defaultLabel = config.defaultReasoningEffort
+        ? t('mastraAdmin.reasoningDefault', { level: t(`mastraAdmin.reasoningLevels.${config.defaultReasoningEffort}`) })
+        : t('mastraAdmin.reasoningDefaultUnknown')
+    return [
+        { label: defaultLabel, value: null as string | null },
+        ...config.reasoningEfforts.map((level) => ({ label: t(`mastraAdmin.reasoningLevels.${level}`), value: level })),
+    ]
+}
+
+async function updateModelConfig(id: string, patch: { model?: string, reasoningEffort?: string | null }) {
     try {
         await $fetch(`/api/ai/configs/${id}`, {
             method: 'PUT',
-            body: { model },
+            body: patch,
         })
         toast.add({ title: t('mastraAdmin.updated'), color: 'success' })
         await refreshConfigs()
@@ -180,7 +194,19 @@ async function updateAgent(id: string, patch: Partial<Pick<AgentRow, 'modelConfi
                         }"
                         size="lg"
                         class="w-full sm:flex-1"
-                        @update:model-value="updateModelConfig(config.id, $event as string)"
+                        @update:model-value="updateModelConfig(config.id, { model: $event as string })"
+                    />
+                    <USelectMenu
+                        v-if="reasoningOptionsFor(config).length"
+                        :model-value="config.reasoningEffort"
+                        :items="reasoningOptionsFor(config)"
+                        value-key="value"
+                        :search-input="false"
+                        :aria-label="t('mastraAdmin.reasoningLabel')"
+                        icon="i-lucide-brain"
+                        size="lg"
+                        class="w-full sm:w-56"
+                        @update:model-value="updateModelConfig(config.id, { reasoningEffort: $event as string | null })"
                     />
                 </div>
             </div>

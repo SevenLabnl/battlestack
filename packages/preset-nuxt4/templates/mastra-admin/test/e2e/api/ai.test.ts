@@ -16,6 +16,7 @@ interface ModelConfig {
     name: string
     description: string
     model: string
+    reasoningEffort: string | null
 }
 
 describe('e2e: ai model admin', () => {
@@ -78,6 +79,63 @@ describe('e2e: ai model admin', () => {
         expect(status).toBeGreaterThanOrEqual(400)
         expect(status).toBeLessThan(500)
     })
+
+    // These cases repoint the shared `chat` config, so each one restores it afterwards.
+    async function withChatConfig(run: (target: ModelConfig, cookie: string) => Promise<void>) {
+        const adminCookie = await loginAsAdmin()
+        const list = await apiGet<ModelConfig[]>('/api/ai/configs', adminCookie)
+        const target = list.data?.find((c) => c.key === 'chat')
+        if (!target) return
+        try {
+            await run(target, adminCookie)
+        } finally {
+            await apiPut(
+                `/api/ai/configs/${target.id}`,
+                { model: target.model, reasoningEffort: target.reasoningEffort },
+                adminCookie,
+            )
+        }
+    }
+
+    it.skipIf(!serverUp)('admin can set and reset a supported reasoning effort', () =>
+        withChatConfig(async (target, cookie) => {
+            const set = await apiPut<ModelConfig>(
+                `/api/ai/configs/${target.id}`,
+                { model: 'mistral/mistral-large-latest', reasoningEffort: 'low' },
+                cookie,
+            )
+            expect(set.status).toBe(200)
+            expect(set.data?.reasoningEffort).toBe('low')
+            const reset = await apiPut<ModelConfig>(`/api/ai/configs/${target.id}`, { reasoningEffort: null }, cookie)
+            expect(reset.status).toBe(200)
+            expect(reset.data?.reasoningEffort).toBeNull()
+        }))
+
+    it.skipIf(!serverUp)('PUT rejects a reasoning effort the model does not support', () =>
+        withChatConfig(async (target, cookie) => {
+            const { status } = await apiPut(
+                `/api/ai/configs/${target.id}`,
+                { model: 'mistral/mistral-large-latest', reasoningEffort: 'xhigh' },
+                cookie,
+            )
+            expect(status).toBe(400)
+        }))
+
+    it.skipIf(!serverUp)('switching to a model without reasoning levels clears the effort', () =>
+        withChatConfig(async (target, cookie) => {
+            await apiPut(
+                `/api/ai/configs/${target.id}`,
+                { model: 'mistral/mistral-large-latest', reasoningEffort: 'high' },
+                cookie,
+            )
+            const { status, data } = await apiPut<ModelConfig>(
+                `/api/ai/configs/${target.id}`,
+                { model: 'moonshot/kimi-k3' },
+                cookie,
+            )
+            expect(status).toBe(200)
+            expect(data?.reasoningEffort).toBeNull()
+        }))
 
     if (!serverUp) {
         it('e2e suite skipped, no server up at TEST_BASE_URL', () => {
