@@ -24,6 +24,7 @@ import { readdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { stripComments } from './strip-comments'
+import { versionStatus } from './version-status'
 
 type Level = 'patch' | 'minor' | 'major'
 type Status = 'changed' | 'bumped' | 'lowered' | 'new' | 'clean'
@@ -272,18 +273,6 @@ function templateDirs(pkgRoot: string, raw: string): string[] {
     return [...dirs]
 }
 
-/** How `version` relates to the version at the base ref, before looking at changed files. */
-export function versionStatus(base: string | null, version: string): 'new' | 'bumped' | 'lowered' | 'same' {
-    if (base === null) return 'new'
-    const a = version.split('.').map(Number)
-    const b = base.split('.').map(Number)
-    for (let i = 0; i < 3; i++) {
-        if (a[i]! > b[i]!) return 'bumped'
-        if (a[i]! < b[i]!) return 'lowered'
-    }
-    return 'same'
-}
-
 function classify(file: string, version: string, ownedPaths: string[], changed: Set<string>, ref: string, base: string | null): Status {
     const status = versionStatus(base, version)
     if (status !== 'same') return status
@@ -412,5 +401,4 @@ function fail(msg: string): never {
     process.exit(1)
 }
 
-// Imported by its test, which must not run the CLI.
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main()
+await main()

@@ -12,6 +12,7 @@ import {
     mergeLabels,
     pruneBases,
     recordedFiles,
+    run,
     stageUpstream,
     storeBase,
     threeWayMerge,
@@ -195,7 +196,7 @@ function isExempt(rel: string, exempt: string[]): boolean {
  * Whether eslint passes on every file changed or added since HEAD, so the errors of a failed
  * `eslint . --fix` were there before this pull. False when eslint cannot be run.
  */
-export function lintCleanWhereTouched(projectDir: string, pm: string): boolean {
+export async function lintCleanWhereTouched(projectDir: string, pm: string): Promise<boolean> {
     const list = (args: string[]): string[] => git(projectDir, args).out.toString().split('\0').filter(Boolean)
     const touched = [
         ...list(['diff', '--name-only', '-z', '--relative', '--diff-filter=d', 'HEAD']),
@@ -204,7 +205,8 @@ export function lintCleanWhereTouched(projectDir: string, pm: string): boolean {
     if (touched.length === 0) return true
     const eslint = ['eslint', '--no-warn-ignored', '--', ...touched]
     const args = pm === 'npm' ? ['exec', '--', ...eslint] : pm === 'bun' ? ['x', ...eslint] : ['exec', ...eslint]
-    return spawnSync(pm, args, { cwd: projectDir, stdio: 'ignore' }).status === 0
+    // `run` reaches pnpm's `.cmd` shim on Windows, which a plain spawn cannot start.
+    return run(pm, args, { cwd: projectDir }).then(() => true, () => false)
 }
 
 /** Recorded files this pull created that git does not know yet. */

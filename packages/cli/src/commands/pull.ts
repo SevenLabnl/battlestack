@@ -506,7 +506,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             if (args.format && !lockfileBlocked) {
                 await formatAndReconcile(ctx, manifest, registries)
                 // Lint debt the project already had would otherwise fail every pull, even a no-op one.
-                if (ctx.state['format:error'] && safety.git && lintCleanWhereTouched(projectDir, String(ctx.state.packageManager ?? 'pnpm'))) {
+                if (ctx.state['format:error'] && safety.git && await lintCleanWhereTouched(projectDir, String(ctx.state.packageManager ?? 'pnpm'))) {
                     delete ctx.state['format:error']
                 }
             }

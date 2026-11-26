@@ -1275,7 +1275,8 @@ describe('battlestack pull: a runtimeConfig default it cannot add', () => {
     })
 })
 
-describe('battlestack pull: lint errors after the update', () => {
+// The stand-in eslint is a shebang script, which Windows cannot run.
+describe.skipIf(process.platform === 'win32')('battlestack pull: lint errors after the update', () => {
     // Fails on any file it lints that contains LINT_ERROR; `.` lints every file.
     const FAKE_ESLINT = [
         '#!/usr/bin/env node',

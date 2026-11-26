@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { versionStatus } from '../bump-check'
+import { versionStatus } from '../version-status'
 
 describe('versionStatus', () => {
     it.each([
