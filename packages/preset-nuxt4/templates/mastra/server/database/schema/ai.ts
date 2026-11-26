@@ -6,6 +6,8 @@ export const aiModelConfigs = pgTable('ai_model_configs', {
     name: text('name').notNull(),
     description: text('description').notNull().default(''),
     model: text('model').notNull().default(''),
+    /** Null omits `reasoning_effort`, so the model runs at its provider default. */
+    reasoningEffort: text('reasoning_effort'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })

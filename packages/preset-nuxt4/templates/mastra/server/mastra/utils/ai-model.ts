@@ -5,6 +5,8 @@ import { db } from '../../database/client'
 import { aiModelConfigs } from '../../database/schema/ai'
 import { inferProviderFromName } from '../gateways/openai-compat'
 import { envModelDefault } from './env-defaults'
+import { effectiveReasoningEffort, type ReasoningEffort } from './reasoning'
+import { getReasoningSupport } from './reasoning-catalog'
 import { createTtlCache, invalidate } from '../../utils/cache-bus'
 
 const CACHE_NAMESPACE = 'ai-model'
@@ -12,6 +14,8 @@ const CACHE_NAMESPACE = 'ai-model'
 const TTL_MS = 30_000
 
 const cache = createTtlCache<string>(CACHE_NAMESPACE, TTL_MS)
+const EFFORT_NAMESPACE = 'ai-model-effort'
+const effortCache = createTtlCache<string | null>(EFFORT_NAMESPACE, TTL_MS)
 
 // `key === 'embedding'` falls back to the embedding env default; every other key (chat + custom configs) falls back to the chat model env.
 function readFallback(key: string): string {
@@ -41,6 +45,30 @@ export async function getActiveModelId(key: string): Promise<string> {
     } catch {
         return toRouterId(readFallback(key))
     }
+}
+
+/**
+ * The reasoning effort to send for a model config, or null to omit it.
+ * Read apart from the model so a project that has not migrated the column yet keeps its model.
+ */
+export async function getActiveReasoningEffort(key: string, modelId: string): Promise<ReasoningEffort | null> {
+    let stored = effortCache.get(key)
+    if (stored === undefined) {
+        const generation = effortCache.generation()
+        try {
+            const [row] = await db
+                .select({ reasoningEffort: aiModelConfigs.reasoningEffort })
+                .from(aiModelConfigs)
+                .where(eq(aiModelConfigs.key, key))
+                .limit(1)
+            stored = row?.reasoningEffort ?? null
+            effortCache.set(key, stored, generation)
+        } catch {
+            stored = null
+        }
+    }
+    if (!stored) return null
+    return effectiveReasoningEffort(await getReasoningSupport(modelId), stored)
 }
 
 // Embeddings reuse the `ai_model_configs.key = 'embedding'` row but resolve to a RAW id (no `gateway/` prefix) since Mastra core doesn't gateway embedding models.
@@ -89,9 +117,11 @@ function toRouterId(stored: string): string {
 export async function invalidateActiveModel(key?: string): Promise<void> {
     if (!key) {
         await invalidate(CACHE_NAMESPACE)
+        await invalidate(EFFORT_NAMESPACE)
         return
     }
     await invalidate(CACHE_NAMESPACE, key)
+    await invalidate(EFFORT_NAMESPACE, key)
     // The `embedding` config is cached twice: prefixed (via getActiveModelId)
     // and raw (via getActiveEmbeddingModelId). Clear both.
     if (key === 'embedding') await invalidate(CACHE_NAMESPACE, EMBEDDING_CACHE_KEY)
