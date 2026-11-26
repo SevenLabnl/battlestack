@@ -191,17 +191,44 @@ function hasHeaderAuth(): boolean {
     return Object.keys(gatewayHeaders()).some((k) => k.toLowerCase() === 'authorization')
 }
 
+export interface GatewayModel {
+    id: string
+    /** Per-model capabilities, when the gateway reports them (sluis.ai does). */
+    capabilities?: Record<string, unknown> | null
+}
+
+/** Matches the gateway's own catalog cache, so new models and levels show up without a restart. */
+const MODELS_TTL_MS = 10 * 60_000
+/** A failed fetch is retried sooner, without hammering a gateway that is down. */
+const MODELS_RETRY_MS = 60_000
+let _models: { at: number, ttl: number, value: GatewayModel[] } | null = null
+let _modelsInFlight: Promise<GatewayModel[]> | null = null
+
 /**
- * Raw model ids from the gateway's `/v1/models` (`{data: [...]}` or a bare array, depending on
- * deployment), wildcards dropped. Shared by provider discovery and the admin model picker.
- * Errors resolve to an empty list, so discovery and the picker both keep working.
+ * The gateway's `/v1/models` entries (`{data: [...]}` or a bare array, depending on deployment),
+ * wildcards dropped. Shared by provider discovery, the admin model picker and reasoning-level lookups.
+ * Errors resolve to an empty list, so every consumer degrades gracefully.
  */
-export async function fetchGatewayModelIds(): Promise<string[]> {
+export async function fetchGatewayModels(): Promise<GatewayModel[]> {
+    if (_models && Date.now() - _models.at < _models.ttl) return _models.value
+    _modelsInFlight ??= loadGatewayModels().finally(() => {
+        _modelsInFlight = null
+    })
+    return _modelsInFlight
+}
+
+async function loadGatewayModels(): Promise<GatewayModel[]> {
+    const value = await requestGatewayModels()
+    _models = { at: Date.now(), ttl: value ? MODELS_TTL_MS : MODELS_RETRY_MS, value: value ?? [] }
+    return _models.value
+}
+
+async function requestGatewayModels(): Promise<GatewayModel[] | null> {
     let endpoints: { root: string, apiKey: string }
     try {
         endpoints = gatewayEndpoints()
     } catch {
-        return []
+        return null
     }
     try {
         const res = await fetch(`${endpoints.root}/v1/models`, {
@@ -214,21 +241,26 @@ export async function fetchGatewayModelIds(): Promise<string[]> {
             if (process.env.DEBUG_AI_GATEWAY) {
                 process.stderr.write(`[ai-gateway] /v1/models → ${res.status} ${res.statusText}\n`)
             }
-            return []
+            return null
         }
-        const raw = (await res.json()) as { data?: Array<{ id?: string }> } | Array<{ id?: string }>
+        type Entry = { id?: string, capabilities?: Record<string, unknown> | null }
+        const raw = (await res.json()) as { data?: Entry[] } | Entry[]
         const entries = Array.isArray(raw) ? raw : (raw.data ?? [])
         return entries
-            .map((m) => m.id)
-            .filter((id): id is string => Boolean(id))
-            .filter((id) => !id.includes('*'))
+            .filter((m): m is Entry & { id: string } => Boolean(m.id) && !m.id!.includes('*'))
+            .map((m) => ({ id: m.id, capabilities: m.capabilities ?? null }))
     } catch (err) {
         if (process.env.DEBUG_AI_GATEWAY) {
             const msg = err instanceof Error ? err.message : String(err)
             process.stderr.write(`[ai-gateway] /v1/models fetch failed: ${msg}\n`)
         }
-        return []
+        return null
     }
+}
+
+/** Raw model ids from the gateway's `/v1/models`. */
+export async function fetchGatewayModelIds(): Promise<string[]> {
+    return (await fetchGatewayModels()).map((m) => m.id)
 }
 
 /**
