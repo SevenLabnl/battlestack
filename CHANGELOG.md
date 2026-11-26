@@ -18,6 +18,11 @@
   `battlestack pull`; run `battlestack db:generate` afterwards and commit the
   migration. Until it is applied the AI settings page errors, while agents
   keep running at their provider default.
+- `battlestack login` works in a project that has not yet been pulled past
+  nuxt-auth-utils 0.6: it signs the magic link with `NUXT_SESSION_PASSWORD`
+  when `.env` has no `NUXT_APP_SECRET`, the key that project's server still
+  verifies with. It also waits up to 5 seconds for the dev server, so a cold
+  first render is no longer reported as "not reachable".
 - A generated project's `.gitignore` lists `.claude/settings.local.json`, Claude
   Code's per-person settings file. Existing projects get the line via
   `battlestack pull`; one that already committed the file still has to run

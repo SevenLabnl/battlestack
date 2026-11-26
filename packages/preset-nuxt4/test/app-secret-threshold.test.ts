@@ -50,8 +50,8 @@ describe('minimum app-secret length is consistent across every copy', () => {
         )
         const cli = await extract(
             CLI_LOGIN,
-            /NUXT_APP_SECRET'\)\s*\?\?\s*''\s*\n\s*if \(secret\.length < (\d+)\)/,
-            'runLogin\'s hardcoded secret-length check',
+            /env\.get\(LEGACY_SECRET_KEY\)\s*\?\?\s*''\s*\n\s*if \(secret\.length < (\d+)\)/,
+            'loginSecret\'s hardcoded secret-length check',
         )
         expect(cli).toBe(authoritative)
     })

@@ -31,7 +31,7 @@ function titleCase(slug: string): string {
 /** Session auth on `nuxt-auth-utils`. The sealed cookie carries an opaque sessionId. */
 export const authFeature: Feature = {
     id: 'nuxt4:auth',
-    version: '1.11.0',
+    version: '1.11.1',
     label: 'Session-based auth (argon2id)',
     frameworks: ['nuxt4'],
     stage: STAGE.AUTH,
@@ -415,13 +415,7 @@ async function runLogin(ctx: RunContext): Promise<void> {
         )
     }
 
-    const secret = env.get('NUXT_APP_SECRET') ?? ''
-    if (secret.length < 32) {
-        throw new CLIError(
-            ErrorCode.SCAFFOLD_FAILED,
-            'NUXT_APP_SECRET is missing or shorter than 32 chars in `.env`. Bump it and re-run.',
-        )
-    }
+    const secret = loginSecret(env)
 
     const port = await resolveAppPort(ctx.projectDir, ctx.projectName)
     // Localhost, not `NUXT_HOST`, which is only the bind address.
@@ -453,10 +447,27 @@ async function runLogin(ctx: RunContext): Promise<void> {
     }
 }
 
+/**
+ * The secret the project's own server verifies a magic link with. A project not yet pulled
+ * past nuxt-auth-utils 0.6 has only the legacy key, and its endpoint still checks that one.
+ */
+export function loginSecret(env: Map<string, string>): string {
+    const secret = env.get(APP_SECRET_KEY) ?? env.get(LEGACY_SECRET_KEY) ?? ''
+    if (secret.length < 32) {
+        throw new CLIError(
+            ErrorCode.SCAFFOLD_FAILED,
+            `Neither ${APP_SECRET_KEY} nor ${LEGACY_SECRET_KEY} in \`.env\` is at least 32 chars. `
+            + `Run \`battlestack pull\` to move to ${APP_SECRET_KEY}, or bump it and re-run.`,
+        )
+    }
+    return secret
+}
+
 /** Short-timeout HEAD probe of `/`. Any HTTP response means up; refused or timeout means down. */
 async function isDevServerUp(baseUrl: string): Promise<boolean> {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 1500)
+    // A dev server's first render after idling can take over a second.
+    const timer = setTimeout(() => controller.abort(), 5000)
     try {
         const res = await fetch(`${baseUrl}/`, {
             method: 'HEAD',
