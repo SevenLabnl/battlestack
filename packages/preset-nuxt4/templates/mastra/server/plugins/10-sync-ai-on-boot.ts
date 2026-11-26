@@ -80,15 +80,16 @@ async function registerAgents(tx: Tx): Promise<void> {
 
 /**
  * Keys of the agents actually registered on the Mastra instance, so any agent added to the constructor is picked up with no extra wiring.
- * Falls back to the static registry if the Mastra API shape differs.
+ * Mastra 1.x calls it `listAgents`; `getAgents` is the name older versions used.
  */
 function liveAgentKeys(): string[] {
+    const instance = mastra as { listAgents?: () => Record<string, unknown>, getAgents?: () => Record<string, unknown> }
     try {
-        const all = (mastra as { getAgents?: () => Record<string, unknown> }).getAgents?.()
-        const keys = all ? Object.keys(all) : []
+        const keys = Object.keys(instance.listAgents?.() ?? instance.getAgents?.() ?? {})
         if (keys.length > 0) return keys
-    } catch {
-        /* fall through */
+    } catch (err) {
+        console.warn('[sync-ai-on-boot] could not list the Mastra agents:', err)
     }
+    console.warn('[sync-ai-on-boot] no agents listed on the Mastra instance, registering only `default`; your own agents will be missing from the AI settings')
     return ['default']
 }

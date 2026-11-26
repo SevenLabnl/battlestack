@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { BattlestackRegistries, exists, updateLedger, type ProjectManifest, type RunContext } from '@battlestack/core'
+import { BattlestackRegistries, exists, ownedAnywhere, ownedPaths, updateLedger, type ProjectManifest, type RunContext } from '@battlestack/core'
 import { parseArgs } from '../src/cli/args.js'
 import {
     needsAttention,
@@ -147,7 +147,7 @@ describe('repairOverwrites', () => {
         await write('Dockerfile', 'FROM node:24\n')
         const ctx = ctxRecording({ Dockerfile: sha256('FROM node:24\n') })
 
-        const repairs = await repairOverwrites(ctx, start, ctx.registries)
+        const repairs = await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))
         expect(repairs).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'staged' }])
         expect(lf(await read('Dockerfile'))).toBe('FROM node\nCOPY patches/ ./patches/\n')
         expect(await read('.battlestack/pull/Dockerfile.new')).toBe('FROM node:24\n')
@@ -170,9 +170,79 @@ describe('repairOverwrites', () => {
         await write('Dockerfile', upstream)
         const ctx = ctxRecording({ Dockerfile: sha256(upstream) })
 
-        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'merged' }])
+        expect(await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'merged' }])
         expect(lf(await read('Dockerfile'))).toBe('FROM node:24\nWORKDIR /app\nCOPY . .\nRUN build --prod\nCMD start\n')
         expect(updateLedger(ctx).merged).toContain('Dockerfile')
+    })
+
+    it('puts back an owned file a feature wrote over even when it was unedited', async () => {
+        git('init', '-q')
+        await write('Dockerfile', 'FROM node\n')
+        await commitAll()
+        // HEAD matches what battlestack recorded, so the file was never edited.
+        const start = recordedAtStart(manifestWith({ Dockerfile: sha256('FROM node\n') }))
+
+        await write('Dockerfile', 'FROM node:24\n')
+        const ctx = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { 'owned:test:feat': ['Dockerfile'] })
+
+        expect((await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))).map((r) => r.outcome)).toEqual(['kept yours, owned'])
+        expect(lf(await read('Dockerfile'))).toBe('FROM node\n')
+    })
+
+    it('puts back an owned file a feature wrote over, without staging anything', async () => {
+        git('init', '-q')
+        await write('Dockerfile', 'FROM node\nCOPY patches/ ./patches/\n')
+        git('add', '-A')
+        git('commit', '-q', '-m', 'init')
+        const start = recordedAtStart(manifestWith({ Dockerfile: sha256('FROM node\n') }))
+
+        await write('Dockerfile', 'FROM node:24\n')
+        // Owned under a feature other than the one that wrote it.
+        const ctx = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { 'owned:other:feat': ['Dockerfile'] })
+
+        const repairs = await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))
+        expect(repairs).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'kept yours, owned' }])
+        expect(lf(await read('Dockerfile'))).toBe('FROM node\nCOPY patches/ ./patches/\n')
+        expect(await exists(path.join(projectDir, '.battlestack/pull/Dockerfile.new'))).toBe(false)
+        expect(updateLedger(ctx).staged).toEqual([])
+    })
+
+    it('puts back an owned file a direct patch changed after a guarded writer skipped it', async () => {
+        git('init', '-q')
+        await write('app.config.ts', "primary: 'blue'\n")
+        await commitAll()
+        const start = recordedAtStart(manifestWith({ 'app.config.ts': sha256("primary: 'blue'\n") }))
+
+        await write('app.config.ts', "primary: 'brand'\n")
+        const ctx = ctxRecording({ 'app.config.ts': sha256("primary: 'brand'\n") }, projectDir, { 'owned:test:feat': ['app.config.ts'] })
+        updateLedger(ctx).handled.push('app.config.ts')
+
+        expect((await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))).map((r) => r.outcome)).toEqual(['kept yours, owned'])
+        expect(lf(await read('app.config.ts'))).toBe("primary: 'blue'\n")
+        expect((ctx.state['files:test:feat'] as Record<string, string>)['app.config.ts']).toBe(sha256("primary: 'blue'\n"))
+    })
+
+    it('lets a structural file arrive through an upgrade at a path another feature tracked', async () => {
+        git('init', '-q')
+        await write('Dockerfile', 'FROM node\n')
+        await commitAll()
+        const startManifest: ProjectManifest = {
+            ...manifestWith({}),
+            features: [{ id: 'other:feat', version: '1.0.0', files: { Dockerfile: sha256('FROM node\n') } }],
+        }
+        const start = recordedAtStart(startManifest)
+
+        // test:feat ships the file for the first time and claims it as structural during this pull.
+        await write('Dockerfile', 'FROM node:24\n')
+        const ctx = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, {
+            'files:other:feat': { Dockerfile: sha256('FROM node:24\n') },
+            'owned:test:feat': ['Dockerfile'],
+        })
+        updateLedger(ctx).handled.push('Dockerfile')
+
+        expect(await repairOverwrites(ctx, start, ctx.registries, ownedPaths(startManifest))).toEqual([])
+        expect(await read('Dockerfile')).toBe('FROM node:24\n')
+        expect((ctx.state['files:test:feat'] as Record<string, string>).Dockerfile).toBe(sha256('FROM node:24\n'))
     })
 
     it('leaves a file alone that was pristine before the pull', async () => {
@@ -184,7 +254,7 @@ describe('repairOverwrites', () => {
         await write('a.ts', 'v2\n')
         const ctx = ctxRecording({ 'a.ts': sha256('v2\n') })
 
-        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([])
+        expect(await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))).toEqual([])
         expect(await read('a.ts')).toBe('v2\n')
     })
 
@@ -197,7 +267,7 @@ describe('repairOverwrites', () => {
         await write('a.txt', 'v2\r\n')
         const ctx = ctxRecording({ 'a.txt': sha256('v2\r\n') })
 
-        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([])
+        expect(await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))).toEqual([])
         expect(await read('a.txt')).toBe('v2\r\n')
     })
 
@@ -210,7 +280,7 @@ describe('repairOverwrites', () => {
         await write('a.txt', 'v2\n')
         const ctx = ctxRecording({ 'a.txt': sha256('v2\n') })
 
-        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([])
+        expect(await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))).toEqual([])
         expect(await read('a.txt')).toBe('v2\n')
     })
 
@@ -223,7 +293,7 @@ describe('repairOverwrites', () => {
         await write('apps/web/a.txt', 'v2\r\n')
         const ctx = ctxRecording({ 'a.txt': sha256('v2\r\n') }, path.join(projectDir, 'apps/web'))
 
-        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([])
+        expect(await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))).toEqual([])
         expect(await read('apps/web/a.txt')).toBe('v2\r\n')
     })
 
@@ -236,7 +306,7 @@ describe('repairOverwrites', () => {
         await write('apps/web/Dockerfile', 'FROM node:24\n')
         const ctx = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, web)
 
-        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'staged' }])
+        expect(await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))).toEqual([{ rel: 'Dockerfile', featureId: 'test:feat', outcome: 'staged' }])
         expect(lf(await read('apps/web/Dockerfile'))).toBe('FROM node\nCOPY patches/ ./patches/\n')
         expect(await read('apps/web/.battlestack/pull/Dockerfile.new')).toBe('FROM node:24\n')
     })
@@ -250,15 +320,20 @@ describe('repairOverwrites', () => {
 
         const cli = parseArgs(['--overwrite'])
         const overwrite = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { force: cli.force, overwrite: cli.overwrite })
-        expect(await repairOverwrites(overwrite, start, overwrite.registries)).toEqual([])
+        expect(await repairOverwrites(overwrite, start, overwrite.registries, ownedAnywhere(overwrite))).toEqual([])
         expect(await read('Dockerfile')).toBe('FROM node:24\n')
         expect(await exists(path.join(projectDir, '.battlestack', 'pull', 'Dockerfile.bak'))).toBe(false)
 
         // --force keeps the output too, but saves the local version, as the drift-aware writers do.
         const force = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { force: true })
-        expect((await repairOverwrites(force, start, force.registries)).map((r) => r.outcome)).toEqual(['backed up'])
+        expect((await repairOverwrites(force, start, force.registries, ownedAnywhere(force))).map((r) => r.outcome)).toEqual(['backed up'])
         expect(await read('Dockerfile')).toBe('FROM node:24\n')
         expect(lf(await read(path.join('.battlestack', 'pull', 'Dockerfile.bak')))).toBe('FROM node\nCOPY patches/ ./patches/\n')
+
+        // --overwrite also takes an owned file, as confirmed at its prompt, and leaves no backup.
+        const both = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { overwrite: true, force: true, 'owned:test:feat': ['Dockerfile'] })
+        expect(await repairOverwrites(both, start, both.registries, ownedAnywhere(both))).toEqual([])
+        expect(await read('Dockerfile')).toBe('FROM node:24\n')
     })
 
     it('puts back the record of the feature that wrote the file, not another tracker\'s', async () => {
@@ -279,7 +354,7 @@ describe('repairOverwrites', () => {
             ctx.registries.features.register({ id, label: id, version: '1.0.0', stage: 0, async execute() {} } as never, { plugin: 'p', namespace: 'test' })
         }
 
-        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([{ rel: 'Dockerfile', featureId: 'x:feat', outcome: 'staged' }])
+        expect(await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))).toEqual([{ rel: 'Dockerfile', featureId: 'x:feat', outcome: 'staged' }])
         expect(ctx.state['files:x:feat']).toEqual({ Dockerfile: sha256('FROM node\n') })
         expect(ctx.state['files:x:other']).toEqual({ Dockerfile: sha256('FROM other\n') })
     })
@@ -306,7 +381,7 @@ describe('repairOverwrites', () => {
             ctx.registries.features.register({ id, label: id, version: '1.0.0', stage: 0, async execute() {} } as never, { plugin: 'p', namespace: 'test' })
         }
 
-        expect((await repairOverwrites(ctx, start, ctx.registries)).map((r) => r.outcome)).toEqual(['staged'])
+        expect((await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))).map((r) => r.outcome)).toEqual(['staged'])
         expect(ctx.state['files:x:feat']).toEqual({ Dockerfile: sha256('FROM node\n') })
         expect(ctx.state['files:x:other']).toEqual({ Dockerfile: sha256('FROM other\n') })
         expect(ctx.state['files:x:new']).toEqual({})
@@ -324,7 +399,7 @@ describe('repairOverwrites', () => {
         await write('logo.png', upstream)
         const ctx = ctxRecording({ 'logo.png': sha256(upstream) })
 
-        expect(await repairOverwrites(ctx, start, ctx.registries)).toEqual([{ rel: 'logo.png', featureId: 'test:feat', outcome: 'staged' }])
+        expect(await repairOverwrites(ctx, start, ctx.registries, ownedAnywhere(ctx))).toEqual([{ rel: 'logo.png', featureId: 'test:feat', outcome: 'staged' }])
         expect(lf(await read('logo.png'))).toBe(base.replace('a', 'A'))
         expect(await read('.battlestack/pull/logo.png.new')).toBe(upstream)
         expect(updateLedger(ctx).merged).toEqual([])
@@ -347,6 +422,13 @@ describe('report', () => {
         expect(text).toContain('.battlestack/pull/<path>.new')
         expect(text).toContain('- Set `X`.')
         expect(text).not.toMatch(/—/)
+    })
+
+    it('lists a suggestion under Optional without counting it as work left', () => {
+        const summary = { ...EMPTY, suggestions: ['Add the header actions slot'] }
+        expect(needsAttention(summary)).toBe(false)
+        expect(renderReport(summary)).toMatch(/## Optional[\s\S]*- Add the header actions slot/)
+        expect(renderReport(summary)).toContain('Nothing needs attention')
     })
 
     it('lists a restored file once under New files', () => {

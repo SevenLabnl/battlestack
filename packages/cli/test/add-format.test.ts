@@ -100,6 +100,20 @@ describe('battlestack add formats the project like scaffold and pull do', () => 
         }
     })
 
+    it('leaves an owned file as it was, though the formatter rewrote it', async () => {
+        const manifestPath = path.join(dir, MANIFEST_PATH)
+        const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as ProjectManifest
+        manifest.features[0]!.ownedByUser = ['fmt-base.txt']
+        await writeFile(manifestPath, JSON.stringify(manifest), 'utf8')
+        const before = await readFile(path.join(dir, 'fmt-base.txt'), 'utf8')
+
+        await withCwd(dir, () => addCommand(defaultArgs({ projectName: 'fmt:opt', skipInstall: true }), undefined as never, registries))
+
+        expect(formatProject).toHaveBeenCalledTimes(1)
+        expect(await readFile(path.join(dir, 'fmt-base.txt'), 'utf8')).toBe(before)
+        expect(await readFile(path.join(dir, 'fmt-opt.txt'), 'utf8')).not.toMatch(/^ /)
+    })
+
     it('skips the formatter under --no-format', async () => {
         await withCwd(dir, () => addCommand(
             defaultArgs({ projectName: 'fmt:opt', skipInstall: true, format: false }),

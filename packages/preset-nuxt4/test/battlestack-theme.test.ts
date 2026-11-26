@@ -411,6 +411,23 @@ describe('battlestackThemeFeature: sibling features', () => {
         expect(recorded[path.join(MAIN_CSS)]).toBe(await hashFile(path.join(projectDir, MAIN_CSS)))
     })
 
+    it('leaves an owned main.css alone on the theme\'s update and on nuxt-ui\'s', async () => {
+        const mine = '@import "tailwindcss";\n.mine { color: red; }\n'
+        await writeFile(path.join(projectDir, MAIN_CSS), mine, 'utf8')
+        const owned = { 'owned:nuxt4:nuxt-ui': [MAIN_CSS] }
+        const pullCtx = (): RunContext => mockRunContext({
+            projectDir,
+            enabledFeatures: new Set([FEATURE_ID, 'nuxt4:nuxt-ui']),
+            state: { packageManager: 'pnpm', ...owned },
+        })
+
+        await battlestackThemeFeature.update!(pullCtx(), { id: FEATURE_ID, version: '0.0.1', files: {} })
+        expect(await read(MAIN_CSS)).toBe(mine)
+
+        await nuxtUiFeature.update!(pullCtx(), { id: 'nuxt4:nuxt-ui', version: '0.0.1', files: {}, ownedByUser: [MAIN_CSS] })
+        expect(await read(MAIN_CSS)).toBe(mine)
+    })
+
     it('landing-shell keeps the scaffold defaults when the theme is off', async () => {
         const addCtx = mockRunContext({
             projectDir,

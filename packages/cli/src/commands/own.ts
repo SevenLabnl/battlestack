@@ -3,6 +3,7 @@ import pc from 'picocolors'
 import type { Ora } from 'ora'
 import { ui } from '@battlestack/tui'
 import {
+    buildRunContext,
     CLIError,
     ErrorCode,
     exists,
@@ -10,26 +11,42 @@ import {
     hashFile,
     MANIFEST_PATH,
     readManifest,
+    toPosixRel,
     writeJson,
+    type BattlestackRegistries,
     type InstalledFeatureRecord,
     type ParsedArgs,
     type ProjectManifest,
     type ReservedCommand,
 } from '@battlestack/core'
 
-function featureForPath(
-    manifest: ProjectManifest,
-    rel: string,
-): InstalledFeatureRecord | null {
-    for (const f of manifest.features) {
-        if (rel in f.files) return f
-    }
-    return null
+/** Ownership is per path, so `own` and `disown` act on every feature that tracks it. */
+function featuresForPath(manifest: ProjectManifest, rel: string): InstalledFeatureRecord[] {
+    return manifest.features.filter((f) => rel in f.files || (f.ownedByUser ?? []).includes(rel))
 }
 
 function normalize(projectRoot: string, raw: string): string {
     const abs = path.isAbsolute(raw) ? raw : path.resolve(projectRoot, raw)
     return path.relative(projectRoot, abs).split(path.sep).join('/')
+}
+
+/** Structural paths per loaded feature id: pull claims these as owned again on every run. */
+function structuralOwners(projectRoot: string, manifest: ProjectManifest, registries: BattlestackRegistries | undefined): Map<string, string[]> {
+    const out = new Map<string, string[]>()
+    if (!registries?.frameworks.has(manifest.framework) || !registries.templates.has(manifest.template)) return out
+    const ctx = buildRunContext({ projectDir: projectRoot, manifest }, registries)
+    for (const f of manifest.features) {
+        if (registries.features.has(f.id)) ctx.state[`files:${registries.features.get(f.id).id}`] = { ...f.files }
+    }
+    for (const f of manifest.features) {
+        if (!registries.features.has(f.id)) continue
+        const feature = registries.features.get(f.id)
+        for (const rel of feature.structuralFiles?.(ctx) ?? []) {
+            const posix = toPosixRel(rel)
+            out.set(posix, [...(out.get(posix) ?? []), f.id])
+        }
+    }
+    return out
 }
 
 async function persist(projectRoot: string, manifest: ProjectManifest): Promise<void> {
@@ -73,8 +90,8 @@ export async function ownCommand(args: ParsedArgs, _loader: Ora): Promise<void> 
     const lines: string[] = []
     for (const raw of paths) {
         const rel = normalize(projectRoot, raw)
-        const feature = featureForPath(manifest, rel)
-        if (!feature) {
+        const features = featuresForPath(manifest, rel)
+        if (features.length === 0) {
             const suggestions = suggest(manifest, rel)
             const hint = suggestions.length
                 ? ` Did you mean: ${suggestions.slice(0, 3).join(', ')}?`
@@ -84,16 +101,21 @@ export async function ownCommand(args: ParsedArgs, _loader: Ora): Promise<void> 
                 `${rel} is not tracked by any feature.${hint}`,
             )
         }
-        const list = feature.ownedByUser ?? []
-        if (list.includes(rel)) {
-            const note = pc.dim(`${rel} already owned (${feature.id})`)
+        const claimed: string[] = []
+        for (const feature of features) {
+            const list = feature.ownedByUser ?? []
+            if (list.includes(rel)) continue
+            list.push(rel)
+            feature.ownedByUser = list
+            claimed.push(feature.id)
+        }
+        if (claimed.length === 0) {
+            const note = pc.dim(`${rel} already owned (${features.map((f) => f.id).join(', ')})`)
             lines.push(`${ui.sym.skip} ${note}`)
             continue
         }
-        list.push(rel)
-        feature.ownedByUser = list
         mutated = true
-        const owned = pc.dim(`owned (${feature.id})`)
+        const owned = pc.dim(`owned (${claimed.join(', ')})`)
         lines.push(`${ui.sym.ok} ${rel} ${owned}`)
     }
 
@@ -103,7 +125,7 @@ export async function ownCommand(args: ParsedArgs, _loader: Ora): Promise<void> 
     ui.blank()
 }
 
-export async function disownCommand(args: ParsedArgs, _loader: Ora): Promise<void> {
+export async function disownCommand(args: ParsedArgs, _loader: Ora, registries?: BattlestackRegistries): Promise<void> {
     const paths = collectPaths(args)
     if (paths.length === 0) {
         throw new CLIError(
@@ -121,20 +143,29 @@ export async function disownCommand(args: ParsedArgs, _loader: Ora): Promise<voi
         )
     }
 
+    const structural = structuralOwners(projectRoot, manifest, registries)
     let mutated = false
     const lines: string[] = []
     for (const raw of paths) {
         const rel = normalize(projectRoot, raw)
-        const feature = featureForPath(manifest, rel)
-        if (!feature) {
+        const features = featuresForPath(manifest, rel)
+        if (features.length === 0) {
             throw new CLIError(
                 ErrorCode.UNKNOWN_FEATURE,
                 `${rel} is not tracked by any feature.`,
             )
         }
-        const list = feature.ownedByUser ?? []
-        if (!list.includes(rel)) {
-            const note = pc.dim(`was not owned (${feature.id}), no change`)
+        const shell = structural.get(rel)
+        if (shell) {
+            throw new CLIError(
+                ErrorCode.UNSUPPORTED_FEATURE,
+                `${rel} is part of the project shell (${shell.join(', ')}), so it stays yours and cannot be disowned. `
+                + 'To reset it to the shipped version, run `battlestack pull --overwrite`, which asks before replacing files you own.',
+            )
+        }
+        const owners = features.filter((f) => (f.ownedByUser ?? []).includes(rel))
+        if (owners.length === 0) {
+            const note = pc.dim(`was not owned (${features.map((f) => f.id).join(', ')}), no change`)
             lines.push(`${ui.sym.warn} ${rel} ${note}`)
             continue
         }
@@ -146,11 +177,18 @@ export async function disownCommand(args: ParsedArgs, _loader: Ora): Promise<voi
             )
         }
         const currentHash = await hashFile(abs)
-        feature.files[rel] = currentHash
-        feature.ownedByUser = list.filter((p) => p !== rel)
-        if (feature.ownedByUser.length === 0) delete feature.ownedByUser
+        // Every tracker's baseline moves, or a non-owner's stale hash reads as drift right away.
+        for (const feature of features) {
+            // A feature that only owns the path no longer ships it; tracking it would let its next update delete the file as obsolete.
+            if (rel in feature.files) feature.files[rel] = currentHash
+            const list = (feature.ownedByUser ?? []).filter((p) => p !== rel)
+            if (list.length > 0) feature.ownedByUser = list
+            else delete feature.ownedByUser
+        }
         mutated = true
-        const note = pc.dim(`disowned (${feature.id}); baseline hash refreshed`)
+        const tracked = features.some((f) => rel in f.files)
+        const after = tracked ? 'baseline hash refreshed' : 'no feature manages it any more'
+        const note = pc.dim(`disowned (${owners.map((f) => f.id).join(', ')}); ${after}`)
         lines.push(`${ui.sym.ok} ${rel} ${note}`)
     }
 
@@ -166,9 +204,9 @@ function collectPaths(args: ParsedArgs): string[] {
 
 function suggest(manifest: ProjectManifest, target: string): string[] {
     const all: string[] = []
-    for (const f of manifest.features) all.push(...Object.keys(f.files))
+    for (const f of manifest.features) all.push(...Object.keys(f.files), ...(f.ownedByUser ?? []))
     const lower = target.toLowerCase()
-    return all
+    return [...new Set(all)]
         .filter((p) => p.toLowerCase().includes(lower) || lower.includes(path.basename(p).toLowerCase()))
         .slice(0, 5)
 }

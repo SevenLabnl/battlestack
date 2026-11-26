@@ -70,7 +70,7 @@ interface Handle {
     readManifest(): Promise<ProjectManifest>
 }
 
-async function setup(featureId: string, files: Record<string, string>): Promise<Handle> {
+async function setup(featureId: string, files: Record<string, string>, extra: Partial<Feature> = {}): Promise<Handle> {
     ensureRegistry()
     const projectDir = await mkdtemp(path.join(os.tmpdir(), 'battlestack-own-test-'))
     const templateDir = await mkdtemp(path.join(os.tmpdir(), 'battlestack-own-tpl-'))
@@ -89,6 +89,7 @@ async function setup(featureId: string, files: Record<string, string>): Promise<
         async execute(ctx) {
             await copyTemplateDirRecorded(ctx, featureId, templateDir)
         },
+        ...extra,
     }
     if (!registries.features.has(featureId)) registries.features.register(feature, origin)
 
@@ -209,6 +210,101 @@ describe('battlestack own / disown', () => {
         // patches against the long-gone original, which is what disown prevents.
         const liveHash = await hashFile(path.join(h.projectDir, 'a.ts'))
         expect(rec.files['a.ts']).toBe(liveHash)
+    })
+
+    it('own claims a path for every feature that tracks it, even when one already owns it', async () => {
+        const id = 'test:feat-own-7'
+        const h = await setup(id, { 'shared.ts': 'shared\n' })
+        handles.push(h)
+        const hash = await hashFile(path.join(h.projectDir, 'shared.ts'))
+        const manifest = await h.readManifest()
+        // Listed first, so a lookup that stops at the first tracker only sees this one.
+        manifest.features.unshift({
+            id: 'owntest:test:feat-own-7-owner',
+            version: '0.1.0',
+            files: { 'shared.ts': hash },
+            ownedByUser: ['shared.ts'],
+        })
+        await writeFile(path.join(h.projectDir, MANIFEST_PATH), JSON.stringify(manifest), 'utf8')
+
+        await withCwd(h.projectDir, () => ownCommand(args(['own', 'shared.ts']), undefined as never))
+
+        const features = (await h.readManifest()).features
+        expect(features.map((f) => f.ownedByUser)).toEqual([['shared.ts'], ['shared.ts']])
+    })
+
+    it('disown releases a path from every feature and refreshes each baseline', async () => {
+        const id = 'test:feat-own-8'
+        const h = await setup(id, { 'shared.ts': 'shared\n' })
+        handles.push(h)
+        const manifest = await h.readManifest()
+        manifest.features.push({
+            id: 'owntest:test:feat-own-8-other',
+            version: '0.1.0',
+            files: { 'shared.ts': 'stale-hash' },
+        })
+        await writeFile(path.join(h.projectDir, MANIFEST_PATH), JSON.stringify(manifest), 'utf8')
+
+        await withCwd(h.projectDir, () => ownCommand(args(['own', 'shared.ts']), undefined as never))
+        await writeFile(path.join(h.projectDir, 'shared.ts'), 'mine\n', 'utf8')
+        await withCwd(h.projectDir, () => disownCommand(args(['disown', 'shared.ts']), undefined as never))
+
+        const liveHash = await hashFile(path.join(h.projectDir, 'shared.ts'))
+        for (const rec of (await h.readManifest()).features) {
+            expect(rec.ownedByUser).toBeUndefined()
+            expect(rec.files['shared.ts']).toBe(liveHash)
+        }
+    })
+
+    it('disown does not make a feature that only owns a path track it again', async () => {
+        const id = 'test:feat-own-9'
+        const h = await setup(id, { 'a.ts': '1\n' })
+        handles.push(h)
+        await writeFile(path.join(h.projectDir, 'retired.ts'), 'mine\n', 'utf8')
+        const manifest = await h.readManifest()
+        manifest.features[0]!.ownedByUser = ['retired.ts']
+        await writeFile(path.join(h.projectDir, MANIFEST_PATH), JSON.stringify(manifest), 'utf8')
+
+        await withCwd(h.projectDir, () => disownCommand(args(['disown', 'retired.ts']), undefined as never))
+
+        const rec = (await h.readManifest()).features[0]!
+        expect(rec.ownedByUser).toBeUndefined()
+        expect('retired.ts' in rec.files).toBe(false)
+    })
+
+    it('disown refuses a structural path, since pull claims it again, and points at --overwrite', async () => {
+        const id = 'test:feat-own-10'
+        const h = await setup(id, { 'layout.vue': 'shell\n', 'page.vue': 'page\n' }, { structuralFiles: () => ['layout.vue'] })
+        handles.push(h)
+        await withCwd(h.projectDir, () => ownCommand(args(['own', 'layout.vue', 'page.vue']), undefined as never))
+
+        await expect(
+            withCwd(h.projectDir, () => disownCommand(args(['disown', 'layout.vue']), undefined as never, registries)),
+        ).rejects.toThrow(/battlestack pull --overwrite/)
+        expect((await h.readManifest()).features[0]!.ownedByUser).toEqual(['layout.vue', 'page.vue'])
+
+        await withCwd(h.projectDir, () => disownCommand(args(['disown', 'page.vue']), undefined as never, registries))
+        expect((await h.readManifest()).features[0]!.ownedByUser).toEqual(['layout.vue'])
+    })
+
+    it('disown says no feature manages a path any more when none tracks it', async () => {
+        const id = 'test:feat-own-11'
+        const h = await setup(id, { 'a.ts': '1\n' })
+        handles.push(h)
+        await writeFile(path.join(h.projectDir, 'retired.ts'), 'mine\n', 'utf8')
+        const manifest = await h.readManifest()
+        manifest.features[0]!.ownedByUser = ['retired.ts']
+        await writeFile(path.join(h.projectDir, MANIFEST_PATH), JSON.stringify(manifest), 'utf8')
+
+        const printed: string[] = []
+        await withCwd(h.projectDir, async () => {
+            vi.mocked(console.log).mockImplementation((...a: unknown[]) => { printed.push(a.join(' ')) })
+            await disownCommand(args(['disown', 'retired.ts']), undefined as never)
+        })
+
+        const line = printed.find((l) => l.includes('retired.ts'))!
+        expect(line).toContain('no feature manages it any more')
+        expect(line).not.toContain('baseline hash refreshed')
     })
 
     it('disown errors when the file does not exist on disk', async () => {

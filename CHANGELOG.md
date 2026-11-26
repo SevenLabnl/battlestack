@@ -160,6 +160,39 @@
   skips lint and `db:generate`, and lists the fix in `REPORT.md`:
   `pnpm clean --lockfile && pnpm install`, then lint, the tests and
   `db:generate` if the schema changed.
+- The landing layout has a `#header-actions` target in its header, shown at
+  every width, so a page can add an action such as "New chat" with
+  `<Teleport to="#header-actions" defer>` instead of editing the layout. The
+  layout belongs to your project, so `pull` does not change it: the pull that
+  brings this in lists the edits to make under Optional in `REPORT.md`,
+  without counting them as work left. The `battlestack-ui` skill tells AI
+  agents to check that the page's layout has the target and to add it if not.
+- A prompt can be up to 100,000 characters instead of 10,000, and a prompt that
+  cannot be saved shows the reason in the toast instead of a bare 400. The e2e
+  test for it puts the prompt's own content back afterwards instead of
+  resetting it to the seed, so an admin's edit on a dev server survives a run.
+- The AI settings e2e test sets the model from `NUXT_AI_GATEWAY_CHAT_MODEL`
+  instead of a hard-coded one, and puts the chat model an admin chose back
+  afterwards, so a run against a dev server leaves its settings as they were.
+- The project's own Mastra agents are registered on boot again: Mastra 1.x
+  renamed `getAgents()` to `listAgents()`, so only `default` showed up in the AI
+  settings. Boot now warns when it finds no agents.
+- `battlestack own` and `disown` apply to every feature that tracks a path, so
+  a file tracked by two features, such as `app/app.config.ts`, is really yours.
+  `pull`, `add`, `doctor` and `remove` treat a path owned under any feature as
+  owned, and `pull` never changes an owned file. Paths owned with an earlier
+  version need no migration.
+- `battlestack disown` refuses a file of the project shell, such as
+  `app/layouts/default.vue`: `pull` hands those back to you on every run, so
+  disowning one changed nothing. The message points at
+  `battlestack pull --overwrite` to get the shipped version back.
+- `pull` no longer adds the theme imports to an owned
+  `app/assets/css/main.css`, and the `eslint --fix` pass of `pull` and `add`
+  gives every owned file its own bytes back.
+- A path owned only under a feature whose plugin did not load stays owned
+  during `pull`, as `doctor` already reports it. `battlestack remove` hands a
+  path the removed feature owned but did not ship to the features that do
+  track it, so the next pull of one of them leaves it alone.
 - A feature whose update fails without stopping `pull` keeps its old version
   in the manifest, so the next pull tries it again. `REPORT.md` lists the
   failure and pull exits with code 2. Before, it was recorded at the new

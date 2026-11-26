@@ -52,20 +52,19 @@ describe('e2e: ai model admin', () => {
         expect(status).toBe(403)
     })
 
-    it.skipIf(!serverUp)('admin can update a config model', async () => {
-        const adminCookie = await loginAsAdmin()
-        const list = await apiGet<ModelConfig[]>('/api/ai/configs', adminCookie)
-        const target = list.data?.[0]
-        if (!target) return
-        const next = 'openai/gpt-5.6-luna'
-        const { status, data } = await apiPut<ModelConfig>(
-            `/api/ai/configs/${target.id}`,
-            { model: next },
-            adminCookie,
-        )
-        expect(status).toBe(200)
-        expect(data?.model).toBe(next)
-    })
+    // The environment's own chat model, one its gateway key may use.
+    const envChatModel = process.env.NUXT_AI_GATEWAY_CHAT_MODEL
+
+    it.skipIf(!serverUp || !envChatModel)('admin can update a config model', () =>
+        withChatConfig(async (target, cookie) => {
+            const { status, data } = await apiPut<ModelConfig>(
+                `/api/ai/configs/${target.id}`,
+                { model: envChatModel },
+                cookie,
+            )
+            expect(status).toBe(200)
+            expect(data?.model).toBe(envChatModel)
+        }))
 
     it.skipIf(!serverUp)('PUT rejects empty model', async () => {
         const adminCookie = await loginAsAdmin()

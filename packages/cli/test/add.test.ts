@@ -518,6 +518,24 @@ describe('battlestack add into an existing file', () => {
     })
 })
 
+describe('battlestack add over a path another feature owns', () => {
+    it('leaves the owned file alone and stages nothing', async () => {
+        const p = await project()
+        await writeFile(path.join(p.dir, 'add-opt.txt'), 'the project\'s own file\n')
+        const manifest = await p.manifest()
+        manifest.features[0]!.ownedByUser = ['add-opt.txt']
+        await writeFile(path.join(p.dir, MANIFEST_PATH), JSON.stringify(manifest), 'utf8')
+
+        process.exitCode = undefined
+        await withCwd(p.dir, () => add('add:opt')(p))
+
+        expect(await readFile(path.join(p.dir, 'add-opt.txt'), 'utf8')).toBe('the project\'s own file\n')
+        expect(await fileExists(p.dir, '.battlestack/pull/add-opt.txt.new')).toBe(false)
+        expect(process.exitCode).toBeUndefined()
+        process.exitCode = undefined
+    })
+})
+
 describe('battlestack add after a pull that left work', () => {
     it('keeps the pull\'s items in REPORT.md next to its own', async () => {
         const p = await project()
@@ -588,6 +606,33 @@ describe('battlestack remove of a feature whose plugin is not loaded', () => {
 
         await remove(p, true)
         expect((await p.manifest()).features.map((f) => f.id)).not.toContain(GONE)
+    })
+})
+
+describe('battlestack remove keeps ownership the removed feature held for others', () => {
+    it('moves an owned path the feature did not track to the features that do', async () => {
+        const p = await project()
+        await withCwd(p.dir, () => add('add:opt')(p))
+        const m = await p.manifest()
+        m.features.find((f) => f.id === `${NS}:add:opt`)!.ownedByUser = ['add-base.txt']
+        await writeFile(path.join(p.dir, MANIFEST_PATH), JSON.stringify(m))
+
+        await withCwd(p.dir, () => removeCommand(defaultArgs({ projectName: 'add:opt', skipInstall: true }), undefined as never, p.registries))
+
+        const base = (await p.manifest()).features.find((f) => f.id === `${NS}:add:base`)!
+        expect(base.ownedByUser).toEqual(['add-base.txt'])
+    })
+
+    it('does the same for a feature whose plugin is not loaded', async () => {
+        const p = await project()
+        const m = await p.manifest()
+        m.features.push({ id: 'gone:feature', version: '1.0.0', files: {}, ownedByUser: ['add-base.txt'] })
+        await writeFile(path.join(p.dir, MANIFEST_PATH), JSON.stringify(m))
+
+        await withCwd(p.dir, () => removeCommand(defaultArgs({ projectName: 'gone:feature' }), undefined as never, p.registries))
+
+        const base = (await p.manifest()).features.find((f) => f.id === `${NS}:add:base`)!
+        expect(base.ownedByUser).toEqual(['add-base.txt'])
     })
 })
 
