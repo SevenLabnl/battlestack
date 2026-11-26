@@ -234,11 +234,11 @@ describe('battlestack pull: drift protection (hash mismatch)', () => {
         // Never written beside the real file; that would break framework auto-scanners.
         expect(await exists(path.join(projectDir, 'a.ts.battlestack.new'))).toBe(false)
 
-        // The manifest keeps the ORIGINAL v1 baseline hash, neither the new template's nor
-        // the user's edit, so `doctor` still reports drift instead of re-baselining.
+        // The manifest records the staged version, never the user's edit, so `doctor` still
+        // reports drift and taking the `.new` as is reads as pristine on the next pull.
         const manifest = await readManifestRaw(projectDir)
         const rec = manifest.features.find((f) => f.id === fqid('test:feat-a'))!
-        expect(rec.files['a.ts']).toBe(await hashFile(path.join(tplV1, 'a.ts')))
+        expect(rec.files['a.ts']).toBe(await hashFile(path.join(tplV2, 'a.ts')))
         // The version record still advances: only the FILE overwrite is drift-gated.
         expect(rec.version).toBe('2.0.0')
     })
@@ -1127,6 +1127,82 @@ describe('battlestack pull: misc plumbing', () => {
         // A missing plugin must not unmanage its files: the record survives untouched.
         expect(manifest.features.find((f) => f.id === fqid('test:feat-orphan'))?.files).toEqual({ 'o.ts': expect.any(String) })
         expect(await readFile(path.join(projectDir, 'o.ts'), 'utf8')).toBe('o-content\n')
+    })
+})
+
+describe('battlestack pull: a file staged for a manual merge', () => {
+    const V1 = 'one\ntwo\nthree\nfour\nfive\n'
+    const V2 = 'one\ntwo, v2\nthree\nfour\nfive\n'
+    const V3 = 'one\ntwo, v2\nthree\nfour\nfive, v3\n'
+
+    async function stagedProject(): Promise<{ projectDir: string, pull: (version: string, content: string) => Promise<string>, git: (...a: string[]) => void }> {
+        const { execFileSync } = await import('node:child_process')
+        const projectDir = await tmp('battlestack-pull-staged-')
+        const git = (...a: string[]) => {
+            execFileSync('git', a, {
+                cwd: projectDir,
+                stdio: 'ignore',
+                env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
+            })
+        }
+        const tplV1 = await tmp('battlestack-pull-staged-v1-')
+        await writeTemplateFile(tplV1, 'a.ts', V1)
+        const registriesV1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplV1)
+        registriesV1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+        // Edited before the first commit, so no base exists for the scaffolded version.
+        await writeFile(path.join(projectDir, 'a.ts'), 'mine\n')
+        await writeFile(path.join(projectDir, '.gitignore'), '.battlestack/lock\n.battlestack/pull/\n')
+        git('init', '-q')
+        git('add', '-A')
+        git('commit', '-q', '-m', 'init')
+
+        const pull = async (version: string, content: string): Promise<string> => {
+            git('add', '-A')
+            git('commit', '-q', '--allow-empty', '-m', 'user')
+            const tpl = await tmp('battlestack-pull-staged-tpl-')
+            await writeTemplateFile(tpl, 'a.ts', content)
+            const registries = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+            registries.features.register(makeFileFeature('test:feat-a', version, tpl), origin)
+            await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registries))
+            process.exitCode = undefined
+            git('add', '-A')
+            git('commit', '-q', '-m', `pull ${version}`)
+            return readFile(path.join(projectDir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        }
+        expect(await pull('2.0.0', V2)).toContain('## Staged for a manual merge')
+        return { projectDir, pull, git }
+    }
+
+    const staged = (projectDir: string) => path.join(projectDir, '.battlestack', 'pull', 'a.ts.new')
+
+    it('does not stage again once the .new was taken by hand', async () => {
+        const { projectDir, pull } = await stagedProject()
+        await writeFile(path.join(projectDir, 'a.ts'), await readFile(staged(projectDir)))
+        await rm(path.join(projectDir, '.battlestack', 'pull'), { recursive: true })
+
+        expect(await pull('3.0.0', V3)).not.toContain('## Staged for a manual merge')
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe(V3)
+    })
+
+    it('merges a later bump into a taken .new the user edited further', async () => {
+        const { projectDir, pull } = await stagedProject()
+        await writeFile(path.join(projectDir, 'a.ts'), V2.replace('one', 'one, mine'))
+        await rm(path.join(projectDir, '.battlestack', 'pull'), { recursive: true })
+
+        expect(await pull('3.0.0', V3)).not.toContain('## Staged for a manual merge')
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe(V3.replace('one', 'one, mine'))
+    })
+
+    it('stages again, without merging, while the earlier .new is not taken', async () => {
+        const { projectDir, pull } = await stagedProject()
+
+        expect(await pull('3.0.0', V3)).toContain('## Staged for a manual merge')
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe('mine\n')
+        expect(await readFile(staged(projectDir), 'utf8')).toBe(V3)
     })
 })
 

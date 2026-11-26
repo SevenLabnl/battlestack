@@ -565,13 +565,19 @@ async function applyUpdateState(
         report.notes.push(`${rel}: overwritten (--force); prior content saved to ${bakRel}`)
         return
     }
-    if (!isBinaryPath(rel) && await mergeInPlace(ctx, featureId, { dest, rel, newContent, newHash, recordedHashes, report })) return
+    const newPath = stagedArtifact(ctx, rel, '.new')
+    // A `.new` still matching the record was staged earlier and not taken yet, so it is no merge base.
+    const pending = recordedHash !== undefined && await exists(newPath) && sha256(await readFile(newPath)) === recordedHash
+    const bases = pending ? new Set([...recordedHashes].filter((h) => h !== recordedHash)) : recordedHashes
+    if (!isBinaryPath(rel) && await mergeInPlace(ctx, featureId, { dest, rel, newContent, newHash, recordedHashes: bases, report })) return
 
     // drifted, no base to merge against: stage the new version and a patch.
     pushOnce(updateLedger(ctx).staged, toPosix(rel))
-    const newPath = stagedArtifact(ctx, rel, '.new')
     await mkdir(path.dirname(newPath), { recursive: true })
     await writeFile(newPath, newContent)
+    // Recording the staged version makes a taken `.new` pristine, and a later edit to it merges against the stored base.
+    recordFile(ctx, featureId, rel, newHash)
+    if (!isBinaryPath(rel)) await storeBase(ctx.projectDir, newContent)
     // Legacy in-tree artifacts beside the real file.
     await rmIfExists(`${dest}.battlestack.new`)
     await rmIfExists(`${dest}.battlestack.patch`)

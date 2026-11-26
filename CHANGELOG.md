@@ -121,6 +121,11 @@
   conflict markers. A local edit that a feature wrote over is kept as
   `.battlestack/pull/<path>.bak` under `--force`, and replaced without a
   backup under `--overwrite`.
+- A file `pull` staged for a manual merge is no longer staged again on every
+  later update once you took the `.new`. Pull now records the staged version
+  and keeps a copy in `.battlestack/base/`, so a `.new` taken as is counts as
+  unchanged, and one you edited further is merged. A `.new` you have not taken
+  yet is replaced by the newer version, not merged into your file.
 - When `pull` puts back your edits and stages a feature's file, every feature
   tracking that file keeps its earlier record, so the next pull merges against
   the version you actually have. A binary file is staged, never merged as
