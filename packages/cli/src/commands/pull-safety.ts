@@ -118,7 +118,8 @@ export async function repairOverwrites(
     start: StartRecords,
     registries: BattlestackRegistries,
 ): Promise<OverwriteRepair[]> {
-    if (ctx.state.overwrite === true && ctx.state.force !== true) return []
+    // `--overwrite` also sets `force`, so it has to be checked first.
+    if (ctx.state.overwrite === true) return []
     const ledger = updateLedger(ctx)
     const handled = new Set(ledger.handled)
     const exempt = selfMergedPaths(ctx, registries)

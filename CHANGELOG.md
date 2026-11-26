@@ -113,8 +113,8 @@
   listed as no longer managed.
 - `pull --force` and `pull --overwrite` start even when an earlier pull left
   conflict markers. A local edit that a feature wrote over is kept as
-  `.battlestack/pull/<path>.bak` under `--force`, and replaced under
-  `--overwrite`.
+  `.battlestack/pull/<path>.bak` under `--force`, and replaced without a
+  backup under `--overwrite`.
 - When `pull` puts back your edits and stages a feature's file, every feature
   tracking that file keeps its earlier record, so the next pull merges against
   the version you actually have. A binary file is staged, never merged as

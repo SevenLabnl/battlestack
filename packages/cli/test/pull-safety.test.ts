@@ -4,7 +4,8 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { BattlestackRegistries, updateLedger, type ProjectManifest, type RunContext } from '@battlestack/core'
+import { BattlestackRegistries, exists, updateLedger, type ProjectManifest, type RunContext } from '@battlestack/core'
+import { parseArgs } from '../src/cli/args.js'
 import {
     needsAttention,
     preflight,
@@ -247,9 +248,11 @@ describe('repairOverwrites', () => {
         const start = recordedAtStart(manifestWith({ Dockerfile: sha256('FROM node\n') }))
         await write('Dockerfile', 'FROM node:24\n')
 
-        const overwrite = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { overwrite: true })
+        const cli = parseArgs(['--overwrite'])
+        const overwrite = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { force: cli.force, overwrite: cli.overwrite })
         expect(await repairOverwrites(overwrite, start, overwrite.registries)).toEqual([])
         expect(await read('Dockerfile')).toBe('FROM node:24\n')
+        expect(await exists(path.join(projectDir, '.battlestack', 'pull', 'Dockerfile.bak'))).toBe(false)
 
         // --force keeps the output too, but saves the local version, as the drift-aware writers do.
         const force = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { force: true })
