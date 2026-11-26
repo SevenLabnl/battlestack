@@ -238,7 +238,7 @@ Calendar / Date Picker
 
 - NEVER use the Nuxt UI calendar component.
 - Always use `@vuepic/vue-datepicker` for all date/calendar needs.
-- Use the `<ExampleCalendar>` component or import `VueDatePicker` directly.
+- Use the `<ExampleCalendar>` component, or the named export: `import { VueDatePicker } from '@vuepic/vue-datepicker'`. There is no default export, and a default import only fails in the production build.
 - Docs: https://vue3datepicker.com/
 
 Key Conventions

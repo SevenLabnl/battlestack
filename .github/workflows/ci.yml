@@ -192,6 +192,20 @@ jobs:
           mkdir -p "$RUNNER_TEMP/scaffold"
           node packages/cli/dist/index.js ci-app nuxt4-fullstack -y --debug --cwd "$RUNNER_TEMP/scaffold"
 
+      # Reference components are copied into real pages but rendered by none, so a
+      # production build never bundles them. This page makes lint, typecheck, the
+      # build and the request after "Start the app" cover them.
+      - name: Render the reference components
+        working-directory: ${{ runner.temp }}/scaffold/ci-app
+        run: |
+          cat > app/pages/ci-reference-components.vue <<'VUE'
+          <template>
+              <div>
+                  <ExampleCalendar />
+              </div>
+          </template>
+          VUE
+
       - name: Lint
         working-directory: ${{ runner.temp }}/scaffold/ci-app
         run: |
@@ -225,7 +239,10 @@ jobs:
           pnpm run build
           pnpm run db:seed
           node --env-file=.env .output/server/index.mjs > server.log 2>&1 &
-          curl -fsS --connect-timeout 2 --max-time 5 --retry 60 --retry-delay 1 --retry-all-errors "$TEST_BASE_URL/api/health"
+          curl -fsS --connect-timeout 2 --max-time 5 --retry 60 --retry-delay 1 --retry-all-errors "$TEST_BASE_URL/api/health" || { cat server.log; exit 1; }
+          node --env-file=.env -e 'console.log(JSON.stringify({ email: process.env.SEED_ADMIN_EMAIL, password: process.env.SEED_ADMIN_PASSWORD }))' > login.json
+          curl -fsS -c cookies.txt -H 'content-type: application/json' --data @login.json "$TEST_BASE_URL/api/auth/login" > /dev/null
+          curl -fsS -b cookies.txt "$TEST_BASE_URL/ci-reference-components" | grep -q 'data-test-id="dp-input"' || { echo "::error::ExampleCalendar did not render"; cat server.log; exit 1; }
 
       # `--reporter=verbose` because the markers are passing tests' titles, which
       # the default reporter does not print. An unreachable database or app
