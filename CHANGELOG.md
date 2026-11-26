@@ -94,6 +94,10 @@
   updated. A file moving to another feature, whichever of the two updates
   first, is no longer deleted or written back in the same run, and a pull that
   stops halfway leaves it in place.
+- When two features ship the same file and the one whose version wins stops
+  shipping it, `pull` now writes the other feature's version in the same run,
+  whichever of the two updates first. Before, the file could keep the old
+  owner's content, which may refer to files that pull just deleted.
 - `pull` leaves files claimed with `battlestack own` untouched when their
   feature writes them outside its template folder, such as the Dockerfile, and
   no longer drops a feature's `own` entries when that feature declares

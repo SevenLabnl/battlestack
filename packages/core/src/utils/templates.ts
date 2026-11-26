@@ -656,8 +656,9 @@ export async function removeQueuedObsoleteFiles(ctx: RunContext): Promise<string
     const deferred = (ctx.state[DEFERRED_QUEUE_KEY] as DeferredWrite[] | undefined) ?? []
     delete ctx.state[DEFERRED_QUEUE_KEY]
     for (const { featureId, rel, content } of deferred) {
-        const tracked = new Set([...recordedFiles(ctx)].map((r) => toPosix(r.rel)))
-        if (!tracked.has(toPosix(rel))) await writeGuarded(ctx, featureId, rel, content)
+        // The deferring feature still carries its own record of `rel`, so only other trackers count.
+        const otherOwner = trackersOf(ctx, rel).some((t) => t.featureId !== featureId)
+        if (!otherOwner) await writeGuarded(ctx, featureId, rel, content)
     }
 
     const queue = (ctx.state[OBSOLETE_QUEUE_KEY] as QueuedObsolete[] | undefined) ?? []
