@@ -177,9 +177,11 @@ On a machine without a browser, `--no-browser` prints the URL instead.
 
 ### Login says the session secret is too short
 
-`NUXT_SESSION_PASSWORD` must be at least 32 characters. If it still holds a
+`NUXT_APP_SECRET` must be at least 32 characters. If it still holds a
 placeholder, `battlestack pull` replaces it with a generated value, or set one
-yourself and restart.
+yourself and restart. A project from before nuxt-auth-utils 0.6 used
+`NUXT_SESSION_PASSWORD`; `battlestack pull` renames it in `.env`, but a deployed
+environment needs `NUXT_APP_SECRET` set by hand.
 
 ### Passkeys do not work
 
@@ -228,21 +230,25 @@ back to a localhost port. Install mkcert if you want the hostnames. See
 
 ## Pull and drift
 
-### pull says a file drifted and did not update it
+### pull exited with code 2
 
-Working as intended. It never overwrites your edits silently. Two files are
-staged for you:
-
-```
-.battlestack/pull/<path>.new      what pull wanted to write
-.battlestack/pull/<path>.patch    a diff from your version to that
-```
-
-Merge what you want and delete the artefacts, or:
+It finished and left work for you, listed in `.battlestack/pull/REPORT.md`.
+Usually that is conflict markers in files where you and upstream changed the
+same lines, or a file staged as `.battlestack/pull/<path>.new` because there was
+no earlier version to merge against. The report says how to handle each kind.
+To take upstream everywhere instead:
 
 ```bash
 battlestack pull --force    # take upstream, saving yours as .bak
 ```
+
+### pull refuses to start
+
+Either the working tree has uncommitted changes, or a file still has conflict
+markers from the last pull. Commit or stash your work, or resolve the markers
+(`git diff --check` lists them), and run it again. `--allow-dirty` skips the
+first check. `--force` and `--overwrite` skip the second, because they write
+upstream's version over edited files instead of merging into them.
 
 ### I keep getting drift on a file I intend to own
 
@@ -352,9 +358,9 @@ battlestack cleanup      # reconcile what ran under the old name
 ```
 
 The first pull after a rename re-renders every feature, also at unchanged
-versions. Files you edited get a patch in `.battlestack/pull/` as usual, and
-files you own are left alone; pull lists the tracked files that still contain
-the old name.
+versions. Files you edited get the new name merged in like any other update
+(see `.battlestack/pull/REPORT.md`), and files you own are left alone; pull
+lists the tracked files that still contain the old name.
 
 `cleanup` finds Docker resources, hosts entries and gateway routes registered
 under every earlier name the manifest records. For a name it does not record,

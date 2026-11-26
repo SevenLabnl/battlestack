@@ -22,6 +22,8 @@ export interface InstalledFeatureRecord {
     files: Record<string, string>
     /** Paths the user owns; `battlestack pull` skips them entirely. */
     ownedByUser?: string[]
+    /** Relative path → hash of the upstream version last staged as a `.new` for it and not written since. */
+    stagedFiles?: Record<string, string>
     /** Free-form state recorded by the feature for later migrations. */
     state?: Record<string, unknown>
 }
@@ -64,6 +66,8 @@ export interface Feature {
     collectDocs?(ctx: RunContext): DocSection[] | null | undefined
     /** Docker build-time secrets aggregated by `shared:docker` (BuildKit `--mount=type=secret`). */
     collectBuildSecrets?(ctx: RunContext): BuildSecret[] | null | undefined
+    /** Tracked paths whose `update` merges local content itself; a trailing `/` covers a directory. */
+    selfMergedFiles?(ctx: RunContext): string[]
     /** Paths to mark as `ownedByUser` at scaffold time. */
     structuralFiles?(ctx: RunContext): string[]
     /** Feature-specific follow-up prompts at scaffold. MUST self-bypass under non-interactive runs. */

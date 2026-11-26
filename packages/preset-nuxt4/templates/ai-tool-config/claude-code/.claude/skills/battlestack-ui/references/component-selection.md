@@ -3,9 +3,9 @@
 ## Decision sequence
 
 1. **A Nuxt UI component solves it?** Use it. No local substitutes, no styling wrappers.
-2. **Composition solves it?** Compose in the app layer: `UCard + UBadge + UButton` beats a `CustomerStatusCard`. Recurring compositions may become app-level pattern components — domain-neutral, slots/props instead of embedded entity logic — but they still render only `U*` components inside.
+2. **Composition solves it?** Compose in the app layer: `UCard + UBadge + UButton` beats a `CustomerStatusCard`. Recurring compositions may become app-level pattern components (domain-neutral, slots/props instead of embedded entity logic), but they still render only `U*` components inside.
 3. **Only the visual treatment differs?** In order: component props (`variant`, `color`, `size`) → per-instance `ui`/slot classes → `app.config.ts` default under `ui` → token re-value (`brand.css`, or the theme layer when it should hold for every project).
-4. **Genuinely missing behaviour?** That is a design-system gap: raise it (design project first, then `@battlestack/theme`/scaffold), don't patch it locally. The bar for "Nuxt UI can't do this" is high — check props, slots, and the `ui` theming API before claiming it.
+4. **Genuinely missing behaviour?** That is a design-system gap: raise it (design project first, then `@battlestack/theme`/scaffold), don't patch it locally. The bar for "Nuxt UI can't do this" is high: check props, slots, and the `ui` theming API before claiming it.
 
 ## Variant rules
 
@@ -17,7 +17,7 @@ A missing concept that is **visual** → token value change. A missing concept t
 
 ## Business components
 
-Domain components (tied to Customer, Invoice, Project…) live in the application — as compositions of `U*` components. They never migrate into the theme layer; the theme ships exactly one component (`BsLogo`, brand).
+Domain components (tied to Customer, Invoice, Project…) live in the application, as compositions of `U*` components. They never migrate into the theme layer; the theme ships exactly one component (`BsLogo`, brand).
 
 ## Refactoring signals
 

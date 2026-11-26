@@ -3,7 +3,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 
 /**
  * The only file calling the OpenAI-compatible SDK directly; everything else routes through Mastra agents or this gateway.
- * The upstream is ANY OpenAI-compatible AI gateway — sluis.ai, a self-hosted LiteLLM proxy, or another compatible endpoint — configured by `NUXT_AI_GATEWAY_URL`.
+ * The upstream is ANY OpenAI-compatible AI gateway (sluis.ai, a self-hosted LiteLLM proxy, or another compatible endpoint), configured by `NUXT_AI_GATEWAY_URL`.
  * Mastra throws on router ids shorter than `<gateway>/<provider>/<model>`, so providers are discovered as buckets from the gateway's `/v1/models`.
  *
  * Header precedence on every request, lowest to highest: SDK auth (from the API key) → `NUXT_AI_GATEWAY_HEADERS` → per-call headers.
@@ -153,7 +153,7 @@ let _headers: Record<string, string> | null = null
 
 /**
  * Optional extra request headers from `NUXT_AI_GATEWAY_HEADERS` (a JSON object of string/number/boolean values), sent on every gateway call.
- * This is how gateway-specific knobs are passed without dedicated code paths — e.g. sluis.ai's per-request residency override: `{"X-Sluis-Residency":"eu-only"}`.
+ * This is how gateway-specific knobs are passed without dedicated code paths, e.g. sluis.ai's per-request residency override: `{"X-Sluis-Residency":"eu-only"}`.
  * Parsed once per process; entries with nested values are skipped with a warning instead of being sent as "[object Object]".
  */
 export function gatewayHeaders(): Record<string, string> {

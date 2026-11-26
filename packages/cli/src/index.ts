@@ -22,7 +22,7 @@ import { printCommandHelp, printHelp } from './cli/help.js'
 import { bootstrapProject } from './commands/install.js'
 import { doctorCommand } from './commands/doctor.js'
 import { gatewayUp, registerProject } from './commands/gateway.js'
-import { projectCommand } from './commands/project.js'
+import { projectCommand, RESERVED_COMMANDS } from './commands/project.js'
 import { selfUpdateCommand } from './commands/self-update.js'
 import {
     pluginAdd,
@@ -78,7 +78,7 @@ async function show(print: (result: LoadResult) => void): Promise<void> {
 /**
  * Every way a boot can go wrong, in one place: template-extension warnings, then plugins
  * that did not load at all. The second list used to print from `printPlugins` only, so a
- * broken plugin was invisible on every other command — and since its commands are then
+ * broken plugin was invisible on every other command, and since its commands are then
  * absent from the registry, running one falls through to "unknown command", which outside
  * a project means the scaffold wizard treats it as a new project's name.
  */
@@ -265,6 +265,14 @@ async function main(): Promise<void> {
             const asCommand = args.projectName
                 ? await dispatchPluginCommand(args.projectName, stripCommandToken(rawArgv), loader, registries)
                 : false
+            if (!asCommand && args.projectName && RESERVED_COMMANDS.some((c) => c.name === args.projectName)) {
+                const migrate = registries.commands.all().some((c) => c.id === 'migrate')
+                throw new CLIError(
+                    ErrorCode.SCAFFOLD_FAILED,
+                    `\`${args.projectName}\` runs inside a battlestack project, and there is none here or in a parent directory.`
+                    + (migrate ? ' A project made with another tool can be converted first: battlestack migrate' : ''),
+                )
+            }
             if (!asCommand) {
                 // Implicit `create`: the positional is the project name, so nothing is stripped.
                 const dispatched = await dispatchPluginCommand('create', rawArgv, loader, registries)

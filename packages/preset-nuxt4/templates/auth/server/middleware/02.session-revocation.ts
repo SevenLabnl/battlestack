@@ -8,8 +8,9 @@ import { sessions } from '#server/database/schema/sessions'
  * `requireUserSession`, so the row is checked here on every request that carries a session cookie.
  */
 export default defineEventHandler(async (event) => {
-    const config = useRuntimeConfig(event).session as { name?: string, cookie?: Record<string, unknown> }
-    const cookieName = config.name ?? 'nuxt-session'
+    const { name } = useRuntimeConfig(event).session as { name?: string }
+    // nuxt-auth-utils 0.6 swaps a 'nuxt-session' name for its own cookie, so checking the configured name would skip revocation.
+    const cookieName = !name || name === 'nuxt-session' ? 'nuxt-auth-session' : name
     if (!getCookie(event, cookieName)) return
 
     const session = await getUserSession(event)
@@ -18,13 +19,9 @@ export default defineEventHandler(async (event) => {
     const sessionId = session.secure?.sessionId
     if (sessionId && await isLive(sessionId, userId)) return
 
-    // getUserSession returns a copy, and clearUserSession would let the next call re-read the still-valid
-    // cookie, so strip h3's per-request cache in place. Fail closed if it isn't there.
-    const cached = (event.context.sessions as Record<string, { data: Record<string, unknown> }> | undefined)?.[cookieName]
-    if (!cached) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-    delete cached.data.user
-    delete cached.data.secure
-    deleteCookie(event, cookieName, { ...config.cookie, path: '/' })
+    // Replaces the request's cached session too, so later reads in this request see it empty.
+    await clearUserSession(event)
+    if ((await getUserSession(event)).user) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
 })
 
 async function isLive(sessionId: string, userId: string): Promise<boolean> {

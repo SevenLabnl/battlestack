@@ -52,11 +52,11 @@ ui: {
 Always design mobile-first. Base styles = mobile, then add breakpoints:
 
 ```
-sm:  640px   — large phones, small tablets
-md:  768px   — tablets
-lg:  1024px  — laptops
-xl:  1280px  — desktops
-2xl: 1536px  — large desktops
+sm:  640px   large phones, small tablets
+md:  768px   tablets
+lg:  1024px  laptops
+xl:  1280px  desktops
+2xl: 1536px  large desktops
 ```
 
 ### Common patterns:

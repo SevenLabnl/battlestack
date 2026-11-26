@@ -15,7 +15,7 @@ import {
     type UpdateDecision,
 } from '@battlestack/core'
 
-// Unscoped public package name (the `packages/battlestack` wrapper — what users
+// Unscoped public package name (the `packages/battlestack` wrapper that users
 // globally install), used by npm view, `<pm> add -g` and the bun regex. The
 // wrapper is published in version lockstep with @battlestack/cli, so comparing
 // its registry version against our own package.json version stays valid.

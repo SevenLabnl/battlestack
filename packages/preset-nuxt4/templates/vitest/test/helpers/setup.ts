@@ -131,7 +131,7 @@ export async function loginAs(email: string, password: string): Promise<string> 
     if (!res.ok) throw new Error(`login failed: ${res.status} ${res.statusText}`)
 
     const cookies = res.headers.getSetCookie()
-    const sessionCookie = cookies.find((c: string) => c.startsWith('nuxt-session='))
+    const sessionCookie = cookies.find((c: string) => c.startsWith('nuxt-auth-session='))
     if (!sessionCookie) throw new Error('no session cookie returned by /api/auth/login')
 
     return sessionCookie.split(';')[0]!

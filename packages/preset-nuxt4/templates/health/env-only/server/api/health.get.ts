@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import { checkEnvVars, sessionPasswordFrom } from '#server/utils/health-checks'
+import { checkEnvVars, appSecretFrom } from '#server/utils/health-checks'
 
 type HealthBody = {
     status: 'ok' | 'degraded'
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     const commit = text(publicConfig.appCommit)
     const builtAt = text(publicConfig.appBuiltAt)
 
-    const missingEnv = checkEnvVars(sessionPasswordFrom(config))
+    const missingEnv = checkEnvVars(appSecretFrom(config))
     if (missingEnv.length > 0) {
         return respond(
             event,

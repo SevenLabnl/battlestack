@@ -13,7 +13,7 @@ export interface BuildInfo {
     version: string
     /** Full 40-character commit sha, or `''` when the build did not supply one. */
     commit: string
-    /** First 7 characters of `commit` — what `git log --oneline` and GitHub both show. */
+    /** First 7 characters of `commit`, which is what `git log --oneline` and GitHub both show. */
     shortCommit: string
     /** ISO-8601 build timestamp, or `''`. */
     builtAt: string

@@ -7,4 +7,14 @@ export interface UpdateReport {
     notes: string[]
     /** Tracked files the user had deleted, restored by this pull. */
     restoredDeleted?: string[]
+    /** Edited files merged three-way without conflicts. */
+    merged?: string[]
+    /** Edited files merged three-way, left with conflict markers to resolve. */
+    conflicts?: string[]
+    /** Backups of regenerated files that had local edits, relative to the project. */
+    backups?: string[]
+    /** Files no longer shipped, left in place unrecorded because they have local edits. */
+    unmanaged?: string[]
+    /** Steps a person has to take that the update could not, e.g. in GitHub settings. */
+    actions?: string[]
 }

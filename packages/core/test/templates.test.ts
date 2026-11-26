@@ -3,7 +3,14 @@ import { createHash } from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { copyTemplateDirRecorded, reconcilePostFormat, snapshotTrackedHashes, updateFromTemplateDir } from '../src/utils/templates.js'
+import {
+    copyTemplateDirRecorded,
+    queueObsoleteDeletions,
+    reconcilePostFormat,
+    removeQueuedObsoleteFiles,
+    snapshotTrackedHashes,
+    updateFromTemplateDir,
+} from '../src/utils/templates.js'
 import { exists } from '../src/utils/fs.js'
 import { BattlestackRegistries } from '../src/registry.js'
 import { STAGE } from '../src/constants/stages.js'
@@ -614,6 +621,43 @@ describe('updateFromTemplateDir: rels shared across features', () => {
         // …while the shell's tracking entry is untouched.
         expect((ctx.state['files:tpl:shell'] as Record<string, string>)[REL]).toBe(shellHash)
     })
+
+    // Only the ui-first order goes through the deferred write; shell-first guards the direct path.
+    it.each([
+        ['ui', ['tpl:ui', 'tpl:shell']],
+        ['shell', ['tpl:shell', 'tpl:ui']],
+    ])('writes the earlier feature\'s version when the later owner stops shipping the rel (%s updates first)', async (_, order) => {
+        const UI_V2 = '<template>ui shell v2</template>\n'
+        const uiDir = await mkdtemp(path.join(os.tmpdir(), 'battlestack-tpl-test-ui-'))
+        const shellDir = await mkdtemp(path.join(os.tmpdir(), 'battlestack-tpl-test-shell-'))
+        try {
+            await mkdir(path.join(uiDir, 'app'), { recursive: true })
+            await writeFile(path.join(uiDir, REL), UI_V2)
+            await writeFile(path.join(shellDir, 'landing.ts'), 'export const l = 1\n')
+            await mkdir(path.join(projectDir, 'app'), { recursive: true })
+            await writeFile(path.join(projectDir, REL), SHELL_CONTENT)
+            const shellHash = sha(SHELL_CONTENT)
+
+            const ctx = makeSharedCtx({
+                'tpl:ui': { [REL]: shellHash },
+                'tpl:shell': { [REL]: shellHash },
+            })
+            queueObsoleteDeletions(ctx)
+            const dirs: Record<string, string> = { 'tpl:ui': uiDir, 'tpl:shell': shellDir }
+            for (const id of order) {
+                const prev: InstalledFeatureRecord = { id: `shared:${id}`, version: '0.9.0', files: { [REL]: shellHash } }
+                await updateFromTemplateDir(ctx, id, dirs[id]!, prev)
+            }
+            await removeQueuedObsoleteFiles(ctx)
+
+            expect(await readFile(path.join(projectDir, REL), 'utf8')).toBe(UI_V2)
+            expect((ctx.state['files:tpl:ui'] as Record<string, string>)[REL]).toBe(sha(UI_V2))
+            expect((ctx.state['files:tpl:shell'] as Record<string, string>)[REL]).toBeUndefined()
+        } finally {
+            await rm(uiDir, { recursive: true, force: true })
+            await rm(shellDir, { recursive: true, force: true })
+        }
+    })
 })
 
 // Bytes that do not survive a utf8 round-trip: 0x89 opens every PNG, and 0x80/0xFF
@@ -700,7 +744,6 @@ describe('updateFromTemplateDir: binary assets', () => {
         expect(staged.equals(PNG_BYTES_V2)).toBe(true)
         // ...and no line diff of binary noise.
         expect(await exists(path.join(projectDir, '.battlestack', 'pull', rel + '.patch'))).toBe(false)
-        expect(report.notes.join('\n')).toContain('binary asset')
     })
 
     it('still writes a text file as text (the binary branch must not swallow everything)', async () => {

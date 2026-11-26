@@ -36,7 +36,7 @@ Auth: Nitro middleware runs before the upgrade; `requireUserSession(peer.context
 For data-change push, pair the WS route with PostgreSQL LISTEN/NOTIFY:
 
 ```ts
-// server/plugins/realtime.ts — set up LISTEN once at server start
+// server/plugins/realtime.ts: set up LISTEN once at server start
 import postgres from 'postgres'
 
 const peers = new Set<any>()

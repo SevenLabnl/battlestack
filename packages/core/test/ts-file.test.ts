@@ -122,4 +122,46 @@ describe('ts-file (magicast helpers)', () => {
         expect(out).toMatch(/dbTimeoutMs:\s*5000/)
         expect(out).toMatch(/failOnDegraded:\s*true/)
     })
+
+    it.each([
+        ['a variable', 'const cfg = {}\nexport default defineNuxtConfig({ runtimeConfig: cfg })\n'],
+        ['shorthand', 'const runtimeConfig = {}\nexport default defineNuxtConfig({ runtimeConfig })\n'],
+    ])('mergeDefaults names the key when it is %s', async (_, source) => {
+        const file = mkFile(source)
+        await expect(patchTsFile(file, (mod) => {
+            mergeDefaults(defaultObject(mod), 'runtimeConfig', { added: '' }, 'nuxt.config.ts#runtimeConfig')
+        })).rejects.toThrow(/nuxt\.config\.ts#runtimeConfig is not an object literal/)
+    })
+
+    it('mergeDefaults returns the nested defaults it cannot add under a non-literal value', async () => {
+        const file = mkFile(
+            `const baseSession = { maxAge: 60 }\nexport default { runtimeConfig: { session: baseSession, health: { a: 1 } } }\n`,
+        )
+        let skipped: string[] = []
+        await patchTsFile(file, (mod) => {
+            skipped = mergeDefaults(defaultObject(mod), 'runtimeConfig', {
+                session: { sessionHeader: false },
+                health: { b: 2 },
+            })
+        })
+        expect(skipped).toEqual(['runtimeConfig.session.sessionHeader'])
+        const out = readFileSync(file, 'utf8')
+        expect(out).toMatch(/session:\s*baseSession/)
+        expect(out).toMatch(/b:\s*2/)
+    })
+
+    it('mergeDefaults keeps an explicit null as the project\'s value', async () => {
+        const file = mkFile(`export default { runtimeConfig: { smtpHost: null, session: null } }\n`)
+        let skipped: string[] = []
+        await patchTsFile(file, (mod) => {
+            skipped = mergeDefaults(defaultObject(mod), 'runtimeConfig', {
+                smtpHost: '',
+                session: { sessionHeader: false },
+            })
+        })
+        const out = readFileSync(file, 'utf8')
+        expect(out).toMatch(/smtpHost:\s*null/)
+        expect(out).toMatch(/session:\s*null/)
+        expect(skipped).toEqual(['runtimeConfig.session.sessionHeader'])
+    })
 })

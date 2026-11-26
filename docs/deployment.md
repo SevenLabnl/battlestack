@@ -111,6 +111,14 @@ Migrations track what has already been applied, so re-running one is a no-op
 rather than a second attempt at the same change. That is what makes it safe for
 a deploy pipeline to run migrations unconditionally.
 
+`battlestack pull` runs `db:generate` itself when a feature update changes a file
+under `server/database/schema/`, and names the SQL file it wrote. Commit it
+along with the rest of the pull. When no SQL file appears, for example with
+`--skip-install`, a rename drizzle-kit needs to ask you about, or a schema file
+still waiting for your merge, the step is listed in `.battlestack/pull/REPORT.md`
+and `pull` exits with code 2. Finish it with `pnpm run db:generate` in a
+terminal.
+
 Where several replicas start at once, the migrator takes a database-level
 advisory lock, so exactly one applies a given migration and the others wait
 rather than racing.
@@ -127,7 +135,7 @@ Things to get right:
 
 | Key | Why |
 | --- | --- |
-| `NUXT_SESSION_PASSWORD` | Must be a real secret, at least 32 characters, and different from development. Rotating it invalidates every session. |
+| `NUXT_APP_SECRET` | Must be a real secret, at least 32 characters, and different from development. Nuxt only generates one in development, so a production build without it refuses to boot. Rotating it invalidates every session. |
 | `NUXT_DATABASE_URL` | Your production database, not a container. |
 | `NUXT_PUBLIC_APP_URL` | Your real public URL. Wrong here breaks OAuth callbacks and passkeys. |
 | `NUXT_WEBAUTHN_RP_ID` | Must match your production domain, or passkeys silently fail. |

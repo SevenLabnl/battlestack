@@ -7,7 +7,7 @@ import { createDbSession, type SessionUser } from '#server/utils/auth'
 import { isMagicLoginAllowed } from '#server/utils/magic-login-guard'
 
 /**
- * Dev-only magic-link login, signed with the SAME secret that seals session cookies, so a forgeable signature is total compromise. Two guards stack:
+ * Dev-only magic-link login, signed with the app secret that session cookies are sealed from, so a forgeable signature is total compromise. Two guards stack:
  * `import.meta.dev` (never `process.env.NODE_ENV`, inlined at build time, so production compiles the body out) and a local-host check that 404s a tunnel.
  */
 const bodySchema = z.object({
@@ -21,12 +21,12 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 404, statusMessage: 'Not Found' })
     }
 
-    const config = useRuntimeConfig(event)
-    const secret = String((config.session as { password?: unknown } | undefined)?.password ?? '')
+    // The raw secret, not a `deriveSecret` key: `battlestack login` signs with NUXT_APP_SECRET from `.env`.
+    const secret = String(useRuntimeConfig(event).appSecret ?? '')
     if (!secret) {
         throw createError({
             statusCode: 500,
-            statusMessage: 'runtimeConfig.session.password is not set',
+            statusMessage: 'NUXT_APP_SECRET is not set',
         })
     }
 

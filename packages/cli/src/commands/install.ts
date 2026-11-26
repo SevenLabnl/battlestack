@@ -74,7 +74,7 @@ export async function installCommand(args: ParsedArgs, _loader: Ora, registries:
     ui.blank()
 }
 
-/** Local `.env`, deps, and — unless `includeDb` is false — the database up plus schema. */
+/** Local `.env`, deps, and (unless `includeDb` is false) the database up plus schema. */
 export async function bootstrapProject(
     ctx: RunContext,
     pm: PackageManager,

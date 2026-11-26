@@ -133,8 +133,11 @@ function normalizeManifest(manifest: ProjectManifest): { manifest: ProjectManife
 
 export async function writeManifest(
     ctx: RunContext,
-    /** `rendered`: every feature just ran under the current name, so a pending `renderedName` is settled. */
-    opts: { incomplete?: boolean, cliVersion?: string, rendered?: boolean } = {},
+    /**
+     * `rendered`: every feature just ran under the current name, so a pending `renderedName` is settled.
+     * `failed`: fqids whose update failed; they keep their recorded version so the next pull retries them.
+     */
+    opts: { incomplete?: boolean, cliVersion?: string, rendered?: boolean, failed?: ReadonlySet<string> } = {},
 ): Promise<void> {
     const target = path.join(ctx.projectDir, MANIFEST_PATH)
     const { manifest: previous, needsRewrite } = await loadAndMigrate(ctx.projectDir, ctx.registries)
@@ -151,6 +154,8 @@ export async function writeManifest(
             = (ctx.state[`files:${bareStateId}`] as Record<string, string> | undefined) ?? prev?.files ?? {}
         const ownedFromState
             = (ctx.state[`owned:${bareStateId}`] as string[] | undefined) ?? prev?.ownedByUser
+        const stagedFromState
+            = (ctx.state[`staged:${bareStateId}`] as Record<string, string> | undefined) ?? prev?.stagedFiles
         const stashed = ctx.state[`state:${bareStateId}`] as Record<string, unknown> | undefined
         // New writes win.
         const mergedState = stashed
@@ -158,15 +163,22 @@ export async function writeManifest(
             : prev?.state
         records.push({
             id: fqidRecordId,
-            version: feature.version,
+            version: (opts.failed?.has(fqidRecordId) && prev?.version) || feature.version,
             files: filesFromState,
             ...(ownedFromState && ownedFromState.length > 0
                 ? { ownedByUser: ownedFromState }
+                : {}),
+            ...(stagedFromState && Object.keys(stagedFromState).length > 0
+                ? { stagedFiles: stagedFromState }
                 : {}),
             ...(mergedState && Object.keys(mergedState).length > 0
                 ? { state: mergedState }
                 : {}),
         })
+    }
+    // A feature whose plugin did not load keeps its record, so a missing plugin never unmanages files.
+    for (const prev of previous?.features ?? []) {
+        if (!ctx.registries.features.has(prev.id) && !records.some((r) => r.id === prev.id)) records.push(prev)
     }
     // Deterministic on-disk order.
     records.sort(byId)
@@ -237,10 +249,45 @@ export async function renameProject(
     return recorded
 }
 
+/** The sha256 the manifest records for these bytes. */
+export function hashContent(content: string | Buffer): string {
+    return createHash('sha256').update(content).digest('hex')
+}
+
 /** A file matching its recorded hash is unmodified and safe to overwrite. */
 export async function hashFile(absolutePath: string): Promise<string> {
-    const buf = await readFileAsync(absolutePath)
-    return createHash('sha256').update(buf).digest('hex')
+    return hashContent(await readFileAsync(absolutePath))
+}
+
+/** A recorded rel with `/` separators, so keys from any platform compare equal. */
+export function toPosixRel(rel: string): string {
+    return rel.replaceAll(path.sep, '/')
+}
+
+/** One entry of a `files:<featureId>` map in `ctx.state`. */
+export interface RecordedFile {
+    featureId: string
+    /** The key as the map spells it. */
+    rel: string
+    hash: string
+    files: Record<string, string>
+}
+
+/** Every rel → hash entry across the `files:*` maps in `ctx.state`. */
+export function* recordedFiles(ctx: RunContext): Generator<RecordedFile> {
+    for (const [key, value] of Object.entries(ctx.state)) {
+        if (!key.startsWith('files:') || !value || typeof value !== 'object') continue
+        const files = value as Record<string, string>
+        for (const [rel, hash] of Object.entries(files)) {
+            if (typeof hash === 'string') yield { featureId: key.slice('files:'.length), rel, hash, files }
+        }
+    }
+}
+
+/** The recorded entries for `rel` across every feature, matched separator-insensitively. */
+export function trackersOf(ctx: RunContext, rel: string): RecordedFile[] {
+    const posix = toPosixRel(rel)
+    return [...recordedFiles(ctx)].filter((r) => toPosixRel(r.rel) === posix)
 }
 
 export function recordFile(
@@ -271,14 +318,14 @@ export function rebaselineRecordedFile(
          * Move only baselines that equal this hash (the file's pre-write bytes). For a
          * string-patch over a possibly user-drifted file: a feature whose baseline
          * already diverged keeps its drift visible instead of having the user's edits
-         * silently blessed into the baseline — where the next template bump would
+         * silently blessed into the baseline, where the next template bump would
          * classify the file as pristine and overwrite them without staging artifacts.
          */
         onlyIfPrevHash?: string
     } = {},
 ): void {
     // Recorded rels are platform-separated (`path.join` in the emit path), so on
-    // Windows the maps hold `app\...` keys — compare separator-insensitively and
+    // Windows the maps hold `app\...` keys, so compare separator-insensitively and
     // re-record under the exact key each map already uses.
     const posix = relativePath.replaceAll(path.sep, '/')
     for (const key of Object.keys(ctx.state)) {
