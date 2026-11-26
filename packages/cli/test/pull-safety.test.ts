@@ -330,9 +330,9 @@ describe('repairOverwrites', () => {
         expect(await read('Dockerfile')).toBe('FROM node:24\n')
         expect(lf(await read(path.join('.battlestack', 'pull', 'Dockerfile.bak')))).toBe('FROM node\nCOPY patches/ ./patches/\n')
 
-        // --overwrite also takes an owned file, as confirmed at its prompt.
+        // --overwrite also takes an owned file, as confirmed at its prompt, and leaves no backup.
         const both = ctxRecording({ Dockerfile: sha256('FROM node:24\n') }, projectDir, { overwrite: true, force: true, 'owned:test:feat': ['Dockerfile'] })
-        expect((await repairOverwrites(both, start, both.registries, ownedAnywhere(both))).map((r) => r.outcome)).toEqual(['backed up'])
+        expect(await repairOverwrites(both, start, both.registries, ownedAnywhere(both))).toEqual([])
         expect(await read('Dockerfile')).toBe('FROM node:24\n')
     })
 

@@ -133,7 +133,7 @@ export async function repairOverwrites(
 
     for (const rel of changed) {
         // A guarded writer marks an owned rel handled without writing it, so a direct patch after it still needs undoing.
-        const isOwned = owned.has(rel) && ctx.state.overwrite !== true
+        const isOwned = owned.has(rel)
         if (!isOwned && (handled.has(rel) || isExempt(rel, exempt))) continue
         const trackers = trackersOf(ctx, rel)
         if (trackers.length === 0) continue
