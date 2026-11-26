@@ -154,7 +154,10 @@ function collectAtRiskOwnedFiles(
     return atRisk
 }
 
-/** Throws on failure unless `failureIsNonFatal` is set. False when the feature could not run: unregistered, or failed. */
+/**
+ * Throws on failure unless `failureIsNonFatal` is set. False when the feature could not run:
+ * unregistered, or failed, in which case its fqid goes into `failed`.
+ */
 async function pullOneFeature(
     ctx: RunContext,
     record: InstalledFeatureRecord,
@@ -164,6 +167,7 @@ async function pullOneFeature(
     /** Set after `battlestack rename`: every feature re-renders, at unchanged versions too. */
     renamedFrom: string | undefined,
     collected: Collected,
+    failed: Set<string>,
 ): Promise<boolean> {
     if (!registries.features.has(record.id)) {
         ui.warn(`feature "${record.id}" is not registered by any loaded plugin, skipped`)
@@ -220,6 +224,11 @@ async function pullOneFeature(
         const msg = error instanceof Error ? error.message : String(error)
         loader.fail(`${feature.label}: ${msg}`)
         if (!feature.failureIsNonFatal) throw error
+        failed.add(feature.fqid)
+        collected.actions.push(
+            `\`${feature.fqid}\` failed to update to ${feature.version} (${msg}) and stays at ${record.version}. `
+            + 'Fix the cause and run `battlestack pull` again, then delete this line.',
+        )
         return false
     }
     return true
@@ -461,8 +470,9 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         const collected: Collected = { backups: [], unmanaged: [], actions: [], restoredDeleted: [] }
         // An orphan's files were not re-rendered either, so they still carry the old name.
         let renderedAll = orphans.length === 0
+        const failed = new Set<string>()
         for (const record of existingRecords) {
-            if (!(await pullOneFeature(ctx, record, args, loader, registries, renamedFrom, collected))) renderedAll = false
+            if (!(await pullOneFeature(ctx, record, args, loader, registries, renamedFrom, collected, failed))) renderedAll = false
         }
         const obsolete = await removeQueuedObsoleteFiles(ctx)
         for (const rel of obsolete.removed) ui.dim(`  removed obsolete file: ${rel}`)
@@ -485,7 +495,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
                 await formatAndReconcile(ctx, manifest, registries)
             }
             // A feature that did not run still carries the old name, so the rename stays pending.
-            await writeManifest(ctx, { rendered: renderedAll })
+            await writeManifest(ctx, { rendered: renderedAll, failed })
             const written = await readManifest(projectDir, registries)
             if (written) await pruneStoredBases(projectDir, written)
             // The manifest is already written, so a throw here would leave no report and no reminder.

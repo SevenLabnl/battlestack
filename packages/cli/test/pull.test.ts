@@ -1206,6 +1206,39 @@ describe('battlestack pull: a file staged for a manual merge', () => {
     })
 })
 
+describe('battlestack pull: a feature whose update fails without stopping the pull', () => {
+    it('keeps its old version, so the next pull retries it, and lists it in the report', async () => {
+        const projectDir = await tmp('battlestack-pull-failed-')
+        const tplV1 = await tmp('battlestack-pull-failed-v1-')
+        await writeTemplateFile(tplV1, 'a.ts', 'v1\n')
+        const registriesV1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplV1)
+        registriesV1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+
+        const registriesV2 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        registriesV2.features.register({
+            ...makeFileFeature('test:feat-a', '2.0.0', tplV1),
+            failureIsNonFatal: true,
+            async update() {
+                throw new Error('boom')
+            },
+        }, origin)
+        process.exitCode = undefined
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV2))
+        const exitCode = process.exitCode
+        process.exitCode = undefined
+
+        const manifest = await readManifestRaw(projectDir)
+        expect(manifest.features.find((f) => f.id === fqid('test:feat-a'))?.version).toBe('1.0.0')
+        const report = await readFile(path.join(projectDir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        expect(report).toMatch(/test:feat-a.*boom/)
+        expect(exitCode).toBe(2)
+    })
+})
+
 describe('battlestack pull --allow-dirty', () => {
     it('leaves an uncommitted edit to a tracked file exactly as it was', async () => {
         const { execFileSync } = await import('node:child_process')

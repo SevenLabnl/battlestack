@@ -146,6 +146,10 @@
   skips lint and `db:generate`, and lists the fix in `REPORT.md`:
   `pnpm clean --lockfile && pnpm install`, then lint, the tests and
   `db:generate` if the schema changed.
+- A feature whose update fails without stopping `pull` keeps its old version
+  in the manifest, so the next pull tries it again. `REPORT.md` lists the
+  failure and pull exits with code 2. Before, it was recorded at the new
+  version and never retried.
 - A feature whose plugin did not load keeps its manifest record on `pull`
   instead of being dropped, so its files stay managed.
 - `battlestack remove` of a feature whose plugin did not load refuses when
