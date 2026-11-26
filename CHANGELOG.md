@@ -2,10 +2,12 @@
 
 ## Unreleased
 
-- A generated project's `.gitignore` lists `.claude/worktrees/`, where Claude
-  Code agents create their git worktrees. Each is a full checkout, so without
-  the line git, editors and file search treat it as part of the project.
-  Existing projects get the line via `battlestack pull`.
+- Generated projects ignore `.claude/worktrees/`, where Claude Code agents
+  create their git worktrees. Each is a full checkout, so git, editors and file
+  search treated it as part of the project, and `nuxt dev` and `vitest --watch`
+  watched every file in it. `.gitignore` lists it, `nuxt.config.ts` adds it to
+  Nuxt's and Nitro's `ignore`, and `vitest.config.ts` leaves it out of watch
+  mode. Existing projects get all three via `battlestack pull`.
 - The reference `ExampleCalendar` component imports `VueDatePicker` as the
   named export `@vuepic/vue-datepicker` 14 ships, instead of a default import
   that broke `pnpm run build` as soon as a page used it, and turns off the time

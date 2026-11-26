@@ -68,6 +68,8 @@ const NUXT_IGNORE_PATTERNS = [
     '**/*.wolf.new',
     '**/*.wolf.patch',
     '**/*.wolf',
+    // Claude Code agent worktrees: full checkouts the dev watcher would otherwise watch.
+    '.claude/worktrees/**',
 ]
 
 // `eslint .` walks the project root, including the `.agents/` trees `skills add` fetches and the
