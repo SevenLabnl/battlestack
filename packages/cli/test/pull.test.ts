@@ -791,6 +791,51 @@ describe.each([
         expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(edited)
     })
 
+    it('CORE PROPERTY: keeps the user\'s edits to the moved file tracked when the old owner updates first', async () => {
+        const { execFileSync } = await import('node:child_process')
+        const ids = { from: 'test:a-from', to: 'test:z-to' }
+        const { projectDir, registriesV2 } = await setup([ids.from, ids.to], movedContent, ids)
+        const git = (...a: string[]) => execFileSync('git', a, {
+            cwd: projectDir,
+            stdio: 'ignore',
+            env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
+        })
+        await writeFile(path.join(projectDir, '.gitignore'), '.battlestack/lock\n.battlestack/pull/\n')
+        git('init', '-q')
+        git('add', '-A')
+        git('commit', '-q', '-m', 'scaffold')
+        const edited = 'export const moved = true\nexport const mine = 1\n'
+        await writeFile(path.join(projectDir, movedRel), edited, 'utf8')
+        git('commit', '-q', '-am', 'edit')
+        const reportPath = path.join(projectDir, '.battlestack', 'pull', 'REPORT.md')
+
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV2))
+        process.exitCode = undefined
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(edited)
+        expect(Object.keys(filesOf(await readManifestRaw(projectDir), ids.to) ?? {})).toContain(movedRel)
+        let report = await readFile(reportPath, 'utf8')
+        expect(report).not.toContain('## No longer managed')
+        expect(report).not.toContain('## Staged for a manual merge')
+
+        // The next bump of the new owner merges instead of staging again.
+        git('add', '-A')
+        git('commit', '-q', '-m', 'pull')
+        const toV3 = await tmp('battlestack-pull-moved-to-v3-')
+        await writeTemplateFile(toV3, 'to.ts', 'to\n')
+        await writeTemplateFile(toV3, movedRel, '// v3\nexport const moved = true\n')
+        const registriesV3 = makeRegistries({ requiredFeatures: [ids.from, ids.to].map(fqid) })
+        for (const f of registriesV2.features.all()) {
+            registriesV3.features.register(f.id === ids.to ? makeFileFeature(ids.to, '1.2.0', toV3, { stage: toStage }) : f, origin)
+        }
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV3))
+        process.exitCode = undefined
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe('// v3\nexport const moved = true\nexport const mine = 1\n')
+        report = await readFile(reportPath, 'utf8')
+        expect(report).not.toContain('## Staged for a manual merge')
+    })
+
     it('removes the pristine file from a project without the new owner', async () => {
         const { projectDir, registriesV2 } = await setup([FROM])
         await runPull(projectDir, registriesV2)

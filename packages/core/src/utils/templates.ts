@@ -628,6 +628,7 @@ const OBSOLETE_QUEUE_KEY = 'obsolete:queue'
 interface QueuedObsolete {
     rel: string
     recordedHash: string
+    edited?: boolean
 }
 
 const DEFERRED_QUEUE_KEY = 'obsolete:deferred'
@@ -640,8 +641,9 @@ interface DeferredWrite {
 }
 
 /**
- * Makes `deleteObsoleteFiles` queue pristine deletions until `removeQueuedObsoleteFiles`. A file
- * moving to a feature that updates later in the same run is then never deleted by its old owner.
+ * Makes `deleteObsoleteFiles` queue obsolete files until `removeQueuedObsoleteFiles`. A file
+ * moving to a feature that updates later in the same run is then neither deleted nor unmanaged
+ * by its old owner, and the new owner can merge an edited one against the old owner's record.
  */
 export function queueObsoleteDeletions(ctx: RunContext): void {
     ctx.state[OBSOLETE_QUEUE_KEY] = []
@@ -649,10 +651,10 @@ export function queueObsoleteDeletions(ctx: RunContext): void {
 }
 
 /**
- * Writes deferred files whose later owner dropped them, then deletes the queued ones no feature
- * tracks now and that are still pristine. Returns the deleted rels.
+ * Writes deferred files whose later owner dropped them, then deletes the queued files no feature
+ * tracks now that are still pristine, and returns the edited ones as no longer managed.
  */
-export async function removeQueuedObsoleteFiles(ctx: RunContext): Promise<string[]> {
+export async function removeQueuedObsoleteFiles(ctx: RunContext): Promise<{ removed: string[], unmanaged: string[] }> {
     const deferred = (ctx.state[DEFERRED_QUEUE_KEY] as DeferredWrite[] | undefined) ?? []
     delete ctx.state[DEFERRED_QUEUE_KEY]
     for (const { featureId, rel, content } of deferred) {
@@ -665,15 +667,20 @@ export async function removeQueuedObsoleteFiles(ctx: RunContext): Promise<string
     delete ctx.state[OBSOLETE_QUEUE_KEY]
     const tracked = new Set([...recordedFiles(ctx)].map((r) => toPosix(r.rel)))
     const removed: string[] = []
-    for (const { rel, recordedHash } of queue) {
+    const unmanaged: string[] = []
+    for (const { rel, recordedHash, edited } of queue) {
         if (tracked.has(toPosix(rel))) continue
         const dest = path.join(ctx.projectDir, rel)
-        if (!(await exists(dest)) || !(await diskHashes(dest)).includes(recordedHash)) continue
+        if (!(await exists(dest))) continue
+        if (edited || !(await diskHashes(dest)).includes(recordedHash)) {
+            if (edited) unmanaged.push(rel)
+            continue
+        }
         await rm(dest, { force: true })
         await clearArtifacts(ctx, dest, rel)
         removed.push(rel)
     }
-    return removed
+    return { removed, unmanaged }
 }
 
 /**
@@ -708,8 +715,8 @@ export async function deleteObsoleteFiles(
         }
         const pristine = (await diskHashes(dest)).includes(recordedHash)
         const queue = ctx.state[OBSOLETE_QUEUE_KEY] as QueuedObsolete[] | undefined
-        if (pristine && queue) {
-            queue.push({ rel, recordedHash })
+        if (queue) {
+            queue.push({ rel, recordedHash, ...(pristine ? {} : { edited: true }) })
         } else if (pristine) {
             await rm(dest, { force: true })
             await clearArtifacts(ctx, dest, rel)

@@ -5,6 +5,7 @@ import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
 import {
     allocatePort,
+    classifyFileState,
     resolveAppPort,
     writeFileEnsured,
     exists,
@@ -18,7 +19,7 @@ import {
 } from '@battlestack/core'
 import { readDotEnv } from '@battlestack/core/utils/dotenv.js'
 import { ui } from '@battlestack/tui'
-import type { EnvVar, Feature, InstalledFeatureRecord, ProjectCommand, RunContext, UpdateReport } from '@battlestack/core'
+import type { EnvVar, Feature, InstalledFeatureRecord, ProjectCommand, RunContext } from '@battlestack/core'
 
 function titleCase(slug: string): string {
     return slug
@@ -186,7 +187,7 @@ export const authFeature: Feature = {
     async update(ctx, prev) {
         const result = await emitTemplateUpdate(ctx, 'nuxt4:auth', import.meta.url, 'auth', prev)
         result.notes.push(...(await retainedPasswordPolicyNotes(ctx.projectDir)))
-        const guardActions = await retainedSessionPasswordGuardActions(ctx.projectDir, prev, result)
+        const guardActions = await retainedSessionPasswordGuardActions(ctx.projectDir, prev)
         if (guardActions.length > 0) result.actions = [...(result.actions ?? []), ...guardActions]
         await postPatches(ctx.projectDir)
         const migrated = await migrateToAppSecret(ctx.projectDir)
@@ -236,14 +237,15 @@ const OLD_GUARD_UTIL = 'server/utils/session-password.ts'
 async function retainedSessionPasswordGuardActions(
     projectDir: string,
     prev: InstalledFeatureRecord | null,
-    result: UpdateReport,
 ): Promise<string[]> {
     const kept: string[] = []
     for (const rel of [OLD_GUARD_PLUGIN, OLD_GUARD_UTIL]) {
-        if (!(await exists(path.join(projectDir, rel)))) continue
+        const abs = path.join(projectDir, rel)
+        if (!(await exists(abs))) continue
         // A pristine tracked copy is queued for deletion at the end of the pull.
-        const removedLater = prev !== null && rel in prev.files
-            && !(prev.ownedByUser ?? []).includes(rel) && !(result.unmanaged ?? []).includes(rel)
+        const recorded = prev?.files[rel]
+        const removedLater = recorded !== undefined && !(prev!.ownedByUser ?? []).includes(rel)
+            && (await classifyFileState(abs, recorded, false)) === 'pristine'
         if (!removedLater) kept.push(rel)
     }
     if (kept.length === 0) return []

@@ -93,7 +93,9 @@
 - `pull` removes a file a feature no longer ships only after every feature has
   updated. A file moving to another feature, whichever of the two updates
   first, is no longer deleted or written back in the same run, and a pull that
-  stops halfway leaves it in place.
+  stops halfway leaves it in place. An edited file that moves is merged by its new
+  owner and stays tracked, also when the old owner updates first; before, it
+  was staged, listed as no longer managed and staged again on every update.
 - When two features ship the same file and the one whose version wins stops
   shipping it, `pull` now writes the other feature's version in the same run,
   whichever of the two updates first. Before, the file could keep the old

@@ -464,7 +464,10 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         for (const record of existingRecords) {
             if (!(await pullOneFeature(ctx, record, args, loader, registries, renamedFrom, collected))) renderedAll = false
         }
-        for (const rel of await removeQueuedObsoleteFiles(ctx)) ui.dim(`  removed obsolete file: ${rel}`)
+        const obsolete = await removeQueuedObsoleteFiles(ctx)
+        for (const rel of obsolete.removed) ui.dim(`  removed obsolete file: ${rel}`)
+        for (const rel of obsolete.unmanaged) ui.dim(`  no longer shipped but edited, left in place: ${rel}`)
+        collected.unmanaged.push(...obsolete.unmanaged)
 
         // Compares against HEAD, so uncommitted edits would read as feature output.
         const repairs = safety.clean && !ctx.dryRun ? await repairOverwrites(ctx, startRecorded, registries) : []
