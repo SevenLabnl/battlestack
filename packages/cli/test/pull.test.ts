@@ -1275,6 +1275,71 @@ describe('battlestack pull: a runtimeConfig default it cannot add', () => {
     })
 })
 
+describe('battlestack pull: lint errors after the update', () => {
+    // Fails on any file it lints that contains LINT_ERROR; `.` lints every file.
+    const FAKE_ESLINT = [
+        '#!/usr/bin/env node',
+        'const fs = require(\'fs\'), path = require(\'path\')',
+        'const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => [\'node_modules\', \'.git\', \'.battlestack\'].includes(e.name) ? [] : e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)])',
+        'const files = process.argv.slice(2).filter((a) => !a.startsWith(\'-\')).flatMap((a) => a === \'.\' ? walk(\'.\') : [a])',
+        'const bad = files.filter((f) => fs.existsSync(f) && fs.readFileSync(f, \'utf8\').includes(\'LINT_ERROR\'))',
+        'if (bad.length > 0) { console.error(bad.join(\'\\n\')); process.exit(1) }',
+        '',
+    ].join('\n')
+
+    async function lintProject(v2Content: string): Promise<{ exitCode: typeof process.exitCode, report: string }> {
+        const { execFileSync } = await import('node:child_process')
+        const { chmod } = await import('node:fs/promises')
+        const projectDir = await tmp('battlestack-pull-lint-')
+        const git = (...a: string[]) => {
+            execFileSync('git', a, {
+                cwd: projectDir,
+                stdio: 'ignore',
+                env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
+            })
+        }
+        const tplV1 = await tmp('battlestack-pull-lint-v1-')
+        const tplV2 = await tmp('battlestack-pull-lint-v2-')
+        await writeTemplateFile(tplV1, 'a.ts', 'v1\n')
+        await writeTemplateFile(tplV2, 'a.ts', v2Content)
+        const registriesV1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplV1)
+        registriesV1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+        await writeFile(path.join(projectDir, 'package.json'), '{ "name": "lint-test", "private": true }\n')
+        await writeFile(path.join(projectDir, 'debt.ts'), 'LINT_ERROR from before the pull\n')
+        await mkdir(path.join(projectDir, 'node_modules', '.bin'), { recursive: true })
+        await writeFile(path.join(projectDir, 'node_modules', '.bin', 'eslint'), FAKE_ESLINT)
+        await chmod(path.join(projectDir, 'node_modules', '.bin', 'eslint'), 0o755)
+        await writeFile(path.join(projectDir, '.gitignore'), '.battlestack/lock\n.battlestack/pull/\nnode_modules/\n')
+        git('init', '-q')
+        git('add', '-A')
+        git('commit', '-q', '-m', 'init')
+
+        const registriesV2 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        registriesV2.features.register(makeFileFeature('test:feat-a', '2.0.0', tplV2), origin)
+        process.exitCode = undefined
+        await withCwdCapture(projectDir, () => pullCommand(args({ format: true }), silentLoader(), registriesV2))
+        const exitCode = process.exitCode
+        process.exitCode = undefined
+        return { exitCode, report: await readFile(path.join(projectDir, '.battlestack', 'pull', 'REPORT.md'), 'utf8') }
+    }
+
+    it('does not count lint errors in files the pull did not touch', async () => {
+        const { exitCode, report } = await lintProject('v2\n')
+        expect(report).not.toContain('## Lint')
+        expect(exitCode).toBeUndefined()
+    }, 30_000)
+
+    it('reports lint errors in a file the pull wrote', async () => {
+        const { exitCode, report } = await lintProject('LINT_ERROR from upstream\n')
+        expect(report).toContain('## Lint')
+        expect(exitCode).toBe(2)
+    }, 30_000)
+})
+
 describe('battlestack pull --allow-dirty', () => {
     it('leaves an uncommitted edit to a tracked file exactly as it was', async () => {
         const { execFileSync } = await import('node:child_process')

@@ -6,6 +6,7 @@ import { confirmOverwriteOwned, ui } from '@battlestack/tui'
 import { formatAndReconcile } from './format-project.js'
 import {
     isGitRepo,
+    lintCleanWhereTouched,
     missingAtStart,
     leftoverArtifacts,
     needsAttention,
@@ -504,6 +505,10 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             // `--no-format` skips the format pass and its drift re-baseline.
             if (args.format && !lockfileBlocked) {
                 await formatAndReconcile(ctx, manifest, registries)
+                // Lint debt the project already had would otherwise fail every pull, even a no-op one.
+                if (ctx.state['format:error'] && safety.git && lintCleanWhereTouched(projectDir, String(ctx.state.packageManager ?? 'pnpm'))) {
+                    delete ctx.state['format:error']
+                }
             }
             // A feature that did not run still carries the old name, so the rename stays pending.
             await writeManifest(ctx, { rendered: renderedAll, failed })

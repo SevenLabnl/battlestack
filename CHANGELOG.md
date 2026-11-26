@@ -76,6 +76,9 @@
   `.new` or a backup until you delete it, a step until you delete its line
   from the report, and a file no longer managed until you delete the file or
   its line. Console output is one line per feature.
+- Lint errors a project already had no longer make every `pull` exit with
+  code 2. When `eslint --fix` fails, pull lints the files it changed or added
+  and lists lint in `REPORT.md` only when one of those still has errors.
 - Generated projects ship a `battlestack-upgrade` skill for AI agents, and the
   generated AGENTS.md and README describe the merge instead of the old staging.
 - With `nuxt4:storage` on, every `nuxt4:database` update staged
