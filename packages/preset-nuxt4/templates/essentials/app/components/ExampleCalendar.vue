@@ -3,15 +3,14 @@
 <template>
     <VueDatePicker
         v-model="date"
-        :enable-time-picker="false"
+        :time-config="{ enableTimePicker: false }"
         auto-apply
         v-bind="$attrs"
     />
 </template>
 
 <script setup lang="ts">
-// @ts-expect-error: package ships default export via CJS interop, types flag it
-import VueDatePicker from '@vuepic/vue-datepicker'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 
 const date = defineModel<Date | null>({ default: null })
