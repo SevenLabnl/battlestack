@@ -38,6 +38,8 @@ export default defineConfig({
             },
         },
     },
+    // Claude Code agent worktrees are full checkouts; watch mode would track every file in them.
+    server: { watch: { ignored: ['**/.claude/worktrees/**'] } },
     test: {
         projects: [
             {

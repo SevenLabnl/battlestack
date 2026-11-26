@@ -32,8 +32,11 @@ export default defineConfig({
             },
         ],
     },
+    // Agent worktrees under `.claude/worktrees` are full checkouts of this repo.
+    server: { watch: { ignored: ['**/.claude/worktrees/**'] } },
     test: {
         include: ['packages/*/test/**/*.{test,spec}.ts', 'scripts/test/**/*.{test,spec}.ts'],
+        exclude: ['**/node_modules/**', '.claude/**'],
         environment: 'node',
         globals: false,
         // 30s, not 10s. Several tests drive real deadlines (a DB-unreachable

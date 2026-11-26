@@ -32,5 +32,5 @@
     // and its installed deps, none of which resolve here. `**/test/**` in
     // `include` would otherwise pull in template `test/` dirs (e.g. a feature's
     // emitted e2e specs). Excluded wholesale.
-    "exclude": ["packages/**/templates/**", "**/node_modules/**"]
+    "exclude": ["packages/**/templates/**", "**/node_modules/**", ".claude/**"]
 }

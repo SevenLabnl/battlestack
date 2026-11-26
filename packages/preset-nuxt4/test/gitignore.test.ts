@@ -53,7 +53,15 @@ describe('gitignoreFeature: fetched AI-agent skill content (.agents/)', () => {
         await gitignoreFeature.execute(ctx())
         const out = await readGitignore()
         expect(out).toMatch(/^\.claude\/settings\.local\.json$/m)
+        expect(out).toMatch(/^\.claude\/worktrees\/$/m)
         expect(out).not.toMatch(/^\.claude\/?$/m)
+    })
+
+    it('keeps Nuxt and Nitro from watching or scanning Claude Code agent worktrees', async () => {
+        await gitignoreFeature.execute(ctx())
+        const cfg = await readFile(path.join(projectDir, 'nuxt.config.ts'), 'utf8')
+        // Once in `ignore` (Nuxt and its Vite dev watcher) and once in `nitro.ignore`.
+        expect(cfg.match(/['"]\.claude\/worktrees\/\*\*['"]/g)).toHaveLength(2)
     })
 
     it('keeps skills-lock.json tracked: it is the record of what was fetched', async () => {

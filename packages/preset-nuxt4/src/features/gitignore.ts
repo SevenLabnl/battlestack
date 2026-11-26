@@ -29,6 +29,8 @@ const REQUIRED_PATTERNS = [
     '.agents/',
     // Claude Code's per-person settings; the shared ones are `.claude/settings.json`.
     '.claude/settings.local.json',
+    // Git worktrees Claude Code agents create; each is a full checkout.
+    '.claude/worktrees/',
     // Legacy in-tree pull artifacts. Never a bare `*.battlestack`.
     '*.battlestack.bak',
     '*.battlestack.new',
@@ -66,6 +68,8 @@ const NUXT_IGNORE_PATTERNS = [
     '**/*.wolf.new',
     '**/*.wolf.patch',
     '**/*.wolf',
+    // Claude Code agent worktrees: full checkouts the dev watcher would otherwise watch.
+    '.claude/worktrees/**',
 ]
 
 // `eslint .` walks the project root, including the `.agents/` trees `skills add` fetches and the
@@ -226,7 +230,7 @@ async function applyNuxtIgnore(projectDir: string): Promise<void> {
 /** Ignore patterns for git, Nuxt's and Nitro's auto-import scanners, and the ESLint config. */
 export const gitignoreFeature: Feature = {
     id: 'nuxt4:gitignore',
-    version: '1.5.3',
+    version: '1.5.4',
     label: 'Enforce ignore patterns (git, Nuxt, ESLint)',
     frameworks: ['nuxt4'],
     stage: STAGE.GITIGNORE,
