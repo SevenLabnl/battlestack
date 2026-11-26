@@ -153,6 +153,9 @@
   `app/layouts/default.vue`: `pull` hands those back to you on every run, so
   disowning one changed nothing. The message points at
   `battlestack pull --overwrite` to get the shipped version back.
+- `pull` no longer adds the theme imports to an owned
+  `app/assets/css/main.css`, and the `eslint --fix` pass of `pull` and `add`
+  gives every owned file its own bytes back.
 - A feature whose plugin did not load keeps its manifest record on `pull`
   instead of being dropped, so its files stay managed.
 - `battlestack remove` of a feature whose plugin did not load refuses when

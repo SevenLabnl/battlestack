@@ -80,7 +80,7 @@ export const battlestackThemeFeature: Feature = {
 
     async update(ctx, prev) {
         const result = await emitTemplateUpdate(ctx, 'nuxt4:battlestack-theme', import.meta.url, 'battlestack-theme', prev)
-        // The alias patch bypasses the drift-aware writer, so an owned app config is left alone.
+        // The CSS and alias patches bypass the drift-aware writer, so owned files are left alone.
         const owned = ctx.state.overwrite === true ? new Set<string>() : ownedAnywhere(ctx)
         await wireTheme(ctx, owned)
         return result
@@ -91,7 +91,7 @@ async function wireTheme(ctx: RunContext, owned: Set<string> = new Set()): Promi
     await patchNuxtConfig(ctx.projectDir, (c) => {
         c.addExtends('@battlestack/theme')
     })
-    await importThemeCss(ctx)
+    if (!owned.has('app/assets/css/main.css')) await importThemeCss(ctx)
     if (!owned.has('app/app.config.ts')) await applyColorAliases(ctx)
 }
 
