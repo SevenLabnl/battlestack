@@ -5,6 +5,7 @@ import { emitTemplate, emitTemplateUpdate } from '../utils/emit-template.js'
 import { patchNuxtConfig } from '../utils/nuxt-config.js'
 import {
     allocatePort,
+    classifyFileState,
     resolveAppPort,
     writeFileEnsured,
     exists,
@@ -18,7 +19,7 @@ import {
 } from '@battlestack/core'
 import { readDotEnv } from '@battlestack/core/utils/dotenv.js'
 import { ui } from '@battlestack/tui'
-import type { EnvVar, Feature, InstalledFeatureRecord, ProjectCommand, RunContext, UpdateReport } from '@battlestack/core'
+import type { EnvVar, Feature, InstalledFeatureRecord, ProjectCommand, RunContext } from '@battlestack/core'
 
 function titleCase(slug: string): string {
     return slug
@@ -31,7 +32,7 @@ function titleCase(slug: string): string {
 /** Session auth on `nuxt-auth-utils`. The sealed cookie carries an opaque sessionId. */
 export const authFeature: Feature = {
     id: 'nuxt4:auth',
-    version: '1.11.0',
+    version: '1.11.2',
     label: 'Session-based auth (argon2id)',
     frameworks: ['nuxt4'],
     stage: STAGE.AUTH,
@@ -186,7 +187,7 @@ export const authFeature: Feature = {
     async update(ctx, prev) {
         const result = await emitTemplateUpdate(ctx, 'nuxt4:auth', import.meta.url, 'auth', prev)
         result.notes.push(...(await retainedPasswordPolicyNotes(ctx.projectDir)))
-        const guardActions = await retainedSessionPasswordGuardActions(ctx.projectDir, prev, result)
+        const guardActions = await retainedSessionPasswordGuardActions(ctx.projectDir, prev)
         if (guardActions.length > 0) result.actions = [...(result.actions ?? []), ...guardActions]
         await postPatches(ctx.projectDir)
         const migrated = await migrateToAppSecret(ctx.projectDir)
@@ -229,6 +230,11 @@ async function retainedPasswordPolicyNotes(projectDir: string): Promise<string[]
     return notes
 }
 
+/** A manifest written on Windows records template paths with backslashes. */
+function posixRel(rel: string): string {
+    return rel.replaceAll('\\', '/')
+}
+
 const OLD_GUARD_PLUGIN = 'server/plugins/00-session-password-guard.ts'
 const OLD_GUARD_UTIL = 'server/utils/session-password.ts'
 
@@ -236,14 +242,16 @@ const OLD_GUARD_UTIL = 'server/utils/session-password.ts'
 async function retainedSessionPasswordGuardActions(
     projectDir: string,
     prev: InstalledFeatureRecord | null,
-    result: UpdateReport,
 ): Promise<string[]> {
     const kept: string[] = []
     for (const rel of [OLD_GUARD_PLUGIN, OLD_GUARD_UTIL]) {
-        if (!(await exists(path.join(projectDir, rel)))) continue
+        const abs = path.join(projectDir, rel)
+        if (!(await exists(abs))) continue
         // A pristine tracked copy is queued for deletion at the end of the pull.
-        const removedLater = prev !== null && rel in prev.files
-            && !(prev.ownedByUser ?? []).includes(rel) && !(result.unmanaged ?? []).includes(rel)
+        const key = Object.keys(prev?.files ?? {}).find((k) => posixRel(k) === rel)
+        const owned = (prev?.ownedByUser ?? []).some((k) => posixRel(k) === rel)
+        const removedLater = key !== undefined && !owned
+            && (await classifyFileState(abs, prev!.files[key]!, false)) === 'pristine'
         if (!removedLater) kept.push(rel)
     }
     if (kept.length === 0) return []
@@ -415,13 +423,7 @@ async function runLogin(ctx: RunContext): Promise<void> {
         )
     }
 
-    const secret = env.get('NUXT_APP_SECRET') ?? ''
-    if (secret.length < 32) {
-        throw new CLIError(
-            ErrorCode.SCAFFOLD_FAILED,
-            'NUXT_APP_SECRET is missing or shorter than 32 chars in `.env`. Bump it and re-run.',
-        )
-    }
+    const secret = loginSecret(env)
 
     const port = await resolveAppPort(ctx.projectDir, ctx.projectName)
     // Localhost, not `NUXT_HOST`, which is only the bind address.
@@ -453,10 +455,27 @@ async function runLogin(ctx: RunContext): Promise<void> {
     }
 }
 
+/**
+ * The secret the project's own server verifies a magic link with. A project not yet pulled
+ * past nuxt-auth-utils 0.6 has only the legacy key, and its endpoint still checks that one.
+ */
+export function loginSecret(env: Map<string, string>): string {
+    const secret = env.get(APP_SECRET_KEY) ?? env.get(LEGACY_SECRET_KEY) ?? ''
+    if (secret.length < 32) {
+        throw new CLIError(
+            ErrorCode.SCAFFOLD_FAILED,
+            `Neither ${APP_SECRET_KEY} nor ${LEGACY_SECRET_KEY} in \`.env\` is at least 32 chars. `
+            + `Run \`battlestack pull\` to move to ${APP_SECRET_KEY}, or bump it and re-run.`,
+        )
+    }
+    return secret
+}
+
 /** Short-timeout HEAD probe of `/`. Any HTTP response means up; refused or timeout means down. */
 async function isDevServerUp(baseUrl: string): Promise<boolean> {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 1500)
+    // A dev server's first render after idling can take over a second.
+    const timer = setTimeout(() => controller.abort(), 5000)
     try {
         const res = await fetch(`${baseUrl}/`, {
             method: 'HEAD',

@@ -9,6 +9,7 @@ import {
     BattlestackRegistries,
     copyTemplateDirRecorded,
     exists,
+    hashContent,
     hashFile,
     MANIFEST_PATH,
     readManifest,
@@ -25,6 +26,7 @@ import {
     type Provenance,
     type RunContext,
 } from '@battlestack/core'
+import { patchNuxtConfig } from '@battlestack/preset-nuxt4'
 import { buildRegistries, defaultArgs, withCwd, withCwdCapture } from './test-utils.js'
 
 /**
@@ -866,6 +868,72 @@ describe.each([
         expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(edited)
     })
 
+    it('CORE PROPERTY: keeps the user\'s edits to the moved file tracked when the old owner updates first', async () => {
+        const { execFileSync } = await import('node:child_process')
+        const ids = { from: 'test:a-from', to: 'test:z-to' }
+        const { projectDir, registriesV2 } = await setup([ids.from, ids.to], movedContent, ids)
+        const git = (...a: string[]) => execFileSync('git', a, {
+            cwd: projectDir,
+            stdio: 'ignore',
+            env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
+        })
+        await writeFile(path.join(projectDir, '.gitignore'), '.battlestack/lock\n.battlestack/pull/\n')
+        git('init', '-q')
+        git('add', '-A')
+        git('commit', '-q', '-m', 'scaffold')
+        const edited = 'export const moved = true\nexport const mine = 1\n'
+        await writeFile(path.join(projectDir, movedRel), edited, 'utf8')
+        git('commit', '-q', '-am', 'edit')
+        const reportPath = path.join(projectDir, '.battlestack', 'pull', 'REPORT.md')
+
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV2))
+        process.exitCode = undefined
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(edited)
+        expect(Object.keys(filesOf(await readManifestRaw(projectDir), ids.to) ?? {})).toContain(movedRel)
+        let report = await readFile(reportPath, 'utf8')
+        expect(report).not.toContain('## No longer managed')
+        expect(report).not.toContain('## Staged for a manual merge')
+
+        // The next bump of the new owner merges instead of staging again.
+        git('add', '-A')
+        git('commit', '-q', '-m', 'pull')
+        const toV3 = await tmp('battlestack-pull-moved-to-v3-')
+        await writeTemplateFile(toV3, 'to.ts', 'to\n')
+        await writeTemplateFile(toV3, movedRel, '// v3\nexport const moved = true\n')
+        const registriesV3 = makeRegistries({ requiredFeatures: [ids.from, ids.to].map(fqid) })
+        for (const f of registriesV2.features.all()) {
+            registriesV3.features.register(f.id === ids.to ? makeFileFeature(ids.to, '1.2.0', toV3, { stage: toStage }) : f, origin)
+        }
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV3))
+        process.exitCode = undefined
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe('// v3\nexport const moved = true\nexport const mine = 1\n')
+        report = await readFile(reportPath, 'utf8')
+        expect(report).not.toContain('## Staged for a manual merge')
+       }, 30_000)
+
+    it.each([
+        ['old', { from: 'test:a-from', to: 'test:z-to' }],
+        ['new', { from: FROM, to: TO }],
+    ])('keeps an edited moved file tracked by the new owner when it can only stage it (%s owner updates first)', async (_, ids) => {
+        // No git and no stored base, so the new owner cannot merge and stages its version.
+        const { projectDir, registriesV2 } = await setup([ids.from, ids.to], movedContent, ids)
+        const edited = 'export const moved = "edited"\n'
+        await writeFile(path.join(projectDir, movedRel), edited, 'utf8')
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV2))
+        process.exitCode = undefined
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(edited)
+        const manifest = await readManifestRaw(projectDir)
+        expect(filesOf(manifest, ids.to)?.[movedRel]).toBe(hashContent(movedContent))
+        expect(Object.keys(filesOf(manifest, ids.from) ?? {})).not.toContain(movedRel)
+        const report = await readFile(path.join(projectDir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        expect(report).not.toContain('## No longer managed')
+        expect(report.split('\n').filter((l) => l === `- \`${movedRel.replaceAll('\\', '/')}\``)).toHaveLength(1)
+        expect(report).toContain('## Staged for a manual merge')
+    })
+
     it('removes the pristine file from a project without the new owner', async () => {
         const { projectDir, registriesV2 } = await setup([FROM])
         await runPull(projectDir, registriesV2)
@@ -1158,6 +1226,227 @@ describe('battlestack pull: misc plumbing', () => {
         expect(manifest.features.find((f) => f.id === fqid('test:feat-orphan'))?.files).toEqual({ 'o.ts': expect.any(String) })
         expect(await readFile(path.join(projectDir, 'o.ts'), 'utf8')).toBe('o-content\n')
     })
+})
+
+describe('battlestack pull: a file staged for a manual merge', () => {
+    const V1 = 'one\ntwo\nthree\nfour\nfive\n'
+    const V2 = 'one\ntwo, v2\nthree\nfour\nfive\n'
+    const V3 = 'one\ntwo, v2\nthree\nfour\nfive, v3\n'
+
+    async function stagedProject(): Promise<{ projectDir: string, pull: (version: string, content: string) => Promise<string>, git: (...a: string[]) => void }> {
+        const { execFileSync } = await import('node:child_process')
+        const projectDir = await tmp('battlestack-pull-staged-')
+        const git = (...a: string[]) => {
+            execFileSync('git', a, {
+                cwd: projectDir,
+                stdio: 'ignore',
+                env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
+            })
+        }
+        const tplV1 = await tmp('battlestack-pull-staged-v1-')
+        await writeTemplateFile(tplV1, 'a.ts', V1)
+        const registriesV1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplV1)
+        registriesV1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+        // Edited before the first commit, so no base exists for the scaffolded version.
+        await writeFile(path.join(projectDir, 'a.ts'), 'mine\n')
+        await writeFile(path.join(projectDir, '.gitignore'), '.battlestack/lock\n.battlestack/pull/\n')
+        git('init', '-q')
+        git('add', '-A')
+        git('commit', '-q', '-m', 'init')
+
+        const pull = async (version: string, content: string): Promise<string> => {
+            git('add', '-A')
+            git('commit', '-q', '--allow-empty', '-m', 'user')
+            const tpl = await tmp('battlestack-pull-staged-tpl-')
+            await writeTemplateFile(tpl, 'a.ts', content)
+            const registries = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+            registries.features.register(makeFileFeature('test:feat-a', version, tpl), origin)
+            await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registries))
+            process.exitCode = undefined
+            git('add', '-A')
+            git('commit', '-q', '-m', `pull ${version}`)
+            return readFile(path.join(projectDir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        }
+        expect(await pull('2.0.0', V2)).toContain('## Staged for a manual merge')
+        return { projectDir, pull, git }
+    }
+
+    const staged = (projectDir: string) => path.join(projectDir, '.battlestack', 'pull', 'a.ts.new')
+
+    it('does not stage again once the .new was taken by hand', async () => {
+        const { projectDir, pull } = await stagedProject()
+        await writeFile(path.join(projectDir, 'a.ts'), await readFile(staged(projectDir)))
+        await rm(path.join(projectDir, '.battlestack', 'pull'), { recursive: true })
+
+        expect(await pull('3.0.0', V3)).not.toContain('## Staged for a manual merge')
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe(V3)
+    }, 30_000)
+
+    it('stages again, without merging, when the taken .new was edited further', async () => {
+        const { projectDir, pull } = await stagedProject()
+        const edited = V2.replace('one', 'one, mine')
+        await writeFile(path.join(projectDir, 'a.ts'), edited)
+        await rm(path.join(projectDir, '.battlestack', 'pull'), { recursive: true })
+
+        expect(await pull('3.0.0', V3)).toContain('## Staged for a manual merge')
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe(edited)
+        expect(await readFile(staged(projectDir), 'utf8')).toBe(V3)
+    }, 30_000)
+
+    it('stages again in a fresh checkout without the earlier .new, keeping upstream\'s earlier changes', async () => {
+        const { projectDir, pull } = await stagedProject()
+        await rm(path.join(projectDir, '.battlestack', 'pull'), { recursive: true })
+
+        expect(await pull('3.0.0', V3)).toContain('## Staged for a manual merge')
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe('mine\n')
+        expect(await readFile(staged(projectDir), 'utf8')).toContain('two, v2')
+    }, 30_000)
+
+    it('stages again, without merging, while the earlier .new is not taken', async () => {
+        const { projectDir, pull } = await stagedProject()
+
+        expect(await pull('3.0.0', V3)).toContain('## Staged for a manual merge')
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe('mine\n')
+        expect(await readFile(staged(projectDir), 'utf8')).toBe(V3)
+    }, 30_000)
+})
+
+describe('battlestack pull: a feature whose update fails without stopping the pull', () => {
+    it('keeps its old version, so the next pull retries it, and lists it in the report', async () => {
+        const projectDir = await tmp('battlestack-pull-failed-')
+        const tplV1 = await tmp('battlestack-pull-failed-v1-')
+        await writeTemplateFile(tplV1, 'a.ts', 'v1\n')
+        const registriesV1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplV1)
+        registriesV1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+
+        const registriesV2 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        registriesV2.features.register({
+            ...makeFileFeature('test:feat-a', '2.0.0', tplV1),
+            failureIsNonFatal: true,
+            async update() {
+                throw new Error('boom')
+            },
+        }, origin)
+        process.exitCode = undefined
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV2))
+        const exitCode = process.exitCode
+        process.exitCode = undefined
+
+        const manifest = await readManifestRaw(projectDir)
+        expect(manifest.features.find((f) => f.id === fqid('test:feat-a'))?.version).toBe('1.0.0')
+        const report = await readFile(path.join(projectDir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        expect(report).toMatch(/test:feat-a.*boom/)
+        expect(exitCode).toBe(2)
+    })
+})
+
+describe('battlestack pull: a runtimeConfig default it cannot add', () => {
+    it('lists the default in the report', async () => {
+        const projectDir = await tmp('battlestack-pull-runtime-')
+        const tplV1 = await tmp('battlestack-pull-runtime-v1-')
+        await writeTemplateFile(tplV1, 'a.ts', 'v1\n')
+        const registriesV1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplV1)
+        registriesV1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+        await writeFile(
+            path.join(projectDir, 'nuxt.config.ts'),
+            'const pub = { appName: \'x\' }\nexport default defineNuxtConfig({\n    runtimeConfig: { public: pub },\n})\n',
+        )
+
+        const registriesV2 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        registriesV2.features.register({
+            ...makeFileFeature('test:feat-a', '2.0.0', tplV1),
+            async update(c) {
+                await patchNuxtConfig(c.projectDir, (cfg) => cfg.mergeRuntimePublic({ featureFlag: true }))
+                return { written: [], skipped: [], notes: [] }
+            },
+        }, origin)
+        process.exitCode = undefined
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV2))
+        const exitCode = process.exitCode
+        process.exitCode = undefined
+
+        const report = await readFile(path.join(projectDir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        expect(report).toContain('runtimeConfig.public.featureFlag')
+        expect(exitCode).toBe(2)
+    })
+})
+
+// The stand-in eslint is a shebang script, which Windows cannot run.
+describe.skipIf(process.platform === 'win32')('battlestack pull: lint errors after the update', () => {
+    // Fails on any file it lints that contains LINT_ERROR; `.` lints every file.
+    const FAKE_ESLINT = [
+        '#!/usr/bin/env node',
+        'const fs = require(\'fs\'), path = require(\'path\')',
+        'const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => [\'node_modules\', \'.git\', \'.battlestack\'].includes(e.name) ? [] : e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)])',
+        'const files = process.argv.slice(2).filter((a) => !a.startsWith(\'-\')).flatMap((a) => a === \'.\' ? walk(\'.\') : [a])',
+        'const bad = files.filter((f) => fs.existsSync(f) && fs.readFileSync(f, \'utf8\').includes(\'LINT_ERROR\'))',
+        'if (bad.length > 0) { console.error(bad.join(\'\\n\')); process.exit(1) }',
+        '',
+    ].join('\n')
+
+    async function lintProject(v2Content: string): Promise<{ exitCode: typeof process.exitCode, report: string }> {
+        const { execFileSync } = await import('node:child_process')
+        const { chmod } = await import('node:fs/promises')
+        const projectDir = await tmp('battlestack-pull-lint-')
+        const git = (...a: string[]) => {
+            execFileSync('git', a, {
+                cwd: projectDir,
+                stdio: 'ignore',
+                env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
+            })
+        }
+        const tplV1 = await tmp('battlestack-pull-lint-v1-')
+        const tplV2 = await tmp('battlestack-pull-lint-v2-')
+        await writeTemplateFile(tplV1, 'a.ts', 'v1\n')
+        await writeTemplateFile(tplV2, 'a.ts', v2Content)
+        const registriesV1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplV1)
+        registriesV1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+        await writeFile(path.join(projectDir, 'package.json'), '{ "name": "lint-test", "private": true }\n')
+        await writeFile(path.join(projectDir, 'debt.ts'), 'LINT_ERROR from before the pull\n')
+        await mkdir(path.join(projectDir, 'node_modules', '.bin'), { recursive: true })
+        await writeFile(path.join(projectDir, 'node_modules', '.bin', 'eslint'), FAKE_ESLINT)
+        await chmod(path.join(projectDir, 'node_modules', '.bin', 'eslint'), 0o755)
+        await writeFile(path.join(projectDir, '.gitignore'), '.battlestack/lock\n.battlestack/pull/\nnode_modules/\n')
+        git('init', '-q')
+        git('add', '-A')
+        git('commit', '-q', '-m', 'init')
+
+        const registriesV2 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        registriesV2.features.register(makeFileFeature('test:feat-a', '2.0.0', tplV2), origin)
+        process.exitCode = undefined
+        await withCwdCapture(projectDir, () => pullCommand(args({ format: true }), silentLoader(), registriesV2))
+        const exitCode = process.exitCode
+        process.exitCode = undefined
+        return { exitCode, report: await readFile(path.join(projectDir, '.battlestack', 'pull', 'REPORT.md'), 'utf8') }
+    }
+
+    it('does not count lint errors in files the pull did not touch', async () => {
+        const { exitCode, report } = await lintProject('v2\n')
+        expect(report).not.toContain('## Lint')
+        expect(exitCode).toBeUndefined()
+    }, 30_000)
+
+    it('reports lint errors in a file the pull wrote', async () => {
+        const { exitCode, report } = await lintProject('LINT_ERROR from upstream\n')
+        expect(report).toContain('## Lint')
+        expect(exitCode).toBe(2)
+    }, 30_000)
 })
 
 describe('battlestack pull --allow-dirty', () => {

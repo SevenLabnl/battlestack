@@ -22,6 +22,8 @@ export interface InstalledFeatureRecord {
     files: Record<string, string>
     /** Paths the user owns; `battlestack pull` skips them entirely. */
     ownedByUser?: string[]
+    /** Relative path → hash of the upstream version last staged as a `.new` for it and not written since. */
+    stagedFiles?: Record<string, string>
     /** Free-form state recorded by the feature for later migrations. */
     state?: Record<string, unknown>
 }

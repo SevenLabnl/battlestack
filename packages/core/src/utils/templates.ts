@@ -137,6 +137,7 @@ function stagedArtifact(ctx: RunContext, rel: string, suffix: ArtifactSuffix): s
 
 /** Removes staged artifacts and legacy in-tree `*.battlestack.{new,patch,bak}`. */
 async function clearArtifacts(ctx: RunContext, dest: string, rel: string): Promise<void> {
+    setStagedHash(ctx, '', rel, undefined)
     await rmIfExists(stagedArtifact(ctx, rel, '.new'))
     await rmIfExists(stagedArtifact(ctx, rel, '.patch'))
     await rmIfExists(stagedArtifact(ctx, rel, '.bak'))
@@ -387,6 +388,7 @@ async function classifyForUpdate(
     newContent: Buffer,
     isOwned: boolean,
     recordedHashes: Set<string>,
+    stagedHashes: Set<string> = new Set(),
 ): Promise<{ state: UpdateState, newHash: string }> {
     const newHash = sha256(newContent)
     if (isOwned) return { state: 'owned', newHash }
@@ -394,8 +396,8 @@ async function classifyForUpdate(
 
     for (const hash of await diskHashes(dest)) {
         if (hash === newHash) return { state: 'converged', newHash }
-        // Matching any feature's last write means nobody edited it since.
-        if (recordedHashes.has(hash)) return { state: 'pristine', newHash }
+        // Matching any feature's last write, or a staged `.new` taken unchanged, means nobody edited it since.
+        if (recordedHashes.has(hash) || stagedHashes.has(hash)) return { state: 'pristine', newHash }
     }
     return { state: 'drifted', newHash }
 }
@@ -417,6 +419,38 @@ function recordedHashesFor(ctx: RunContext, rel: string, extra?: string): Set<st
         if (toPosix(queued.rel) === posix) hashes.add(queued.recordedHash)
     }
     return hashes
+}
+
+const STAGED_PREFIX = 'staged:'
+
+/** Upstream hashes staged as a `.new` for `rel` and not written since, across every feature. */
+function stagedHashesFor(ctx: RunContext, rel: string): Set<string> {
+    const posix = toPosix(rel)
+    const hashes = new Set<string>()
+    for (const [key, value] of Object.entries(ctx.state)) {
+        if (!key.startsWith(STAGED_PREFIX) || !value || typeof value !== 'object') continue
+        for (const [r, h] of Object.entries(value as Record<string, string>)) {
+            if (toPosix(r) === posix) hashes.add(h)
+        }
+    }
+    return hashes
+}
+
+/** Remembers `hash` as the version staged for `rel`, or forgets every staged version of `rel` when undefined. */
+function setStagedHash(ctx: RunContext, featureId: string, rel: string, hash: string | undefined): void {
+    if (hash !== undefined) {
+        const key = `${STAGED_PREFIX}${featureId}`
+        ctx.state[key] = { ...(ctx.state[key] as Record<string, string> | undefined), [rel]: hash }
+        return
+    }
+    const posix = toPosix(rel)
+    for (const [key, value] of Object.entries(ctx.state)) {
+        if (!key.startsWith(STAGED_PREFIX) || !value || typeof value !== 'object') continue
+        const map = value as Record<string, string>
+        if (Object.keys(map).some((r) => toPosix(r) === posix)) {
+            ctx.state[key] = Object.fromEntries(Object.entries(map).filter(([r]) => toPosix(r) !== posix))
+        }
+    }
 }
 
 /** Set by `pull` and `add`: writes into an existing project go through the drift check. */
@@ -496,7 +530,7 @@ export async function writeGuarded(
     const dest = path.join(ctx.projectDir, rel)
     const recordedHashes = recordedHashesFor(ctx, rel)
     const owned = ownedSet.has(rel) || ownedAnywhere(ctx).has(toPosix(rel))
-    const { state, newHash } = await classifyForUpdate(dest, rel, content, owned, recordedHashes)
+    const { state, newHash } = await classifyForUpdate(dest, rel, content, owned, recordedHashes, stagedHashesFor(ctx, rel))
     const recorded = (ctx.state[`files:${featureId}`] as Record<string, string> | undefined)?.[rel]
     await applyUpdateState(ctx, featureId, { state, dest, rel, newContent: content, newHash, recordedHash: recorded, recordedHashes, report })
     return report
@@ -591,6 +625,13 @@ async function applyUpdateState(
     const newPath = stagedArtifact(ctx, rel, '.new')
     await mkdir(path.dirname(newPath), { recursive: true })
     await writeFile(newPath, newContent)
+    // The record keeps the version the user's file started from; the staged one only marks a `.new` taken as is.
+    setStagedHash(ctx, featureId, rel, newHash)
+    // A file moving in from another feature takes over that feature's hash, so it stays tracked once that record is dropped.
+    const own = ctx.state[`files:${featureId}`] as Record<string, string> | undefined
+    const tracked = Object.keys(own ?? {}).some((r) => toPosix(r) === toPosix(rel))
+    const startedFrom = [...recordedHashes][0]
+    if (!tracked && startedFrom !== undefined) recordFile(ctx, featureId, rel, startedFrom)
     // Legacy in-tree artifacts beside the real file.
     await rmIfExists(`${dest}.battlestack.new`)
     await rmIfExists(`${dest}.battlestack.patch`)
@@ -647,6 +688,7 @@ const OBSOLETE_QUEUE_KEY = 'obsolete:queue'
 interface QueuedObsolete {
     rel: string
     recordedHash: string
+    edited?: boolean
 }
 
 const DEFERRED_QUEUE_KEY = 'obsolete:deferred'
@@ -659,8 +701,9 @@ interface DeferredWrite {
 }
 
 /**
- * Makes `deleteObsoleteFiles` queue pristine deletions until `removeQueuedObsoleteFiles`. A file
- * moving to a feature that updates later in the same run is then never deleted by its old owner.
+ * Makes `deleteObsoleteFiles` queue obsolete files until `removeQueuedObsoleteFiles`. A file
+ * moving to a feature that updates later in the same run is then neither deleted nor unmanaged
+ * by its old owner, and the new owner can merge an edited one against the old owner's record.
  */
 export function queueObsoleteDeletions(ctx: RunContext): void {
     ctx.state[OBSOLETE_QUEUE_KEY] = []
@@ -668,30 +711,36 @@ export function queueObsoleteDeletions(ctx: RunContext): void {
 }
 
 /**
- * Writes deferred files whose later owner dropped them, then deletes the queued ones no feature
- * tracks now and that are still pristine. Returns the deleted rels.
+ * Writes deferred files whose later owner dropped them, then deletes the queued files no feature
+ * tracks now that are still pristine, and returns the edited ones as no longer managed.
  */
-export async function removeQueuedObsoleteFiles(ctx: RunContext): Promise<string[]> {
+export async function removeQueuedObsoleteFiles(ctx: RunContext): Promise<{ removed: string[], unmanaged: string[] }> {
     const deferred = (ctx.state[DEFERRED_QUEUE_KEY] as DeferredWrite[] | undefined) ?? []
     delete ctx.state[DEFERRED_QUEUE_KEY]
     for (const { featureId, rel, content } of deferred) {
-        const tracked = new Set([...recordedFiles(ctx)].map((r) => toPosix(r.rel)))
-        if (!tracked.has(toPosix(rel))) await writeGuarded(ctx, featureId, rel, content)
+        // The deferring feature still carries its own record of `rel`, so only other trackers count.
+        const otherOwner = trackersOf(ctx, rel).some((t) => t.featureId !== featureId)
+        if (!otherOwner) await writeGuarded(ctx, featureId, rel, content)
     }
 
     const queue = (ctx.state[OBSOLETE_QUEUE_KEY] as QueuedObsolete[] | undefined) ?? []
     delete ctx.state[OBSOLETE_QUEUE_KEY]
     const tracked = new Set([...recordedFiles(ctx)].map((r) => toPosix(r.rel)))
     const removed: string[] = []
-    for (const { rel, recordedHash } of queue) {
+    const unmanaged: string[] = []
+    for (const { rel, recordedHash, edited } of queue) {
         if (tracked.has(toPosix(rel))) continue
         const dest = path.join(ctx.projectDir, rel)
-        if (!(await exists(dest)) || !(await diskHashes(dest)).includes(recordedHash)) continue
+        if (!(await exists(dest))) continue
+        if (edited || !(await diskHashes(dest)).includes(recordedHash)) {
+            if (edited) unmanaged.push(rel)
+            continue
+        }
         await rm(dest, { force: true })
         await clearArtifacts(ctx, dest, rel)
         removed.push(rel)
     }
-    return removed
+    return { removed, unmanaged }
 }
 
 /**
@@ -727,8 +776,8 @@ export async function deleteObsoleteFiles(
         }
         const pristine = (await diskHashes(dest)).includes(recordedHash)
         const queue = ctx.state[OBSOLETE_QUEUE_KEY] as QueuedObsolete[] | undefined
-        if (pristine && queue) {
-            queue.push({ rel, recordedHash })
+        if (queue) {
+            queue.push({ rel, recordedHash, ...(pristine ? {} : { edited: true }) })
         } else if (pristine) {
             await rm(dest, { force: true })
             await clearArtifacts(ctx, dest, rel)
@@ -819,6 +868,7 @@ export async function updateFromTemplateDirs(
                 newContent,
                 owned.has(toPosix(rel)),
                 recordedHashes,
+                stagedHashesFor(ctx, rel),
             )
             await applyUpdateState(ctx, featureId, {
                 state,

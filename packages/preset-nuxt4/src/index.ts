@@ -49,6 +49,7 @@ export { applyEnv, collectEnvForFeature } from './features/env.js'
 export { formatProject } from './features/install.js'
 export { generatePulledMigration, hashSchemaFiles } from './utils/migrations.js'
 export { checkLockfileAgainstReleaseAge, hasReleaseAgePolicy } from './utils/release-age.js'
+export { patchNuxtConfig, takeSkippedNuxtConfigDefaults } from './utils/nuxt-config.js'
 
 /** The shared cross-cutting features, the Nuxt-framework features, and the three templates. */
 

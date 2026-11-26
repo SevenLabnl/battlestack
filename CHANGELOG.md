@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Generated projects ignore `.claude/worktrees/`, where Claude Code agents
+  create their git worktrees. Each is a full checkout, so git, editors and file
+  search treated it as part of the project, and `nuxt dev` and `vitest --watch`
+  watched every file in it. `.gitignore` lists it, `nuxt.config.ts` adds it to
+  Nuxt's and Nitro's `ignore`, and `vitest.config.ts` leaves it out of watch
+  mode. Existing projects get all three via `battlestack pull`.
 - The reference `ExampleCalendar` component imports `VueDatePicker` as the
   named export `@vuepic/vue-datepicker` 14 ships, instead of a default import
   that broke `pnpm run build` as soon as a page used it, and turns off the time
@@ -18,6 +24,11 @@
   `battlestack pull`; run `battlestack db:generate` afterwards and commit the
   migration. Until it is applied the AI settings page errors, while agents
   keep running at their provider default.
+- `battlestack login` works in a project that has not yet been pulled past
+  nuxt-auth-utils 0.6: it signs the magic link with `NUXT_SESSION_PASSWORD`
+  when `.env` has no `NUXT_APP_SECRET`, the key that project's server still
+  verifies with. It also waits up to 5 seconds for the dev server, so a cold
+  first render is no longer reported as "not reachable".
 - A generated project's `.gitignore` lists `.claude/settings.local.json`, Claude
   Code's per-person settings file. Existing projects get the line via
   `battlestack pull`; one that already committed the file still has to run
@@ -71,6 +82,9 @@
   `.new` or a backup until you delete it, a step until you delete its line
   from the report, and a file no longer managed until you delete the file or
   its line. Console output is one line per feature.
+- Lint errors a project already had no longer make every `pull` exit with
+  code 2. When `eslint --fix` fails, pull lints the files it changed or added
+  and lists lint in `REPORT.md` only when one of those still has errors.
 - Generated projects ship a `battlestack-upgrade` skill for AI agents, and the
   generated AGENTS.md and README describe the merge instead of the old staging.
 - With `nuxt4:storage` on, every `nuxt4:database` update staged
@@ -88,7 +102,15 @@
 - `pull` removes a file a feature no longer ships only after every feature has
   updated. A file moving to another feature, whichever of the two updates
   first, is no longer deleted or written back in the same run, and a pull that
-  stops halfway leaves it in place.
+  stops halfway leaves it in place. An edited file that moves is merged by its new
+  owner and stays tracked, also when the old owner updates first. When there
+  is nothing to merge against, it is staged and still tracked by the new owner.
+  Before, it was staged, listed as no longer managed and staged again on every
+  update.
+- When two features ship the same file and the one whose version wins stops
+  shipping it, `pull` now writes the other feature's version in the same run,
+  whichever of the two updates first. Before, the file could keep the old
+  owner's content, which may refer to files that pull just deleted.
 - `pull` leaves files claimed with `battlestack own` untouched when their
   feature writes them outside its template folder, such as the Dockerfile, and
   no longer drops a feature's `own` entries when that feature declares
@@ -96,6 +118,9 @@
 - `shared:github` no longer reports a project's own `production.yml`,
   `staging.yml` or `development.yml` as no longer managed when it never wrote
   that file.
+- On Windows, `pull` no longer lists deleting the old nuxt-auth-utils 0.5
+  session password guard as a step when it already removed the untouched
+  file, which kept every later pull exiting with code 2.
 - `battlestack add` no longer erases an earlier pull's unfinished items from
   `.battlestack/pull/REPORT.md`; it puts its own section first. Adding the
   same feature again replaces that section instead of adding a second one.
@@ -108,8 +133,13 @@
   listed as no longer managed.
 - `pull --force` and `pull --overwrite` start even when an earlier pull left
   conflict markers. A local edit that a feature wrote over is kept as
-  `.battlestack/pull/<path>.bak` under `--force`, and replaced under
-  `--overwrite`.
+  `.battlestack/pull/<path>.bak` under `--force`, and replaced without a
+  backup under `--overwrite`.
+- A file `pull` staged for a manual merge is no longer staged again on every
+  later update once you took the `.new` as is. Pull remembers the staged
+  version in the manifest, so a file that matches it exactly counts as
+  unchanged. A file that does not match it, edited further or never taken, is
+  staged again with the newer version, never merged against the staged one.
 - When `pull` puts back your edits and stages a feature's file, every feature
   tracking that file keeps its earlier record, so the next pull merges against
   the version you actually have. A binary file is staged, never merged as
@@ -163,6 +193,10 @@
   during `pull`, as `doctor` already reports it. `battlestack remove` hands a
   path the removed feature owned but did not ship to the features that do
   track it, so the next pull of one of them leaves it alone.
+- A feature whose update fails without stopping `pull` keeps its old version
+  in the manifest, so the next pull tries it again. `REPORT.md` lists the
+  failure and pull exits with code 2. Before, it was recorded at the new
+  version and never retried.
 - A feature whose plugin did not load keeps its manifest record on `pull`
   instead of being dropped, so its files stay managed.
 - `battlestack remove` of a feature whose plugin did not load refuses when
@@ -209,8 +243,8 @@
   is a variable or shorthand instead of an inline object, where it used to
   crash with a proxy error. A default that cannot be added because its parent
   is not an inline object (for example `public: pub`) is reported as a
-  warning instead of being skipped silently, and an explicit `null` is kept as
-  your value.
+  warning instead of being skipped silently, and `pull` lists it as a step in
+  `REPORT.md` and exits with code 2. An explicit `null` is kept as your value.
   For preset authors, `mergeDefaults` now returns the paths it could not add,
   and `objectLiteralAt` is exported from `@battlestack/core/utils/ts-file.js`.
 - `pull` no longer appends the template's favicon and apple-touch-icon links to

@@ -250,7 +250,7 @@ describe('writes during an update', () => {
 
             await updateFromTemplateDirs(ctx, 'test:f', [templateDir], { id: 'test:f', version: '1.0.0', files: { 'f.txt': sha256(BASE) } })
 
-            expect(await removeQueuedObsoleteFiles(ctx)).toEqual(['f.txt'])
+            expect((await removeQueuedObsoleteFiles(ctx)).removed).toEqual(['f.txt'])
             expect(await exists(path.join(projectDir, 'f.txt'))).toBe(false)
         })
 

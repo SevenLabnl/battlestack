@@ -133,8 +133,11 @@ function normalizeManifest(manifest: ProjectManifest): { manifest: ProjectManife
 
 export async function writeManifest(
     ctx: RunContext,
-    /** `rendered`: every feature just ran under the current name, so a pending `renderedName` is settled. */
-    opts: { incomplete?: boolean, cliVersion?: string, rendered?: boolean } = {},
+    /**
+     * `rendered`: every feature just ran under the current name, so a pending `renderedName` is settled.
+     * `failed`: fqids whose update failed; they keep their recorded version so the next pull retries them.
+     */
+    opts: { incomplete?: boolean, cliVersion?: string, rendered?: boolean, failed?: ReadonlySet<string> } = {},
 ): Promise<void> {
     const target = path.join(ctx.projectDir, MANIFEST_PATH)
     const { manifest: previous, needsRewrite } = await loadAndMigrate(ctx.projectDir, ctx.registries)
@@ -151,6 +154,8 @@ export async function writeManifest(
             = (ctx.state[`files:${bareStateId}`] as Record<string, string> | undefined) ?? prev?.files ?? {}
         const ownedFromState
             = (ctx.state[`owned:${bareStateId}`] as string[] | undefined) ?? prev?.ownedByUser
+        const stagedFromState
+            = (ctx.state[`staged:${bareStateId}`] as Record<string, string> | undefined) ?? prev?.stagedFiles
         const stashed = ctx.state[`state:${bareStateId}`] as Record<string, unknown> | undefined
         // New writes win.
         const mergedState = stashed
@@ -158,10 +163,13 @@ export async function writeManifest(
             : prev?.state
         records.push({
             id: fqidRecordId,
-            version: feature.version,
+            version: (opts.failed?.has(fqidRecordId) && prev?.version) || feature.version,
             files: filesFromState,
             ...(ownedFromState && ownedFromState.length > 0
                 ? { ownedByUser: ownedFromState }
+                : {}),
+            ...(stagedFromState && Object.keys(stagedFromState).length > 0
+                ? { stagedFiles: stagedFromState }
                 : {}),
             ...(mergedState && Object.keys(mergedState).length > 0
                 ? { state: mergedState }

@@ -28,5 +28,6 @@ pnpm-debug.log*
 # Local build cache
 .build/
 
-# Claude Code worktrees
+# Claude Code: per-person settings and the git worktrees its agents create
+.claude/settings.local.json
 .claude/worktrees/

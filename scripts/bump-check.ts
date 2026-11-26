@@ -9,7 +9,8 @@
  *
  * Status markers:
  *   ! changed   owned files differ from base, version identical (comment-only feature-file edits excluded)
- *   ^ bumped    version differs from base
+ *   ^ bumped    version is higher than base
+ *   v lowered   version is lower than base
  *   + new       feature file absent at base
  *   . clean     no change
  *
@@ -23,9 +24,10 @@ import { readdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { stripComments } from './strip-comments'
+import { versionStatus } from './version-status'
 
 type Level = 'patch' | 'minor' | 'major'
-type Status = 'changed' | 'bumped' | 'new' | 'clean'
+type Status = 'changed' | 'bumped' | 'lowered' | 'new' | 'clean'
 
 interface FeatureFile {
     id: string
@@ -34,6 +36,7 @@ interface FeatureFile {
     pkgRoot: string
     ownedPaths: string[]
     status: Status
+    baseVersion: string | null
 }
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -60,7 +63,7 @@ async function main(): Promise<void> {
 
     if (argv.includes('--list') || argv.includes('-l')) return printTable(features)
     if (argv.includes('--changed') || argv.includes('-c')) {
-        const dirty = features.filter((f) => f.status === 'changed' || f.status === 'new')
+        const dirty = features.filter((f) => f.status === 'changed' || f.status === 'lowered' || f.status === 'new')
         return printTable(dirty.length ? dirty : features)
     }
 
@@ -100,8 +103,9 @@ async function runCheck(argv: string[]): Promise<void> {
     const changed = gitChangedFiles(base)
     const features = await collectFeatures(changed, base)
     const offenders = features.filter((f) => f.status === 'changed')
+    const lowered = features.filter((f) => f.status === 'lowered')
     const writerOffenders = await collectWriterOffenders(features, base)
-    if (offenders.length === 0 && writerOffenders.length === 0) {
+    if (offenders.length === 0 && lowered.length === 0 && writerOffenders.length === 0) {
         console.log('OK: every changed feature carries a version bump')
         return
     }
@@ -113,7 +117,14 @@ async function runCheck(argv: string[]): Promise<void> {
             if (!target) fail(`no feature with id "${id}"`)
             await applyBump(target, 'patch')
         }
+        for (const f of lowered) await applyBump({ ...f, version: f.baseVersion! }, 'patch')
         return
+    }
+
+    for (const f of lowered) {
+        console.log(`\nFAIL ${f.id} went down from ${f.baseVersion} to ${f.version}`)
+        console.log('  A project already on the higher version never pulls this one.')
+        console.log(`  fix:   set it to ${bump(f.baseVersion!, 'patch')} or higher (pnpm bump:check --fix)`)
     }
 
     for (const f of offenders) {
@@ -191,7 +202,9 @@ async function collectFeatures(changed: Set<string>, ref: string): Promise<Featu
             }
             const { id, version } = parsed
             const ownedPaths = [file, ...templateDirs(pkgRoot, raw)]
-            out.push({ id, version, file, pkgRoot, ownedPaths, status: classify(file, version, ownedPaths, changed, ref) })
+            const baseVersion = refVersion(file, ref)
+            const status = classify(file, version, ownedPaths, changed, ref, baseVersion)
+            out.push({ id, version, file, pkgRoot, ownedPaths, status, baseVersion })
         }
     }
     return out
@@ -260,10 +273,9 @@ function templateDirs(pkgRoot: string, raw: string): string[] {
     return [...dirs]
 }
 
-function classify(file: string, version: string, ownedPaths: string[], changed: Set<string>, ref: string): Status {
-    const base = refVersion(file, ref)
-    if (base === null) return 'new'
-    if (base !== version) return 'bumped'
+function classify(file: string, version: string, ownedPaths: string[], changed: Set<string>, ref: string, base: string | null): Status {
+    const status = versionStatus(base, version)
+    if (status !== 'same') return status
     const isChanged = (p: string) => (p === file ? isCodeChanged(file, changed, ref) : isPathChanged(p, changed))
     return ownedPaths.some(isChanged) ? 'changed' : 'clean'
 }
@@ -360,7 +372,7 @@ function bump(version: string, level: Level): string {
     return `${major}.${minor}.${patch + 1}`
 }
 
-const MARKERS: Record<Status, string> = { changed: '!', bumped: '^', new: '+', clean: '.' }
+const MARKERS: Record<Status, string> = { changed: '!', bumped: '^', lowered: 'v', new: '+', clean: '.' }
 
 function printTable(features: FeatureFile[]): void {
     const width = Math.max(0, ...features.map((f) => f.id.length))
@@ -372,7 +384,7 @@ function printTable(features: FeatureFile[]): void {
 }
 
 function byStatusThenId(a: FeatureFile, b: FeatureFile): number {
-    const order: Status[] = ['changed', 'new', 'bumped', 'clean']
+    const order: Status[] = ['changed', 'lowered', 'new', 'bumped', 'clean']
     return order.indexOf(a.status) - order.indexOf(b.status) || a.id.localeCompare(b.id)
 }
 

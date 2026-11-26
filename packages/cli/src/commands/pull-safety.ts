@@ -12,6 +12,7 @@ import {
     mergeLabels,
     pruneBases,
     recordedFiles,
+    run,
     stageUpstream,
     storeBase,
     threeWayMerge,
@@ -121,7 +122,8 @@ export async function repairOverwrites(
     /** Owned before any feature ran: a structural file claimed during this pull is new output, not the project's. */
     ownedAtStart: ReadonlySet<string>,
 ): Promise<OverwriteRepair[]> {
-    if (ctx.state.overwrite === true && ctx.state.force !== true) return []
+    // `--overwrite` also sets `force`, so it has to be checked first.
+    if (ctx.state.overwrite === true) return []
     const ledger = updateLedger(ctx)
     const handled = new Set(ledger.handled)
     const exempt = selfMergedPaths(ctx, registries)
@@ -207,6 +209,23 @@ function selfMergedPaths(ctx: RunContext, registries: BattlestackRegistries): st
 
 function isExempt(rel: string, exempt: string[]): boolean {
     return exempt.some((e) => (e.endsWith('/') ? rel.startsWith(e) : rel === e))
+}
+
+/**
+ * Whether eslint passes on every file changed or added since HEAD, so the errors of a failed
+ * `eslint . --fix` were there before this pull. False when eslint cannot be run.
+ */
+export async function lintCleanWhereTouched(projectDir: string, pm: string): Promise<boolean> {
+    const list = (args: string[]): string[] => git(projectDir, args).out.toString().split('\0').filter(Boolean)
+    const touched = [
+        ...list(['diff', '--name-only', '-z', '--relative', '--diff-filter=d', 'HEAD']),
+        ...list(['ls-files', '--others', '--exclude-standard', '-z']),
+    ]
+    if (touched.length === 0) return true
+    const eslint = ['eslint', '--no-warn-ignored', '--', ...touched]
+    const args = pm === 'npm' ? ['exec', '--', ...eslint] : pm === 'bun' ? ['x', ...eslint] : ['exec', ...eslint]
+    // `run` reaches pnpm's `.cmd` shim on Windows, which a plain spawn cannot start.
+    return run(pm, args, { cwd: projectDir }).then(() => true, () => false)
 }
 
 /** Recorded files this pull created that git does not know yet. */
