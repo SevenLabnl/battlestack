@@ -186,7 +186,9 @@ export async function disownCommand(args: ParsedArgs, _loader: Ora, registries?:
             else delete feature.ownedByUser
         }
         mutated = true
-        const note = pc.dim(`disowned (${owners.map((f) => f.id).join(', ')}); baseline hash refreshed`)
+        const tracked = features.some((f) => rel in f.files)
+        const after = tracked ? 'baseline hash refreshed' : 'no feature manages it any more'
+        const note = pc.dim(`disowned (${owners.map((f) => f.id).join(', ')}); ${after}`)
         lines.push(`${ui.sym.ok} ${rel} ${note}`)
     }
 

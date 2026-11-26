@@ -287,6 +287,26 @@ describe('battlestack own / disown', () => {
         expect((await h.readManifest()).features[0]!.ownedByUser).toEqual(['layout.vue'])
     })
 
+    it('disown says no feature manages a path any more when none tracks it', async () => {
+        const id = 'test:feat-own-11'
+        const h = await setup(id, { 'a.ts': '1\n' })
+        handles.push(h)
+        await writeFile(path.join(h.projectDir, 'retired.ts'), 'mine\n', 'utf8')
+        const manifest = await h.readManifest()
+        manifest.features[0]!.ownedByUser = ['retired.ts']
+        await writeFile(path.join(h.projectDir, MANIFEST_PATH), JSON.stringify(manifest), 'utf8')
+
+        const printed: string[] = []
+        await withCwd(h.projectDir, async () => {
+            vi.mocked(console.log).mockImplementation((...a: unknown[]) => { printed.push(a.join(' ')) })
+            await disownCommand(args(['disown', 'retired.ts']), undefined as never)
+        })
+
+        const line = printed.find((l) => l.includes('retired.ts'))!
+        expect(line).toContain('no feature manages it any more')
+        expect(line).not.toContain('baseline hash refreshed')
+    })
+
     it('disown errors when the file does not exist on disk', async () => {
         const id = 'test:feat-own-6'
         const h = await setup(id, { 'a.ts': '1\n' })
