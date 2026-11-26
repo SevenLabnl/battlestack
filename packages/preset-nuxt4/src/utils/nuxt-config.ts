@@ -227,6 +227,9 @@ export class NuxtConfig {
     }
 }
 
+// Keyed by project, since the many callers only have the project directory, not the run context.
+const skippedByProject = new Map<string, Set<string>>()
+
 export async function patchNuxtConfig(
     projectDir: string,
     fn: (cfg: NuxtConfig) => unknown,
@@ -236,7 +239,18 @@ export async function patchNuxtConfig(
     await cfg.save()
     for (const skipped of cfg.skippedDefaults()) {
         ui.warn(`${skipped} not added: its parent is not an object literal. Set it yourself.`)
+        const key = path.resolve(projectDir)
+        if (!skippedByProject.has(key)) skippedByProject.set(key, new Set())
+        skippedByProject.get(key)!.add(skipped)
     }
+}
+
+/** The defaults `patchNuxtConfig` could not add in this project since the last call, which clears them. */
+export function takeSkippedNuxtConfigDefaults(projectDir: string): string[] {
+    const key = path.resolve(projectDir)
+    const skipped = [...(skippedByProject.get(key) ?? [])]
+    skippedByProject.delete(key)
+    return skipped
 }
 
 // magicast appends a new key last; `nuxt/nuxt-config-keys-order` puts `extends` right after the ids.

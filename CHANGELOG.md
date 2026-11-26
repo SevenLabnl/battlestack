@@ -196,8 +196,8 @@
   is a variable or shorthand instead of an inline object, where it used to
   crash with a proxy error. A default that cannot be added because its parent
   is not an inline object (for example `public: pub`) is reported as a
-  warning instead of being skipped silently, and an explicit `null` is kept as
-  your value.
+  warning instead of being skipped silently, and `pull` lists it as a step in
+  `REPORT.md` and exits with code 2. An explicit `null` is kept as your value.
   For preset authors, `mergeDefaults` now returns the paths it could not add,
   and `objectLiteralAt` is exported from `@battlestack/core/utils/ts-file.js`.
 - `pull` no longer appends the template's favicon and apple-touch-icon links to

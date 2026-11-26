@@ -47,7 +47,13 @@ import {
     type RunContext,
     type UpdateReport,
 } from '@battlestack/core'
-import { checkLockfileAgainstReleaseAge, generatePulledMigration, hashSchemaFiles, hasReleaseAgePolicy } from '@battlestack/preset-nuxt4'
+import {
+    checkLockfileAgainstReleaseAge,
+    generatePulledMigration,
+    hashSchemaFiles,
+    hasReleaseAgePolicy,
+    takeSkippedNuxtConfigDefaults,
+} from '@battlestack/preset-nuxt4'
 
 /** Static metadata only. `run` is built per-dispatch in `project.ts`. */
 export const pullReservedMeta: Omit<ReservedCommand, 'run'> = {
@@ -442,6 +448,8 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             }
         }
 
+        // Drops what an earlier command in this process left, so only this pull's skips are reported.
+        takeSkippedNuxtConfigDefaults(projectDir)
         // Before anything writes: the schema files this pull changes need a migration.
         const schemaBefore = await hashSchemaFiles(projectDir)
         const hadReleaseAgePolicy = await hasReleaseAgePolicy(projectDir)
@@ -473,6 +481,9 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         const failed = new Set<string>()
         for (const record of existingRecords) {
             if (!(await pullOneFeature(ctx, record, args, loader, registries, renamedFrom, collected, failed))) renderedAll = false
+        }
+        for (const skipped of takeSkippedNuxtConfigDefaults(projectDir)) {
+            collected.actions.push(`Add \`${skipped}\` yourself: pull could not, because its parent is not an object literal. Then delete this line.`)
         }
         const obsolete = await removeQueuedObsoleteFiles(ctx)
         for (const rel of obsolete.removed) ui.dim(`  removed obsolete file: ${rel}`)

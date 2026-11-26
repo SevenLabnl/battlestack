@@ -25,6 +25,7 @@ import {
     type Provenance,
     type RunContext,
 } from '@battlestack/core'
+import { patchNuxtConfig } from '@battlestack/preset-nuxt4'
 import { buildRegistries, defaultArgs, withCwd, withCwdCapture } from './test-utils.js'
 
 /**
@@ -1235,6 +1236,41 @@ describe('battlestack pull: a feature whose update fails without stopping the pu
         expect(manifest.features.find((f) => f.id === fqid('test:feat-a'))?.version).toBe('1.0.0')
         const report = await readFile(path.join(projectDir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
         expect(report).toMatch(/test:feat-a.*boom/)
+        expect(exitCode).toBe(2)
+    })
+})
+
+describe('battlestack pull: a runtimeConfig default it cannot add', () => {
+    it('lists the default in the report', async () => {
+        const projectDir = await tmp('battlestack-pull-runtime-')
+        const tplV1 = await tmp('battlestack-pull-runtime-v1-')
+        await writeTemplateFile(tplV1, 'a.ts', 'v1\n')
+        const registriesV1 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        const featV1 = makeFileFeature('test:feat-a', '1.0.0', tplV1)
+        registriesV1.features.register(featV1, origin)
+        const ctx = scaffoldCtx(projectDir, registriesV1, [fqid('test:feat-a')])
+        await featV1.execute(ctx)
+        await writeManifest(ctx)
+        await writeFile(
+            path.join(projectDir, 'nuxt.config.ts'),
+            'const pub = { appName: \'x\' }\nexport default defineNuxtConfig({\n    runtimeConfig: { public: pub },\n})\n',
+        )
+
+        const registriesV2 = makeRegistries({ requiredFeatures: [fqid('test:feat-a')] })
+        registriesV2.features.register({
+            ...makeFileFeature('test:feat-a', '2.0.0', tplV1),
+            async update(c) {
+                await patchNuxtConfig(c.projectDir, (cfg) => cfg.mergeRuntimePublic({ featureFlag: true }))
+                return { written: [], skipped: [], notes: [] }
+            },
+        }, origin)
+        process.exitCode = undefined
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV2))
+        const exitCode = process.exitCode
+        process.exitCode = undefined
+
+        const report = await readFile(path.join(projectDir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        expect(report).toContain('runtimeConfig.public.featureFlag')
         expect(exitCode).toBe(2)
     })
 })
