@@ -67,7 +67,7 @@ function buildReservedRunners(
         'add': (args, loader) => addCommand({ ...args, projectName: args.secondPositional }, loader, registries),
         'remove': (args, loader) => removeCommand({ ...args, projectName: args.secondPositional }, loader, registries),
         'own': (args, loader) => ownCommand(args, loader),
-        'disown': (args, loader) => disownCommand(args, loader),
+        'disown': (args, loader) => disownCommand(args, loader, registries),
         'rename': (args, loader) => renameCommand(args, loader),
         'gateway:up': (args, loader) => gatewayCommand({ ...args, secondPositional: 'up' }, loader),
         'gateway:down': (args, loader) => gatewayCommand({ ...args, secondPositional: 'down' }, loader),

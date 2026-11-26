@@ -149,6 +149,10 @@
   `pull`, `add`, `doctor` and `remove` treat a path owned under any feature as
   owned, and `pull` never changes an owned file. Paths owned with an earlier
   version need no migration.
+- `battlestack disown` refuses a file of the project shell, such as
+  `app/layouts/default.vue`: `pull` hands those back to you on every run, so
+  disowning one changed nothing. The message points at
+  `battlestack pull --overwrite` to get the shipped version back.
 - A feature whose plugin did not load keeps its manifest record on `pull`
   instead of being dropped, so its files stay managed.
 - `battlestack remove` of a feature whose plugin did not load refuses when

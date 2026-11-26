@@ -70,7 +70,7 @@ interface Handle {
     readManifest(): Promise<ProjectManifest>
 }
 
-async function setup(featureId: string, files: Record<string, string>): Promise<Handle> {
+async function setup(featureId: string, files: Record<string, string>, extra: Partial<Feature> = {}): Promise<Handle> {
     ensureRegistry()
     const projectDir = await mkdtemp(path.join(os.tmpdir(), 'battlestack-own-test-'))
     const templateDir = await mkdtemp(path.join(os.tmpdir(), 'battlestack-own-tpl-'))
@@ -89,6 +89,7 @@ async function setup(featureId: string, files: Record<string, string>): Promise<
         async execute(ctx) {
             await copyTemplateDirRecorded(ctx, featureId, templateDir)
         },
+        ...extra,
     }
     if (!registries.features.has(featureId)) registries.features.register(feature, origin)
 
@@ -269,6 +270,21 @@ describe('battlestack own / disown', () => {
         const rec = (await h.readManifest()).features[0]!
         expect(rec.ownedByUser).toBeUndefined()
         expect('retired.ts' in rec.files).toBe(false)
+    })
+
+    it('disown refuses a structural path, since pull claims it again, and points at --overwrite', async () => {
+        const id = 'test:feat-own-10'
+        const h = await setup(id, { 'layout.vue': 'shell\n', 'page.vue': 'page\n' }, { structuralFiles: () => ['layout.vue'] })
+        handles.push(h)
+        await withCwd(h.projectDir, () => ownCommand(args(['own', 'layout.vue', 'page.vue']), undefined as never))
+
+        await expect(
+            withCwd(h.projectDir, () => disownCommand(args(['disown', 'layout.vue']), undefined as never, registries)),
+        ).rejects.toThrow(/battlestack pull --overwrite/)
+        expect((await h.readManifest()).features[0]!.ownedByUser).toEqual(['layout.vue', 'page.vue'])
+
+        await withCwd(h.projectDir, () => disownCommand(args(['disown', 'page.vue']), undefined as never, registries))
+        expect((await h.readManifest()).features[0]!.ownedByUser).toEqual(['layout.vue'])
     })
 
     it('disown errors when the file does not exist on disk', async () => {

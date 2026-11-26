@@ -3,6 +3,7 @@ import pc from 'picocolors'
 import type { Ora } from 'ora'
 import { ui } from '@battlestack/tui'
 import {
+    buildRunContext,
     CLIError,
     ErrorCode,
     exists,
@@ -10,7 +11,9 @@ import {
     hashFile,
     MANIFEST_PATH,
     readManifest,
+    toPosixRel,
     writeJson,
+    type BattlestackRegistries,
     type InstalledFeatureRecord,
     type ParsedArgs,
     type ProjectManifest,
@@ -25,6 +28,25 @@ function featuresForPath(manifest: ProjectManifest, rel: string): InstalledFeatu
 function normalize(projectRoot: string, raw: string): string {
     const abs = path.isAbsolute(raw) ? raw : path.resolve(projectRoot, raw)
     return path.relative(projectRoot, abs).split(path.sep).join('/')
+}
+
+/** Structural paths per loaded feature id: pull claims these as owned again on every run. */
+function structuralOwners(projectRoot: string, manifest: ProjectManifest, registries: BattlestackRegistries | undefined): Map<string, string[]> {
+    const out = new Map<string, string[]>()
+    if (!registries?.frameworks.has(manifest.framework) || !registries.templates.has(manifest.template)) return out
+    const ctx = buildRunContext({ projectDir: projectRoot, manifest }, registries)
+    for (const f of manifest.features) {
+        if (registries.features.has(f.id)) ctx.state[`files:${registries.features.get(f.id).id}`] = { ...f.files }
+    }
+    for (const f of manifest.features) {
+        if (!registries.features.has(f.id)) continue
+        const feature = registries.features.get(f.id)
+        for (const rel of feature.structuralFiles?.(ctx) ?? []) {
+            const posix = toPosixRel(rel)
+            out.set(posix, [...(out.get(posix) ?? []), f.id])
+        }
+    }
+    return out
 }
 
 async function persist(projectRoot: string, manifest: ProjectManifest): Promise<void> {
@@ -103,7 +125,7 @@ export async function ownCommand(args: ParsedArgs, _loader: Ora): Promise<void> 
     ui.blank()
 }
 
-export async function disownCommand(args: ParsedArgs, _loader: Ora): Promise<void> {
+export async function disownCommand(args: ParsedArgs, _loader: Ora, registries?: BattlestackRegistries): Promise<void> {
     const paths = collectPaths(args)
     if (paths.length === 0) {
         throw new CLIError(
@@ -121,6 +143,7 @@ export async function disownCommand(args: ParsedArgs, _loader: Ora): Promise<voi
         )
     }
 
+    const structural = structuralOwners(projectRoot, manifest, registries)
     let mutated = false
     const lines: string[] = []
     for (const raw of paths) {
@@ -130,6 +153,14 @@ export async function disownCommand(args: ParsedArgs, _loader: Ora): Promise<voi
             throw new CLIError(
                 ErrorCode.UNKNOWN_FEATURE,
                 `${rel} is not tracked by any feature.`,
+            )
+        }
+        const shell = structural.get(rel)
+        if (shell) {
+            throw new CLIError(
+                ErrorCode.UNSUPPORTED_FEATURE,
+                `${rel} is part of the project shell (${shell.join(', ')}), so it stays yours and cannot be disowned. `
+                + 'To reset it to the shipped version, run `battlestack pull --overwrite`, which asks before replacing files you own.',
             )
         }
         const owners = features.filter((f) => (f.ownedByUser ?? []).includes(rel))
