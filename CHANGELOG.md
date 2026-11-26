@@ -138,7 +138,9 @@
   without counting them as work left. The `battlestack-ui` skill tells AI
   agents to check that the page's layout has the target and to add it if not.
 - A prompt can be up to 100,000 characters instead of 10,000, and a prompt that
-  cannot be saved shows the reason in the toast instead of a bare 400.
+  cannot be saved shows the reason in the toast instead of a bare 400. The e2e
+  test for it puts the prompt's own content back afterwards instead of
+  resetting it to the seed, so an admin's edit on a dev server survives a run.
 - The AI settings e2e test sets the model from `NUXT_AI_GATEWAY_CHAT_MODEL`
   instead of a hard-coded one, and puts the chat model an admin chose back
   afterwards, so a run against a dev server leaves its settings as they were.

@@ -89,7 +89,8 @@ describe('e2e: prompts management', () => {
             expect(tooLong.status).toBe(400)
             expect(JSON.stringify(tooLong.data)).toContain('100,000 characters')
         } finally {
-            await apiPost(`/api/prompts/${target.id}/reset`, {}, adminCookie)
+            // Not /reset: that would replace a prompt an admin edited on this server with the seed.
+            await apiPut(`/api/prompts/${target.id}`, { content: target.content }, adminCookie)
         }
     })
 
