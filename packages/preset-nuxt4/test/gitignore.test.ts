@@ -53,6 +53,7 @@ describe('gitignoreFeature: fetched AI-agent skill content (.agents/)', () => {
         await gitignoreFeature.execute(ctx())
         const out = await readGitignore()
         expect(out).toMatch(/^\.claude\/settings\.local\.json$/m)
+        expect(out).toMatch(/^\.claude\/worktrees\/$/m)
         expect(out).not.toMatch(/^\.claude\/?$/m)
     })
 
