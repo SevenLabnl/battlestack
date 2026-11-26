@@ -10,9 +10,6 @@
   by a built-in or feature command (a plugin's `login` next to the auth
   feature's), or provided by two plugins (`deploy`), was hidden or shown in a
   form that does not run; it is now listed as `<namespace>:<command>`.
-- A generated project's auth feature pins `nuxt-auth-utils` to `^0.5.34`.
-  0.6.0 drops `sessionHeader` and `NUXT_SESSION_PASSWORD`, which broke new
-  projects' type-check; support for it follows in its own release.
 - Auth moves to nuxt-auth-utils 0.6 and Nuxt 4.6. Sessions are sealed with a
   key derived from `NUXT_APP_SECRET`, which replaces `NUXT_SESSION_PASSWORD`,
   and the session cookie is now `nuxt-auth-session`, so every user is logged
