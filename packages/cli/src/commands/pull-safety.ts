@@ -10,7 +10,6 @@ import {
     hasMergeMarkers,
     isBinaryPath,
     mergeLabels,
-    ownedAnywhere,
     pruneBases,
     recordedFiles,
     stageUpstream,
@@ -119,12 +118,14 @@ export async function repairOverwrites(
     ctx: RunContext,
     start: StartRecords,
     registries: BattlestackRegistries,
+    /** Owned before any feature ran: a structural file claimed during this pull is new output, not the project's. */
+    ownedAtStart: ReadonlySet<string>,
 ): Promise<OverwriteRepair[]> {
     if (ctx.state.overwrite === true && ctx.state.force !== true) return []
     const ledger = updateLedger(ctx)
     const handled = new Set(ledger.handled)
     const exempt = selfMergedPaths(ctx, registries)
-    const owned = ownedAnywhere(ctx)
+    const owned = ownedAtStart
     const changed = git(ctx.projectDir, ['diff', '--name-only', '-z', '--relative', 'HEAD']).out.toString().split('\0').filter(Boolean)
     const repairs: OverwriteRepair[] = []
 

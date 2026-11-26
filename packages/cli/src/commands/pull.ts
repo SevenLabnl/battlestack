@@ -27,6 +27,7 @@ import {
     ErrorCode,
     exists,
     findProjectRoot,
+    ownedPaths,
     queueObsoleteDeletions,
     readManifest,
     recordOwned,
@@ -367,6 +368,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         const earlierSteps = args.dryRun ? [] : await unfinishedSteps(projectDir)
         const earlierUnmanaged = args.dryRun ? [] : await unmanagedLeft(projectDir)
         const startRecorded = recordedAtStart(manifest)
+        const ownedAtStart = ownedPaths(manifest)
         const missingBefore = await missingAtStart(projectDir, startRecorded)
 
         // Orphan features are dropped from ctx. Warnings are deferred to the end.
@@ -471,7 +473,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
         for (const rel of await removeQueuedObsoleteFiles(ctx)) ui.dim(`  removed obsolete file: ${rel}`)
 
         // Compares against HEAD, so uncommitted edits would read as feature output.
-        const repairs = safety.clean && !ctx.dryRun ? await repairOverwrites(ctx, startRecorded, registries) : []
+        const repairs = safety.clean && !ctx.dryRun ? await repairOverwrites(ctx, startRecorded, registries, ownedAtStart) : []
         if (!ctx.dryRun && !safety.clean && !args.force && !args.overwrite) {
             ui.warn(safety.git
                 ? 'Uncommitted changes (--allow-dirty), so local edits a feature writes over cannot be detected.'
