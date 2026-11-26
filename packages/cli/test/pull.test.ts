@@ -9,6 +9,7 @@ import {
     BattlestackRegistries,
     copyTemplateDirRecorded,
     exists,
+    hashContent,
     hashFile,
     MANIFEST_PATH,
     readManifest,
@@ -836,6 +837,27 @@ describe.each([
         report = await readFile(reportPath, 'utf8')
         expect(report).not.toContain('## Staged for a manual merge')
        }, 30_000)
+
+    it.each([
+        ['old', { from: 'test:a-from', to: 'test:z-to' }],
+        ['new', { from: FROM, to: TO }],
+    ])('keeps an edited moved file tracked by the new owner when it can only stage it (%s owner updates first)', async (_, ids) => {
+        // No git and no stored base, so the new owner cannot merge and stages its version.
+        const { projectDir, registriesV2 } = await setup([ids.from, ids.to], movedContent, ids)
+        const edited = 'export const moved = "edited"\n'
+        await writeFile(path.join(projectDir, movedRel), edited, 'utf8')
+        await withCwdCapture(projectDir, () => pullCommand(args(), silentLoader(), registriesV2))
+        process.exitCode = undefined
+
+        expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe(edited)
+        const manifest = await readManifestRaw(projectDir)
+        expect(filesOf(manifest, ids.to)?.[movedRel]).toBe(hashContent(movedContent))
+        expect(Object.keys(filesOf(manifest, ids.from) ?? {})).not.toContain(movedRel)
+        const report = await readFile(path.join(projectDir, '.battlestack', 'pull', 'REPORT.md'), 'utf8')
+        expect(report).not.toContain('## No longer managed')
+        expect(report.split('\n').filter((l) => l === `- \`${movedRel.replaceAll('\\', '/')}\``)).toHaveLength(1)
+        expect(report).toContain('## Staged for a manual merge')
+    })
 
     it('removes the pristine file from a project without the new owner', async () => {
         const { projectDir, registriesV2 } = await setup([FROM])

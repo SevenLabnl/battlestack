@@ -608,6 +608,11 @@ async function applyUpdateState(
     await writeFile(newPath, newContent)
     // The record keeps the version the user's file started from; the staged one only marks a `.new` taken as is.
     setStagedHash(ctx, featureId, rel, newHash)
+    // A file moving in from another feature takes over that feature's hash, so it stays tracked once that record is dropped.
+    const own = ctx.state[`files:${featureId}`] as Record<string, string> | undefined
+    const tracked = Object.keys(own ?? {}).some((r) => toPosix(r) === toPosix(rel))
+    const startedFrom = [...recordedHashes][0]
+    if (!tracked && startedFrom !== undefined) recordFile(ctx, featureId, rel, startedFrom)
     // Legacy in-tree artifacts beside the real file.
     await rmIfExists(`${dest}.battlestack.new`)
     await rmIfExists(`${dest}.battlestack.patch`)
