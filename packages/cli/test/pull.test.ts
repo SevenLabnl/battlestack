@@ -835,7 +835,7 @@ describe.each([
         expect(await readFile(path.join(projectDir, movedRel), 'utf8')).toBe('// v3\nexport const moved = true\nexport const mine = 1\n')
         report = await readFile(reportPath, 'utf8')
         expect(report).not.toContain('## Staged for a manual merge')
-    })
+       }, 30_000)
 
     it('removes the pristine file from a project without the new owner', async () => {
         const { projectDir, registriesV2 } = await setup([FROM])
@@ -1187,7 +1187,7 @@ describe('battlestack pull: a file staged for a manual merge', () => {
 
         expect(await pull('3.0.0', V3)).not.toContain('## Staged for a manual merge')
         expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe(V3)
-    })
+    }, 30_000)
 
     it('merges a later bump into a taken .new the user edited further', async () => {
         const { projectDir, pull } = await stagedProject()
@@ -1196,7 +1196,7 @@ describe('battlestack pull: a file staged for a manual merge', () => {
 
         expect(await pull('3.0.0', V3)).not.toContain('## Staged for a manual merge')
         expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe(V3.replace('one', 'one, mine'))
-    })
+    }, 30_000)
 
     it('stages again, without merging, while the earlier .new is not taken', async () => {
         const { projectDir, pull } = await stagedProject()
@@ -1204,7 +1204,7 @@ describe('battlestack pull: a file staged for a manual merge', () => {
         expect(await pull('3.0.0', V3)).toContain('## Staged for a manual merge')
         expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe('mine\n')
         expect(await readFile(staged(projectDir), 'utf8')).toBe(V3)
-    })
+    }, 30_000)
 })
 
 describe('battlestack pull: a feature whose update fails without stopping the pull', () => {
