@@ -16,7 +16,7 @@ const SUPPORTED: AiTool[] = ['claude-code', 'gemini-cli', 'cursor', 'codex']
 /** AI coding tool rules + MCP server scaffolding. Selection via `state.aiTool` (default: `claude-code`). */
 export const aiToolConfigFeature: Feature = {
     id: 'shared:ai-tool-config',
-    version: '1.2.1',
+    version: '1.2.2',
     label: 'AI coding tool config',
     stage: STAGE.AI_TOOL_CONFIG,
 

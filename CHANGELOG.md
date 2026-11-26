@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The reference `ExampleCalendar` component imports `VueDatePicker` as the
+  named export `@vuepic/vue-datepicker` 14 ships, instead of a default import
+  that broke `pnpm run build` as soon as a page used it, and turns off the time
+  picker through `time-config`, the v14 prop. The Claude Code `vue.md` rule now
+  names the named import. Existing projects get both via `battlestack pull`.
 - The AI settings page lets an admin pick a reasoning effort per chat model
   config, for models that support one. The levels come from the AI gateway
   when it reports them on `/v1/models` (sluis.ai does), else from a built-in
