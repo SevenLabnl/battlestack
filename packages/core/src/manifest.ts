@@ -154,6 +154,8 @@ export async function writeManifest(
             = (ctx.state[`files:${bareStateId}`] as Record<string, string> | undefined) ?? prev?.files ?? {}
         const ownedFromState
             = (ctx.state[`owned:${bareStateId}`] as string[] | undefined) ?? prev?.ownedByUser
+        const stagedFromState
+            = (ctx.state[`staged:${bareStateId}`] as Record<string, string> | undefined) ?? prev?.stagedFiles
         const stashed = ctx.state[`state:${bareStateId}`] as Record<string, unknown> | undefined
         // New writes win.
         const mergedState = stashed
@@ -165,6 +167,9 @@ export async function writeManifest(
             files: filesFromState,
             ...(ownedFromState && ownedFromState.length > 0
                 ? { ownedByUser: ownedFromState }
+                : {}),
+            ...(stagedFromState && Object.keys(stagedFromState).length > 0
+                ? { stagedFiles: stagedFromState }
                 : {}),
             ...(mergedState && Object.keys(mergedState).length > 0
                 ? { state: mergedState }

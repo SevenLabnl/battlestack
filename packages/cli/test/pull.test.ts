@@ -235,11 +235,11 @@ describe('battlestack pull: drift protection (hash mismatch)', () => {
         // Never written beside the real file; that would break framework auto-scanners.
         expect(await exists(path.join(projectDir, 'a.ts.battlestack.new'))).toBe(false)
 
-        // The manifest records the staged version, never the user's edit, so `doctor` still
-        // reports drift and taking the `.new` as is reads as pristine on the next pull.
+        // The manifest keeps the ORIGINAL v1 baseline hash, neither the new template's nor
+        // the user's edit, so `doctor` still reports drift instead of re-baselining.
         const manifest = await readManifestRaw(projectDir)
         const rec = manifest.features.find((f) => f.id === fqid('test:feat-a'))!
-        expect(rec.files['a.ts']).toBe(await hashFile(path.join(tplV2, 'a.ts')))
+        expect(rec.files['a.ts']).toBe(await hashFile(path.join(tplV1, 'a.ts')))
         // The version record still advances: only the FILE overwrite is drift-gated.
         expect(rec.version).toBe('2.0.0')
     })
@@ -1189,13 +1189,24 @@ describe('battlestack pull: a file staged for a manual merge', () => {
         expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe(V3)
     }, 30_000)
 
-    it('merges a later bump into a taken .new the user edited further', async () => {
+    it('stages again, without merging, when the taken .new was edited further', async () => {
         const { projectDir, pull } = await stagedProject()
-        await writeFile(path.join(projectDir, 'a.ts'), V2.replace('one', 'one, mine'))
+        const edited = V2.replace('one', 'one, mine')
+        await writeFile(path.join(projectDir, 'a.ts'), edited)
         await rm(path.join(projectDir, '.battlestack', 'pull'), { recursive: true })
 
-        expect(await pull('3.0.0', V3)).not.toContain('## Staged for a manual merge')
-        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe(V3.replace('one', 'one, mine'))
+        expect(await pull('3.0.0', V3)).toContain('## Staged for a manual merge')
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe(edited)
+        expect(await readFile(staged(projectDir), 'utf8')).toBe(V3)
+    }, 30_000)
+
+    it('stages again in a fresh checkout without the earlier .new, keeping upstream\'s earlier changes', async () => {
+        const { projectDir, pull } = await stagedProject()
+        await rm(path.join(projectDir, '.battlestack', 'pull'), { recursive: true })
+
+        expect(await pull('3.0.0', V3)).toContain('## Staged for a manual merge')
+        expect(await readFile(path.join(projectDir, 'a.ts'), 'utf8')).toBe('mine\n')
+        expect(await readFile(staged(projectDir), 'utf8')).toContain('two, v2')
     }, 30_000)
 
     it('stages again, without merging, while the earlier .new is not taken', async () => {

@@ -418,6 +418,7 @@ export async function pullCommand(args: ParsedArgs, loader: Ora, registries: Bat
             const bare = registries.features.get(f.id).id
             ctx.state[`files:${bare}`] = { ...f.files }
             if (f.ownedByUser) ctx.state[`owned:${bare}`] = [...f.ownedByUser]
+            if (f.stagedFiles) ctx.state[`staged:${bare}`] = { ...f.stagedFiles }
         }
 
         // `--skills-only`: skills only, skipping template updates, dep install and formatting.

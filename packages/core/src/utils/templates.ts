@@ -137,6 +137,7 @@ function stagedArtifact(ctx: RunContext, rel: string, suffix: ArtifactSuffix): s
 
 /** Removes staged artifacts and legacy in-tree `*.battlestack.{new,patch,bak}`. */
 async function clearArtifacts(ctx: RunContext, dest: string, rel: string): Promise<void> {
+    setStagedHash(ctx, '', rel, undefined)
     await rmIfExists(stagedArtifact(ctx, rel, '.new'))
     await rmIfExists(stagedArtifact(ctx, rel, '.patch'))
     await rmIfExists(stagedArtifact(ctx, rel, '.bak'))
@@ -385,6 +386,7 @@ async function classifyForUpdate(
     newContent: Buffer,
     ownedSet: Set<string>,
     recordedHashes: Set<string>,
+    stagedHashes: Set<string> = new Set(),
 ): Promise<{ state: UpdateState, newHash: string }> {
     const newHash = sha256(newContent)
     if (ownedSet.has(rel)) return { state: 'owned', newHash }
@@ -392,8 +394,8 @@ async function classifyForUpdate(
 
     for (const hash of await diskHashes(dest)) {
         if (hash === newHash) return { state: 'converged', newHash }
-        // Matching any feature's last write means nobody edited it since.
-        if (recordedHashes.has(hash)) return { state: 'pristine', newHash }
+        // Matching any feature's last write, or a staged `.new` taken unchanged, means nobody edited it since.
+        if (recordedHashes.has(hash) || stagedHashes.has(hash)) return { state: 'pristine', newHash }
     }
     return { state: 'drifted', newHash }
 }
@@ -415,6 +417,38 @@ function recordedHashesFor(ctx: RunContext, rel: string, extra?: string): Set<st
         if (toPosix(queued.rel) === posix) hashes.add(queued.recordedHash)
     }
     return hashes
+}
+
+const STAGED_PREFIX = 'staged:'
+
+/** Upstream hashes staged as a `.new` for `rel` and not written since, across every feature. */
+function stagedHashesFor(ctx: RunContext, rel: string): Set<string> {
+    const posix = toPosix(rel)
+    const hashes = new Set<string>()
+    for (const [key, value] of Object.entries(ctx.state)) {
+        if (!key.startsWith(STAGED_PREFIX) || !value || typeof value !== 'object') continue
+        for (const [r, h] of Object.entries(value as Record<string, string>)) {
+            if (toPosix(r) === posix) hashes.add(h)
+        }
+    }
+    return hashes
+}
+
+/** Remembers `hash` as the version staged for `rel`, or forgets every staged version of `rel` when undefined. */
+function setStagedHash(ctx: RunContext, featureId: string, rel: string, hash: string | undefined): void {
+    if (hash !== undefined) {
+        const key = `${STAGED_PREFIX}${featureId}`
+        ctx.state[key] = { ...(ctx.state[key] as Record<string, string> | undefined), [rel]: hash }
+        return
+    }
+    const posix = toPosix(rel)
+    for (const [key, value] of Object.entries(ctx.state)) {
+        if (!key.startsWith(STAGED_PREFIX) || !value || typeof value !== 'object') continue
+        const map = value as Record<string, string>
+        if (Object.keys(map).some((r) => toPosix(r) === posix)) {
+            ctx.state[key] = Object.fromEntries(Object.entries(map).filter(([r]) => toPosix(r) !== posix))
+        }
+    }
 }
 
 /** Set by `pull` and `add`: writes into an existing project go through the drift check. */
@@ -477,7 +511,7 @@ export async function writeGuarded(
     const dest = path.join(ctx.projectDir, rel)
     const recordedHashes = recordedHashesFor(ctx, rel)
     const owned = new Set([...ownedSet, ...ownedRelsFor(ctx, featureId)])
-    const { state, newHash } = await classifyForUpdate(dest, rel, content, owned, recordedHashes)
+    const { state, newHash } = await classifyForUpdate(dest, rel, content, owned, recordedHashes, stagedHashesFor(ctx, rel))
     const recorded = (ctx.state[`files:${featureId}`] as Record<string, string> | undefined)?.[rel]
     await applyUpdateState(ctx, featureId, { state, dest, rel, newContent: content, newHash, recordedHash: recorded, recordedHashes, report })
     return report
@@ -565,19 +599,15 @@ async function applyUpdateState(
         report.notes.push(`${rel}: overwritten (--force); prior content saved to ${bakRel}`)
         return
     }
-    const newPath = stagedArtifact(ctx, rel, '.new')
-    // A `.new` still matching the record was staged earlier and not taken yet, so it is no merge base.
-    const pending = recordedHash !== undefined && await exists(newPath) && sha256(await readFile(newPath)) === recordedHash
-    const bases = pending ? new Set([...recordedHashes].filter((h) => h !== recordedHash)) : recordedHashes
-    if (!isBinaryPath(rel) && await mergeInPlace(ctx, featureId, { dest, rel, newContent, newHash, recordedHashes: bases, report })) return
+    if (!isBinaryPath(rel) && await mergeInPlace(ctx, featureId, { dest, rel, newContent, newHash, recordedHashes, report })) return
 
     // drifted, no base to merge against: stage the new version and a patch.
     pushOnce(updateLedger(ctx).staged, toPosix(rel))
+    const newPath = stagedArtifact(ctx, rel, '.new')
     await mkdir(path.dirname(newPath), { recursive: true })
     await writeFile(newPath, newContent)
-    // Recording the staged version makes a taken `.new` pristine, and a later edit to it merges against the stored base.
-    recordFile(ctx, featureId, rel, newHash)
-    if (!isBinaryPath(rel)) await storeBase(ctx.projectDir, newContent)
+    // The record keeps the version the user's file started from; the staged one only marks a `.new` taken as is.
+    setStagedHash(ctx, featureId, rel, newHash)
     // Legacy in-tree artifacts beside the real file.
     await rmIfExists(`${dest}.battlestack.new`)
     await rmIfExists(`${dest}.battlestack.patch`)
@@ -812,6 +842,7 @@ export async function updateFromTemplateDirs(
                 newContent,
                 ownedSet,
                 recordedHashes,
+                stagedHashesFor(ctx, rel),
             )
             await applyUpdateState(ctx, featureId, {
                 state,

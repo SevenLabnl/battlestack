@@ -267,11 +267,10 @@ describe('updateFromTemplateDir', () => {
         expect(patch).toContain('-export const a = 1')
         expect(patch).toContain('+export const a = 2')
 
-        // A drifted file stays tracked, at the staged version rather than the user's edit,
-        // so doctor still reports it and taking the `.new` as is reads as pristine.
+        // A drifted file must stay tracked with its baseline carried forward, or doctor
+        // forgets the user's edit.
         const recorded = ctx.state['files:test:tpl-update-drift'] as Record<string, string>
-        expect(recorded[rel]).toBe(createHash('sha256').update(updated).digest('hex'))
-        expect(await exists(path.join(projectDir, '.battlestack', 'base', recorded[rel]!))).toBe(true)
+        expect(recorded[rel]).toBe(originalHash)
     })
 
     it('stops tracking a file the new version no longer ships (obsolete)', async () => {
