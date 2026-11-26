@@ -18,7 +18,7 @@ export const healthFeature: Feature = {
                     'Three endpoints, because liveness and readiness answer different questions. The rule: a liveness probe must not depend on anything a restart cannot fix.',
                     '',
                     '- `GET /api/health/live`: liveness + startup probes. Checks nothing but the process; failing means the pod is restarted. Never add a dependency check here (a test guards this).',
-                    '- `GET /api/health/ready`: readiness probe. Checks env config, plus a Postgres ping with `nuxt4:database`; failing takes the pod out of the Service and reverses on its own. Only applicable config gates: the session password is checked only when `nuxt4:auth` is installed.',
+                    '- `GET /api/health/ready`: readiness probe. Checks env config, plus a Postgres ping with `nuxt4:database`; failing takes the pod out of the Service and reverses on its own. Only applicable config gates: `NUXT_APP_SECRET` is checked only when `nuxt4:auth` is installed.',
                     '  With `nuxt4:database` it also answers 503 until every boot task in `server/utils/boot-tasks.ts` has settled (migrate-on-boot and the boot-time syncs), and keeps answering 503 if the migration failed. Nitro starts serving before async plugins finish, so this is what keeps a new pod out of the Service while it migrates. Register your own boot work with `runBootTask` rather than an unawaited async plugin.',
                     '- `GET /api/health`: humans and monitoring. Returns `{ status, version, commit, builtAt, checks }`; wired to no probe.',
                     '',
