@@ -107,6 +107,9 @@
 - `shared:github` no longer reports a project's own `production.yml`,
   `staging.yml` or `development.yml` as no longer managed when it never wrote
   that file.
+- On Windows, `pull` no longer lists deleting the old nuxt-auth-utils 0.5
+  session password guard as a step when it already removed the untouched
+  file, which kept every later pull exiting with code 2.
 - `battlestack add` no longer erases an earlier pull's unfinished items from
   `.battlestack/pull/REPORT.md`; it puts its own section first. Adding the
   same feature again replaces that section instead of adding a second one.

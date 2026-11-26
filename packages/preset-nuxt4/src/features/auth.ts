@@ -32,7 +32,7 @@ function titleCase(slug: string): string {
 /** Session auth on `nuxt-auth-utils`. The sealed cookie carries an opaque sessionId. */
 export const authFeature: Feature = {
     id: 'nuxt4:auth',
-    version: '1.11.1',
+    version: '1.11.2',
     label: 'Session-based auth (argon2id)',
     frameworks: ['nuxt4'],
     stage: STAGE.AUTH,
@@ -230,6 +230,11 @@ async function retainedPasswordPolicyNotes(projectDir: string): Promise<string[]
     return notes
 }
 
+/** A manifest written on Windows records template paths with backslashes. */
+function posixRel(rel: string): string {
+    return rel.replaceAll('\\', '/')
+}
+
 const OLD_GUARD_PLUGIN = 'server/plugins/00-session-password-guard.ts'
 const OLD_GUARD_UTIL = 'server/utils/session-password.ts'
 
@@ -243,9 +248,10 @@ async function retainedSessionPasswordGuardActions(
         const abs = path.join(projectDir, rel)
         if (!(await exists(abs))) continue
         // A pristine tracked copy is queued for deletion at the end of the pull.
-        const recorded = prev?.files[rel]
-        const removedLater = recorded !== undefined && !(prev!.ownedByUser ?? []).includes(rel)
-            && (await classifyFileState(abs, recorded, false)) === 'pristine'
+        const key = Object.keys(prev?.files ?? {}).find((k) => posixRel(k) === rel)
+        const owned = (prev?.ownedByUser ?? []).some((k) => posixRel(k) === rel)
+        const removedLater = key !== undefined && !owned
+            && (await classifyFileState(abs, prev!.files[key]!, false)) === 'pristine'
         if (!removedLater) kept.push(rel)
     }
     if (kept.length === 0) return []

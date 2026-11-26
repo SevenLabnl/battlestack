@@ -204,6 +204,17 @@ describe('the 0.5 session password guard', () => {
         const report = await pullWithGuard({ files: { [GUARD]: hashContent(GUARD_SRC) } })
         expect(guardAction(report.actions)).toEqual([])
     })
+
+    it('says nothing about a pristine copy a Windows manifest recorded with backslashes', async () => {
+        const report = await pullWithGuard({ files: { [GUARD.replaceAll('/', '\\')]: hashContent(GUARD_SRC) } })
+        expect(guardAction(report.actions)).toEqual([])
+    })
+
+    it('reports a copy a Windows manifest records as owned with backslashes', async () => {
+        const windows = GUARD.replaceAll('/', '\\')
+        const report = await pullWithGuard({ files: { [windows]: hashContent(GUARD_SRC) }, ownedByUser: [windows] })
+        expect(guardAction(report.actions)).toHaveLength(1)
+    })
 })
 
 it('keeps the Nuxt 4.6 floor in package.json when auth is removed', () => {
