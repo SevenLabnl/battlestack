@@ -47,11 +47,11 @@ function optionsFor(configKey: string) {
 
 function reasoningOptionsFor(config: ModelConfig) {
     if (!config.reasoningEfforts.length) return []
-    const fallback = config.defaultReasoningEffort
-        ? t(`mastraAdmin.reasoningLevels.${config.defaultReasoningEffort}`)
-        : t('mastraAdmin.reasoningProviderDefault')
+    const defaultLabel = config.defaultReasoningEffort
+        ? t('mastraAdmin.reasoningDefault', { level: t(`mastraAdmin.reasoningLevels.${config.defaultReasoningEffort}`) })
+        : t('mastraAdmin.reasoningDefaultUnknown')
     return [
-        { label: t('mastraAdmin.reasoningDefault', { level: fallback }), value: null as string | null },
+        { label: defaultLabel, value: null as string | null },
         ...config.reasoningEfforts.map((level) => ({ label: t(`mastraAdmin.reasoningLevels.${level}`), value: level })),
     ]
 }

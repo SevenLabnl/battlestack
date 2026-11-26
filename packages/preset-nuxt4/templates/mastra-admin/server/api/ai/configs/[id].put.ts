@@ -6,7 +6,8 @@ import { Role } from '#server/database/schema/users'
 import { requireRole, requireRouterParam } from '#server/utils/auth'
 import { tryLogAudit } from '#server/utils/audit-bridge'
 import { invalidateActiveModel } from '#server/mastra/utils/ai-model'
-import { effectiveReasoningEffort, withReasoningSupport } from '#server/mastra/utils/reasoning'
+import { effectiveReasoningEffort } from '#server/mastra/utils/reasoning'
+import { getReasoningSupport, withReasoningSupport } from '#server/mastra/utils/reasoning-catalog'
 
 const schema = z.object({
     model: z.string().min(1, 'Model is required').max(200).optional(),
@@ -39,7 +40,7 @@ export default defineEventHandler(async (event) => {
 
     const model = body.model ?? current.model
     const requested = body.reasoningEffort === undefined ? current.reasoningEffort : body.reasoningEffort
-    const reasoningEffort = effectiveReasoningEffort(model, requested)
+    const reasoningEffort = effectiveReasoningEffort(await getReasoningSupport(model), requested)
     if (body.reasoningEffort && !reasoningEffort) {
         throw createError({
             statusCode: 400,

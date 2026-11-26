@@ -6,6 +6,7 @@ import { aiModelConfigs } from '../../database/schema/ai'
 import { inferProviderFromName } from '../gateways/openai-compat'
 import { envModelDefault } from './env-defaults'
 import { effectiveReasoningEffort, type ReasoningEffort } from './reasoning'
+import { getReasoningSupport } from './reasoning-catalog'
 import { createTtlCache, invalidate } from '../../utils/cache-bus'
 
 const CACHE_NAMESPACE = 'ai-model'
@@ -66,7 +67,8 @@ export async function getActiveReasoningEffort(key: string, modelId: string): Pr
             stored = null
         }
     }
-    return effectiveReasoningEffort(modelId, stored)
+    if (!stored) return null
+    return effectiveReasoningEffort(await getReasoningSupport(modelId), stored)
 }
 
 // Embeddings reuse the `ai_model_configs.key = 'embedding'` row but resolve to a RAW id (no `gateway/` prefix) since Mastra core doesn't gateway embedding models.

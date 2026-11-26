@@ -18,14 +18,15 @@
         "errorGeneric": "Er ging iets mis",
         "reasoningLabel": "Denkniveau",
         "reasoningDefault": "Standaard ({level})",
-        "reasoningProviderDefault": "standaard van de provider",
         "reasoningLevels": {
-            "none": "Geen",
+            "none": "Uit",
             "minimal": "Minimaal",
             "low": "Laag",
             "medium": "Gemiddeld",
             "high": "Hoog",
-            "xhigh": "Extra hoog"
-        }
+            "xhigh": "Extra hoog",
+            "max": "Maximaal"
+        },
+        "reasoningDefaultUnknown": "Standaard"
     }
 }

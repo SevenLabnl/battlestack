@@ -18,14 +18,15 @@
         "errorGeneric": "Something went wrong",
         "reasoningLabel": "Reasoning effort",
         "reasoningDefault": "Default ({level})",
-        "reasoningProviderDefault": "provider default",
         "reasoningLevels": {
-            "none": "None",
+            "none": "Off",
             "minimal": "Minimal",
             "low": "Low",
             "medium": "Medium",
             "high": "High",
-            "xhigh": "Extra high"
-        }
+            "xhigh": "Extra high",
+            "max": "Max"
+        },
+        "reasoningDefaultUnknown": "Default"
     }
 }

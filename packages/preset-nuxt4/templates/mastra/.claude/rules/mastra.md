@@ -68,8 +68,9 @@ export const myAgent = new Agent({
 ```
 
 `getAgentDefaultOptions` sends the reasoning effort an admin picked for the
-linked model config. Models that support it are listed in
-`server/mastra/utils/reasoning.ts`; extend that table for new ones.
+linked model config. The levels a model accepts come from the gateway's
+`/v1/models` when it reports them (sluis.ai does), else from the fallback table
+in `server/mastra/utils/reasoning.ts`; extend that table for new models.
 
 Add the agent to the Mastra constructor in `server/mastra/index.ts` and give it
 an entry in `server/mastra/agents/registry.ts` (name, default model config +

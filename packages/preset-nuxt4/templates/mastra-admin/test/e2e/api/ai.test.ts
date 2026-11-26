@@ -118,7 +118,7 @@ describe('e2e: ai model admin', () => {
             expect(status).toBe(400)
         }))
 
-    it.skipIf(!serverUp)('switching to a model without reasoning support clears the effort', () =>
+    it.skipIf(!serverUp)('switching to a model without reasoning levels clears the effort', () =>
         withChatConfig(async (target, cookie) => {
             await apiPut(
                 `/api/ai/configs/${target.id}`,
@@ -127,7 +127,7 @@ describe('e2e: ai model admin', () => {
             )
             const { status, data } = await apiPut<ModelConfig>(
                 `/api/ai/configs/${target.id}`,
-                { model: 'openai/gpt-4o' },
+                { model: 'moonshot/kimi-k3' },
                 cookie,
             )
             expect(status).toBe(200)

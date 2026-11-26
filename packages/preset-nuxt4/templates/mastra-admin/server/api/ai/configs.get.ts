@@ -2,7 +2,7 @@ import { db } from '#server/database/client'
 import { aiModelConfigs } from '#server/database/schema/ai'
 import { Role } from '#server/database/schema/users'
 import { requireRole } from '#server/utils/auth'
-import { withReasoningSupport } from '#server/mastra/utils/reasoning'
+import { withReasoningSupport } from '#server/mastra/utils/reasoning-catalog'
 
 export default defineEventHandler(async (event) => {
     await requireRole(event, Role.Admin)
@@ -18,5 +18,5 @@ export default defineEventHandler(async (event) => {
         })
         .from(aiModelConfigs)
         .orderBy(aiModelConfigs.key)
-    return rows.map(withReasoningSupport)
+    return Promise.all(rows.map(withReasoningSupport))
 })
